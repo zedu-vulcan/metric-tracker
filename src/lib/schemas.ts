@@ -3,14 +3,14 @@ import { z } from "zod";
 
 extendZodWithOpenApi(z);
 
-export const DirectoryBodySchema = z.object({
-  name: z.string().min(1, "Name is required").openapi({ example: "Product Hunt" }),
-  url: z.string().url("Must be a valid URL").openapi({ example: "https://www.producthunt.com" }),
+export const ListBodySchema = z.object({
+  name: z.string().min(1, "Name is required").openapi({ example: "Product Directories" }),
 });
 
-export const ProductBodySchema = z.object({
-  name: z.string().min(1, "Name is required").openapi({ example: "Zeduchat" }),
-  url: z.string().url("Must be a valid URL").openapi({ example: "https://zeduchat.com" }),
+export const DirectoryBodySchema = z.object({
+  name: z.string().min(1, "Name is required").openapi({ example: "Product Hunt" }),
+  url: z.string().url("Must be a valid URL").optional().or(z.literal("")).openapi({ example: "https://www.producthunt.com" }),
+  listId: z.string().min(1, "listId is required").openapi({ example: "clxxxxxxxxxxxxxxxx" }),
 });
 
 export const SubmissionStatusSchema = z
@@ -18,16 +18,15 @@ export const SubmissionStatusSchema = z
   .openapi({ example: "planned" });
 
 export const CreateSubmissionBodySchema = z.object({
-  productId: z.string().min(1, "productId is required").openapi({ example: "clxxxxxxxxxxxxxxxx" }),
   directoryId: z.string().min(1, "directoryId is required").openapi({ example: "clxxxxxxxxxxxxxxxx" }),
   status: SubmissionStatusSchema.optional().default("planned"),
   submittedAt: z.string().datetime().nullable().optional().openapi({ example: "2026-10-15T00:00:00Z" }),
-  listingUrl: z.string().url().nullable().optional().openapi({ example: "https://www.producthunt.com/posts/zeduchat" }),
+  listingUrl: z.string().url().nullable().optional().openapi({ example: "https://www.producthunt.com/posts/my-product" }),
 });
 
 export const UpdateSubmissionBodySchema = z.object({
   status: SubmissionStatusSchema.optional(),
-  listingUrl: z.string().url().nullable().optional().openapi({ example: "https://www.producthunt.com/posts/zeduchat" }),
+  listingUrl: z.string().url().nullable().optional().openapi({ example: "https://www.producthunt.com/posts/my-product" }),
   submittedAt: z.string().datetime().nullable().optional().openapi({ example: "2026-10-15T00:00:00Z" }),
 });
 

@@ -9,6 +9,6 @@ export async function DELETE(
   const { error } = await requireAuth();
   if (error) return error;
 
-  await prisma.product.delete({ where: { id: params.id } });
+  await prisma.list.delete({ where: { id: params.id } });
   return new NextResponse(null, { status: 204 });
 }

@@ -8,8 +8,11 @@ export async function GET() {
   if (error) return error;
 
   const directories = await prisma.directory.findMany({
-    orderBy: { createdAt: "asc" },
-    include: { _count: { select: { submissions: true } } },
+    orderBy: [{ list: { name: "asc" } }, { name: "asc" }],
+    include: {
+      list: { select: { id: true, name: true } },
+      submission: { select: { id: true, status: true } },
+    },
   });
 
   return NextResponse.json(directories);
@@ -27,6 +30,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const directory = await prisma.directory.create({ data: result.data });
+  const { name, url, listId } = result.data;
+
+  const directory = await prisma.directory.create({
+    data: { name, url: url || null, listId },
+    include: { list: { select: { id: true, name: true } } },
+  });
+
   return NextResponse.json(directory, { status: 201 });
 }

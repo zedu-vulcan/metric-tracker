@@ -4,11 +4,9 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
-interface Product { id: string; name: string; }
-interface Directory { id: string; name: string; }
+interface Directory { id: string; name: string; list: { id: string; name: string } }
 
 interface NewSubmissionButtonProps {
-  products: Product[];
   directories: Directory[];
 }
 
@@ -19,10 +17,9 @@ const STATUSES = [
   { value: "rejected",  label: "Rejected" },
 ];
 
-export function NewSubmissionButton({ products, directories }: NewSubmissionButtonProps) {
+export function NewSubmissionButton({ directories }: NewSubmissionButtonProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [productId, setProductId] = useState("");
   const [directoryId, setDirectoryId] = useState("");
   const [status, setStatus] = useState("planned");
   const [submittedAt, setSubmittedAt] = useState("");
@@ -36,7 +33,6 @@ export function NewSubmissionButton({ products, directories }: NewSubmissionButt
   useEffect(() => { setMounted(true); }, []);
 
   function openModal() {
-    setProductId(products[0]?.id ?? "");
     setDirectoryId(directories[0]?.id ?? "");
     setStatus("planned");
     setSubmittedAt("");
@@ -76,7 +72,7 @@ export function NewSubmissionButton({ products, directories }: NewSubmissionButt
     setLoading(true);
 
     try {
-      const body: Record<string, unknown> = { productId, directoryId, status };
+      const body: Record<string, unknown> = { directoryId, status };
       if (submittedAt) body.submittedAt = new Date(submittedAt).toISOString();
       if (listingUrl)  body.listingUrl  = listingUrl;
 
@@ -103,12 +99,21 @@ export function NewSubmissionButton({ products, directories }: NewSubmissionButt
     }
   }
 
-  const noProducts     = products.length === 0;
-  const noDirectories  = directories.length === 0;
-  const cannotSubmit   = noProducts || noDirectories;
+  const noDirectories = directories.length === 0;
 
   const inputBase = "w-full h-[42px] px-[14px] bg-surface border border-line rounded-[8px] text-ink text-[13px] transition-[border-color,box-shadow,background-color] duration-[120ms] focus:outline-none focus:bg-sheet focus:border-violet focus:shadow-[0_0_0_3px_rgba(142,106,250,0.2)] placeholder:text-muted placeholder:opacity-70";
   const inputError = "border-rejected focus:shadow-[0_0_0_3px_rgba(220,38,38,0.12)]";
+
+  // Group directories by list for optgroup
+  const byList = directories.reduce<Record<string, { listName: string; dirs: Directory[] }>>(
+    (acc, d) => {
+      if (!acc[d.list.id]) acc[d.list.id] = { listName: d.list.name, dirs: [] };
+      acc[d.list.id].dirs.push(d);
+      return acc;
+    },
+    {},
+  );
+  const listGroups = Object.values(byList);
 
   const modal = open && (
     <div
@@ -123,11 +128,9 @@ export function NewSubmissionButton({ products, directories }: NewSubmissionButt
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 mb-2">
-          <div className="flex items-center gap-[10px]">
-            <h2 id="new-sub-title" className="m-0 text-[16px] font-bold tracking-[-0.03em] text-ink leading-[1.2]">
-              New submission
-            </h2>
-          </div>
+          <h2 id="new-sub-title" className="m-0 text-[16px] font-bold tracking-[-0.03em] text-ink leading-[1.2]">
+            New submission
+          </h2>
           <button
             type="button"
             className="bg-transparent border-none text-muted text-[12px] font-bold tracking-[0.06em] uppercase cursor-pointer px-2 py-1 rounded-[6px] w-auto transition-[color,background-color] duration-[120ms] hover:text-violet-deep hover:bg-violet-tint"
@@ -140,56 +143,41 @@ export function NewSubmissionButton({ products, directories }: NewSubmissionButt
         </div>
 
         <p className="m-0 mb-5 text-muted text-[13px] leading-[1.5]">
-          Record a product submission to a directory and track its status over time.
+          Track a directory submission and monitor its status over time.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
 
-          {cannotSubmit && (
+          {noDirectories && (
             <p className="m-0 px-3 py-[10px] rounded-[8px] bg-rejected-bg text-rejected text-[13px]">
-              {noProducts
-                ? "Add at least one product before creating a submission."
-                : "Add at least one directory before creating a submission."}
+              Add at least one directory before creating a submission.
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-[14px]">
-            <div className="flex flex-col gap-[6px]">
-              <label htmlFor="sub-product" className="text-[12px] font-semibold text-ink tracking-[-0.01em]">Product</label>
-              <select
-                ref={firstFieldRef}
-                id="sub-product"
-                className={`${inputBase} modal-select ${fieldErrors.productId ? inputError : ""}`}
-                value={productId}
-                onChange={(e) => setProductId(e.target.value)}
-                required
-                disabled={noProducts}
-              >
-                {noProducts
-                  ? <option>No products yet</option>
-                  : products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)
-                }
-              </select>
-              {fieldErrors.productId && <span className="text-[12px] text-rejected mt-[2px]">{fieldErrors.productId[0]}</span>}
-            </div>
-
-            <div className="flex flex-col gap-[6px]">
-              <label htmlFor="sub-directory" className="text-[12px] font-semibold text-ink tracking-[-0.01em]">Directory</label>
-              <select
-                id="sub-directory"
-                className={`${inputBase} modal-select ${fieldErrors.directoryId ? inputError : ""}`}
-                value={directoryId}
-                onChange={(e) => setDirectoryId(e.target.value)}
-                required
-                disabled={noDirectories}
-              >
-                {noDirectories
-                  ? <option>No directories yet</option>
-                  : directories.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)
-                }
-              </select>
-              {fieldErrors.directoryId && <span className="text-[12px] text-rejected mt-[2px]">{fieldErrors.directoryId[0]}</span>}
-            </div>
+          <div className="flex flex-col gap-[6px]">
+            <label htmlFor="sub-directory" className="text-[12px] font-semibold text-ink tracking-[-0.01em]">Directory</label>
+            <select
+              ref={firstFieldRef}
+              id="sub-directory"
+              className={`${inputBase} modal-select ${fieldErrors.directoryId ? inputError : ""}`}
+              value={directoryId}
+              onChange={(e) => setDirectoryId(e.target.value)}
+              required
+              disabled={noDirectories}
+            >
+              {noDirectories ? (
+                <option>No directories yet</option>
+              ) : listGroups.length === 1 ? (
+                directories.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)
+              ) : (
+                listGroups.map((g) => (
+                  <optgroup key={g.listName} label={g.listName}>
+                    {g.dirs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </optgroup>
+                ))
+              )}
+            </select>
+            {fieldErrors.directoryId && <span className="text-[12px] text-rejected mt-[2px]">{fieldErrors.directoryId[0]}</span>}
           </div>
 
           <div className="grid grid-cols-2 gap-[14px]">
@@ -248,7 +236,7 @@ export function NewSubmissionButton({ products, directories }: NewSubmissionButt
             <button
               type="submit"
               className="inline-flex items-center justify-center px-[18px] h-[38px] rounded-[8px] bg-violet text-white border-none text-[13px] font-semibold cursor-pointer w-auto whitespace-nowrap shadow-[0_1px_2px_rgba(118,81,232,0.25),0_4px_12px_rgba(118,81,232,0.14)] transition-[background-color,transform,box-shadow] duration-[140ms] hover:bg-violet-deep hover:-translate-y-px hover:shadow-[0_2px_4px_rgba(118,81,232,0.28),0_6px_18px_rgba(118,81,232,0.18)] active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed"
-              disabled={loading || cannotSubmit}
+              disabled={loading || noDirectories}
             >
               {loading ? "Saving…" : "Save submission"}
             </button>

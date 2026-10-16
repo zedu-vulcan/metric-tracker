@@ -34,8 +34,9 @@ export async function PATCH(
     where: { id: params.id },
     data,
     include: {
-      product: { select: { id: true, name: true, url: true } },
-      directory: { select: { id: true, name: true, url: true } },
+      directory: {
+        select: { id: true, name: true, url: true, list: { select: { id: true, name: true } } },
+      },
       _count: { select: { traffic: true } },
     },
   });

@@ -10,8 +10,9 @@ export async function GET() {
   const submissions = await prisma.submission.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      product: { select: { id: true, name: true, url: true } },
-      directory: { select: { id: true, name: true, url: true } },
+      directory: {
+        select: { id: true, name: true, url: true, list: { select: { id: true, name: true } } },
+      },
       _count: { select: { traffic: true } },
     },
   });
@@ -31,19 +32,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { productId, directoryId, status, submittedAt, listingUrl } = result.data;
+  const { directoryId, status, submittedAt, listingUrl } = result.data;
 
   const submission = await prisma.submission.create({
     data: {
-      productId,
       directoryId,
       status: status ?? "planned",
       submittedAt: submittedAt ? new Date(submittedAt) : null,
       listingUrl: listingUrl ?? null,
     },
     include: {
-      product: { select: { id: true, name: true, url: true } },
-      directory: { select: { id: true, name: true, url: true } },
+      directory: {
+        select: { id: true, name: true, url: true, list: { select: { id: true, name: true } } },
+      },
       _count: { select: { traffic: true } },
     },
   });

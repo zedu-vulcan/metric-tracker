@@ -51,22 +51,23 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model Directory {
-  id          String       @id @default(cuid())
+model List {
+  id          String      @id @default(cuid())
   name        String
-  url         String
-  submissions Submission[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  directories Directory[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
 
-model Product {
-  id          String       @id @default(cuid())
-  name        String
-  url         String
-  submissions Submission[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+model Directory {
+  id         String      @id @default(cuid())
+  name       String
+  url        String?
+  listId     String
+  list       List        @relation(fields: [listId], references: [id], onDelete: Cascade)
+  submission Submission?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 }
 
 enum SubmissionStatus {
@@ -78,18 +79,14 @@ enum SubmissionStatus {
 
 model Submission {
   id          String           @id @default(cuid())
-  productId   String
-  directoryId String
+  directoryId String           @unique
   status      SubmissionStatus @default(planned)
   submittedAt DateTime?
   listingUrl  String?
-  product     Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   directory   Directory        @relation(fields: [directoryId], references: [id], onDelete: Cascade)
   traffic     Traffic[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-
-  @@unique([productId, directoryId])
 }
 
 model Traffic {
