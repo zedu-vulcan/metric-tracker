@@ -32,6 +32,8 @@ Use the Tailwind token, never the hex value.
 
 The product is **light-theme only**.
 
+**Data series** (`series-1` … `series-8`, `series-other`) are a separate categorical palette for charts: blue, orange, aqua, yellow, magenta, green, violet, red, then a neutral gray for folded "Other" buckets. Use them in that fixed order, assign them per entity (a channel keeps its colour across date ranges), and never use status colors or `primary` for a series. Several are below 3:1 on white, so every chart that uses them also offers a table view or visible labels. Never use a second y-axis: give a metric with a different scale its own aligned panel.
+
 ### Type
 
 - **Manrope** (`font-sans`) for all UI: weights 400–800. The base size is 14px with a 1.5 line height.

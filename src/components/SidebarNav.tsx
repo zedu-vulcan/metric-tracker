@@ -1,5 +1,6 @@
 "use client";
 
+import { FolderGit2Icon, TrendingUpIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -15,9 +16,19 @@ interface SidebarNavLinkProps extends React.ComponentProps<"a"> {
   badge?: React.ReactNode;
 }
 
-export function SidebarNavLink({ icon, badge, children, className, ...props }: SidebarNavLinkProps) {
+/** `/dashboard` matches only itself; other links also match their sub-pages. */
+function isCurrent(pathname: string, href: string | undefined): boolean {
+  if (!href) return false;
+  if (href === "/dashboard") return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function SidebarNavLink({ icon, badge, children, className, href, ...props }: SidebarNavLinkProps) {
+  const pathname = usePathname();
   return (
     <a
+      href={href}
+      aria-current={isCurrent(pathname, href) ? "page" : undefined}
       className={cn(
         "group/nav flex shrink-0 items-center gap-2 overflow-hidden rounded-[7px] px-2.5 py-1.75 text-[13px] font-medium whitespace-nowrap text-muted-foreground no-underline transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&_svg]:size-3.5 [&_svg]:shrink-0",
         "aria-[current=page]:bg-transparent aria-[current=page]:font-semibold aria-[current=page]:text-primary-deep",
@@ -47,6 +58,12 @@ export function DashboardSidebarNav() {
       </SidebarNavLink>
       <SidebarNavLink aria-current={pathname.startsWith("/dashboard/content") ? "page" : undefined} href="/dashboard/content" icon={<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 4.5h7l4 4V18a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2Zm7 0v4h4" /><path d="M8.5 12h7M8.5 15.5h7" /></svg>}>
         Content
+      </SidebarNavLink>
+      <SidebarNavLink href="/dashboard/directories" icon={<FolderGit2Icon aria-hidden="true" />}>
+        Directories
+      </SidebarNavLink>
+      <SidebarNavLink href="/dashboard/seo" icon={<TrendingUpIcon aria-hidden="true" />}>
+        SEO Analytics
       </SidebarNavLink>
     </SidebarNavList>
   );

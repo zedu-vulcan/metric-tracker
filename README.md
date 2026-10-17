@@ -20,6 +20,7 @@ A marketing metrics dashboard built by several teams on one shared codebase. The
 - [Database & migrations](#database--migrations)
 - [Authentication](#authentication)
 - [Deployment](#deployment)
+- [SEO Analytics](#seo-analytics)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -71,6 +72,10 @@ Put the `.env` file you were given in the project root, next to `package.json`. 
 | `NEXTAUTH_SECRET` | Secret used to sign sessions |
 | `NEXTAUTH_URL` | Public URL of the app. Use `http://localhost:3000` locally |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials |
+| `GOOGLE_ANALYTICS_CLIENT_EMAIL` / `GOOGLE_ANALYTICS_PRIVATE_KEY` | Service account that reads Search Console and GA4 (see [SEO Analytics](#seo-analytics)) |
+| `GSC_SITE_URL` | Search Console property, e.g. `sc-domain:zedu.chat` |
+| `GA4_PROPERTY_ID` | GA4 property ID (numbers only) |
+| `SEO_ANALYTICS_DEMO` | `true` shows labelled demo data on `/dashboard/seo` in development. Ignored in production |
 
 If you add a new environment variable, add it to `.env.example` with a placeholder value and tell the project lead, so it can be added to the shared `.env` and to Coolify.
 
@@ -127,13 +132,16 @@ src/
     dashboard/
       layout.tsx           # Auth guard + sidebar shell for every /dashboard/* page
       page.tsx             # Overview page
+      seo/page.tsx         # SEO Analytics (Search Console + GA4 charts)
     api/
       auth/[...nextauth]/  # NextAuth (don't change without discussing)
       health/              # GET /api/health
+      seo/                 # GET /api/seo/search-performance, /api/seo/traffic-channels
       openapi/             # GET /api/openapi — generated OpenAPI document
     docs/route.ts          # /docs — Scalar API reference UI
   components/
     ui/                    # shadcn/ui components (generated, themed)
+    seo/                   # SEO Analytics charts, date-range bar, data hook
     SidebarNav.tsx         # SidebarNavList / SidebarNavLink
     Wordmark.tsx
     AuthButtons.tsx
@@ -144,6 +152,8 @@ src/
     openapi.ts             # OpenAPI registry + document generator
     zod.ts                 # Zod with `.openapi()` enabled — import `z` from here
     utils.ts               # cn() class-name helper
+    seo/                   # SEO types, date + format helpers, transforms
+      server/              # Google auth, Search Console + GA4 clients, cache, demo data (server-only)
 ```
 
 The path alias `@/` maps to `src/`, as in `import { prisma } from "@/lib/prisma"`.
@@ -207,7 +217,7 @@ import { LayoutGridIcon, MegaphoneIcon } from "lucide-react";
 </SidebarNavList>
 ```
 
-The active link is the one with `aria-current="page"`. Right now it's hard-coded on Overview. When the sidebar has more than one link, move it into a small client component that compares each `href` with `usePathname()`.
+`SidebarNavLink` sets `aria-current="page"` itself by comparing its `href` with `usePathname()` (`/dashboard` matches only itself; other links also match their sub-pages).
 
 ### Server vs client components
 
@@ -491,6 +501,49 @@ The team `.env` already has working credentials. For a new deployment URL:
 1. In [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials), open the OAuth 2.0 Client.
 2. Add the authorized redirect URI `https://<domain>/api/auth/callback/google`.
 3. Set `NEXTAUTH_URL` to `https://<domain>` in that environment.
+
+## SEO Analytics
+
+`/dashboard/seo` shows two charts for one shared date range (7 days, 28 days, 3 months or custom; presets end yesterday because neither Google product has a finished "today"):
+
+| Chart | Source | What it measures |
+|---|---|---|
+| **Clicks vs. Impressions** | Search Console API, `searchAnalytics.query`, dimension `date`, search type `web` | Google Search clicks and impressions for the property. CTR = total clicks ÷ total impressions × 100 (shown as "—" when there are no impressions). Not website sessions or on-site clicks. |
+| **Users Traffic by Channels** | GA4 Data API, `batchRunReports` | `activeUsers` (GA4's "Users") by `sessionDefaultChannelGroup` and `date`. The headline total is a separate site-wide query, so it is deduplicated; channel figures overlap because one person can arrive through several channels. |
+
+Freshness: Search Console finalises a day 2–3 days later and GA4 within about 24–48 hours, so the charts are not real-time. Responses are cached on the server for 5 minutes; **Refresh** bypasses that cache. The page shows when the data was last fetched and the latest date each source has data for.
+
+The browser only talks to `/api/seo/*`, which require a signed-in session. Google credentials stay on the server and are never sent to the client. No database tables are used.
+
+### Connect the real data
+
+1. **Google Cloud project** – in [APIs & Services → Library](https://console.cloud.google.com/apis/library), enable the **Google Search Console API** and the **Google Analytics Data API**.
+2. **Service account** – in [IAM → Service accounts](https://console.cloud.google.com/iam-admin/serviceaccounts), create one (no Cloud roles needed), then **Keys → Add key → JSON**. Keep the file out of the repo.
+3. **Search Console access** – in [Search Console](https://search.google.com/search-console) open the zedu.chat property → **Settings → Users and permissions → Add user**, enter the service account's email, permission **Restricted** (read-only is enough).
+4. **GA4 access** – in Google Analytics → **Admin → Property access management → +**, add the service account's email with the **Viewer** role. The property ID is under **Admin → Property details**.
+5. **Environment variables** – add these to the shared `.env` and to Coolify:
+
+   | Variable | Value |
+   |---|---|
+   | `GOOGLE_ANALYTICS_CLIENT_EMAIL` | `client_email` from the JSON key |
+   | `GOOGLE_ANALYTICS_PRIVATE_KEY` | `private_key` from the JSON key, on one line with literal `\n` line breaks, in double quotes |
+   | `GSC_SITE_URL` | The property exactly as Search Console names it: `sc-domain:zedu.chat` for a domain property, or `https://zedu.chat/` (trailing slash) for a URL-prefix property |
+   | `GA4_PROPERTY_ID` | The numeric property ID, e.g. `123456789` (not the `G-…` measurement ID) |
+
+6. Restart the app and open `/dashboard/seo`. Each chart says what is still missing or which permission Google refused.
+
+### Develop without credentials
+
+Set `SEO_ANALYTICS_DEMO=true` in your local `.env`. Both charts then show seeded synthetic numbers, badged **"Demo data — not live analytics"**. The flag is ignored when `NODE_ENV=production`, so demo data can't reach the deployed dashboard.
+
+### Errors you might see
+
+| Message | Cause |
+|---|---|
+| "Connect Search Console / Google Analytics" | One or more variables above are unset. The chart lists which ones. |
+| "Google rejected the service account credentials" | Wrong email or malformed private key (check the `\n` line breaks). |
+| "The service account can't access this property" | The service account isn't a user on the Search Console property or GA4 property, the API isn't enabled, or `GSC_SITE_URL` / `GA4_PROPERTY_ID` doesn't match. |
+| "Google API quota exceeded" | Too many requests. Wait a few minutes; the 5-minute cache normally prevents this. |
 
 ---
 
