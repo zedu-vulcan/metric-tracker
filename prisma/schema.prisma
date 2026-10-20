@@ -30,17 +30,21 @@ enum SubmissionStatus {
 }
 
 model User {
-  id            String        @id @default(cuid())
-  name          String?
-  email         String?       @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  contentItems  ContentItem[]
-  seoChecks     SeoCheck[]
-  createdTasks  Task[]        @relation("TaskCreator")
-  assignedTasks Task[]        @relation("TaskOwner")
+  id                  String        @id @default(cuid())
+  name                String?
+  email               String?       @unique
+  emailVerified       DateTime?
+  image               String?
+  accounts            Account[]
+  sessions            Session[]
+  contentItems        ContentItem[]
+  seoChecks           SeoCheck[]
+  agents              Agent[]
+  createdGoals        Goal[]        @relation("GoalCreator")
+  acceptedWorkstreams Workstream[]  @relation("WorkstreamAcceptor")
+  taskComments        TaskComment[] @relation("UserCommentAuthor")
+  createdTasks        Task[]        @relation("TaskCreator")
+  assignedTasks       Task[]        @relation("TaskOwner")
 }
 
 model ContentItem {
@@ -253,6 +257,89 @@ model PressOutlet {
   submissions  PressSubmission[]
 }
 
+// An AI agent a user connects to the platform. The plain key is shown once at creation; only its hash is stored.
+model Agent {
+  id                  String        @id @default(cuid())
+  name                String
+  speciality          String        // e.g. "seo", "content", "research"
+  description         String?
+  avatarStyle         String        @default("bottts")
+  avatarSeed          String        @default("default")
+  keyHash             String        @unique
+  keyHint             String
+  ownerId             String
+  owner               User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  connectedAt         DateTime?
+  lastActiveAt        DateTime?
+  proposedWorkstreams Workstream[]  @relation("WorkstreamProposer")
+  assignedTasks       Task[]        @relation("AssignedAgent")
+  offeredTasks        Task[]        @relation("OfferedAgent")
+  comments            TaskComment[] @relation("AgentCommentAuthor")
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([ownerId])
+  @@index([keyHash])
+}
+
+enum GoalType {
+  seo
+  content
+  marketing
+  research
+  outreach
+}
+
+enum GoalStatus {
+  active
+  completed
+  archived
+}
+
+model Goal {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  type        GoalType      @default(marketing)
+  status      GoalStatus    @default(active)
+  createdById String
+  createdBy   User          @relation("GoalCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  workstreams Workstream[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([createdById])
+}
+
+enum WorkstreamStatus {
+  proposed
+  accepted
+  rejected
+}
+
+model Workstream {
+  id                String           @id @default(cuid())
+  goalId            String
+  goal              Goal             @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  status            WorkstreamStatus @default(proposed)
+  autoAcceptTasks   Boolean          @default(false)
+  proposedByAgentId String?
+  proposedByAgent   Agent?           @relation("WorkstreamProposer", fields: [proposedByAgentId], references: [id], onDelete: SetNull)
+  acceptedById      String?
+  acceptedBy        User?            @relation("WorkstreamAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+  tasks             Task[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([goalId, title])
+  @@index([goalId, status])
+  @@index([proposedByAgentId])
+}
+
 enum TaskType {
   Call
   Email
@@ -261,22 +348,87 @@ enum TaskType {
   Other
 }
 
-model Task {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  type        TaskType  @default(Other)
-  dueAt       DateTime
-  done        Boolean   @default(false)
-  completedAt DateTime?
-  ownerId     String?
-  owner       User?     @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  userId      String
-  user        User      @relation("TaskCreator", fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([dueAt])
-  @@index([userId, done])
-  @@index([ownerId])
+enum TaskStatus {
+  proposed
+  open
+  bidding
+  in_progress
+  submitted
+  in_review
+  changes_requested
+  approved
+  reopened
 }
+
+model Task {
+  id               String        @id @default(cuid())
+  workstreamId     String?
+  workstream       Workstream?   @relation(fields: [workstreamId], references: [id], onDelete: Cascade)
+  taskType         String?       // "research", "lead_hunting", "content", "seo", "press"
+  type             TaskType      @default(Other)
+  title            String
+  description      String?
+  status           TaskStatus    @default(proposed)
+  assignedAgentId  String?
+  assignedAgent    Agent?        @relation("AssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  offeredToAgentId String?
+  offeredToAgent   Agent?        @relation("OfferedAgent", fields: [offeredToAgentId], references: [id], onDelete: SetNull)
+  offeredAt        DateTime?
+  offerExpiresAt   DateTime?
+  revisionCount    Int           @default(0)
+  maxRevisions     Int           @default(2)
+  comments         TaskComment[]
+
+  // Legacy Task fields retained as optional for backwards compatibility
+  dueAt            DateTime?
+  done             Boolean       @default(false)
+  completedAt      DateTime?
+  ownerId          String?
+  owner            User?         @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  userId           String?
+  user             User?         @relation("TaskCreator", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([workstreamId, status])
+  @@index([assignedAgentId])
+  @@index([offeredToAgentId])
+  @@index([userId, done])
+   @@index([ownerId])
+}
+
+enum CommentType {
+  idea
+  bid
+  review
+  delivery
+  revision_request
+  approval
+  escalation
+  note
+}
+
+model TaskComment {
+  id            String      @id @default(cuid())
+  taskId        String
+  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  type          CommentType @default(note)
+  tag           String?     // e.g. "blog", "leads", "contact_list", "press", "seo"
+  title         String?
+  body          String
+  attachment    String?     // Deliverable text, URL, or link
+  score         Int?        // Peer review score (e.g. 1-10)
+  authorAgentId String?
+  authorAgent   Agent?      @relation("AgentCommentAuthor", fields: [authorAgentId], references: [id], onDelete: SetNull)
+  authorUserId  String?
+  authorUser    User?       @relation("UserCommentAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([taskId, type])
+  @@index([authorAgentId])
+  @@index([authorUserId])
+}
+
+

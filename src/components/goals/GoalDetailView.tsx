@@ -2,15 +2,41 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckIcon, ChevronRightIcon, TargetIcon, XIcon } from "lucide-react";
+import { ArrowRightIcon, CheckIcon, LayersIcon, LightbulbIcon, TargetIcon, XIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { shortDate, summarizeTasks, type Agent, type Idea } from "./goal-model";
-import { BackLink, ByAgent, NotFoundState, Progress, QuietEmpty, RejectedToggle, RowList } from "./GoalParts";
+import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import { shortDate, summarizeGoal, summarizeTasks, type Agent, type Idea } from "./goal-model";
+import {
+  BackLink,
+  ByAgent,
+  CardStack,
+  ColorTab,
+  Description,
+  EmptyCard,
+  ITEM_CARD,
+  ITEM_LINK,
+  ItemHeading,
+  NotFoundState,
+  OwnerAvatar,
+  RejectedToggle,
+  TaskProgress,
+  type ItemStyle,
+} from "./GoalParts";
 import { useGoals } from "./GoalsProvider";
 import { RejectDialog } from "./RejectDialog";
+
+/**
+ * Each kind of item keeps one colour everywhere on the page, tabs included:
+ * workstreams are violet (approved, being worked), ideas are amber (waiting on a decision), rejected ideas are red.
+ */
+const KINDS = {
+  workstream: { icon: LayersIcon, chip: "bg-accent text-primary-deep" },
+  idea: { icon: LightbulbIcon, chip: "bg-warning-muted text-warning" },
+  rejected: { icon: XIcon, chip: "bg-destructive-muted text-destructive" },
+} satisfies Record<string, ItemStyle>;
 
 export function GoalDetailView({ goalId }: { goalId: string }) {
   const { goals, ideas, tasks, currentUser, agentFor, approveIdea, rejectIdea } = useGoals();
@@ -41,6 +67,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
   const proposed = goalIdeas.filter((idea) => idea.status === "proposed");
   const rejected = goalIdeas.filter((idea) => idea.status === "rejected");
   const workstreams = goalIdeas.filter((idea) => idea.status === "accepted");
+  const summary = summarizeGoal(goal.id, ideas, tasks);
 
   return (
     <>
@@ -48,95 +75,107 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
       <PageHeader title={goal.title} description={goal.description || undefined} className="pt-2" />
 
       <PageContent>
-        <p className="m-0 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
-          <Badge variant="secondary">{goal.type}</Badge>
-          {isOwner ? "Your goal" : `${goal.ownerName}'s goal`} · created {shortDate.format(new Date(goal.createdAt))}
-        </p>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+          <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
+            <OwnerAvatar name={goal.ownerName} image={isOwner ? currentUser.image : undefined} />
+            <span className="font-semibold text-foreground">{isOwner ? "Your goal" : `${goal.ownerName}'s goal`}</span>·
+            <span>{goal.type}</span>·<span>created {shortDate.format(new Date(goal.createdAt))}</span>
+          </p>
+          <div className="w-full lg:max-w-md">
+            <TaskProgress label={goal.title} done={summary.approvedTasks} total={summary.totalTasks} />
+          </div>
+        </div>
 
-        <section className="rounded-[22px] border border-border bg-card p-4 sm:p-5">
-          <Tabs key={goal.id} defaultValue="workstreams">
-            <TabsList>
-              <TabsTrigger value="workstreams">
-                Workstreams <span className="tabular-nums opacity-70">{workstreams.length}</span>
-              </TabsTrigger>
-              <TabsTrigger value="ideas">
-                Ideas{" "}
-                {isOwner && proposed.length > 0 ? (
-                  <span className="rounded-full bg-warning-muted px-1.5 text-xs font-semibold text-warning tabular-nums">
-                    {proposed.length}
-                  </span>
-                ) : (
-                  <span className="tabular-nums opacity-70">{proposed.length}</span>
-                )}
-              </TabsTrigger>
-            </TabsList>
+        <Tabs key={goal.id} defaultValue="workstreams" className="gap-4">
+          <TabsList className="h-11! self-start p-1">
+            <ColorTab value="workstreams" style={KINDS.workstream} label="Workstreams" count={workstreams.length} />
+            <ColorTab
+              value="ideas"
+              style={KINDS.idea}
+              label="Ideas"
+              count={proposed.length}
+              highlight={isOwner && proposed.length > 0}
+            />
+          </TabsList>
 
-            <TabsContent value="workstreams">
-              {workstreams.length === 0 ? (
-                <QuietEmpty>Approved ideas become workstreams, where agents add tasks.</QuietEmpty>
-              ) : (
-                <RowList>
-                  {workstreams.map((workstream) => {
-                    const summary = summarizeTasks(tasks.filter((task) => task.workstreamId === workstream.id));
-                    return (
-                      <li key={workstream.id}>
-                        <Link
-                          href={`/dashboard/goals/${goal.id}/workstreams/${workstream.id}`}
-                          className="-mx-2 grid gap-2 rounded-xl px-2 py-3.5 text-inherit no-underline transition-colors outline-none hover:bg-accent/45 focus-visible:ring-3 focus-visible:ring-ring/50 sm:grid-cols-[minmax(0,1fr)_160px_16px] sm:items-center sm:gap-5"
-                        >
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <h3 className="m-0 truncate text-[15px] leading-snug font-bold text-foreground">{workstream.title}</h3>
-                            <p className="m-0 truncate text-xs text-muted-foreground">
-                              {summary.openTasks} open · {summary.activeTasks} in progress
-                            </p>
+          <TabsContent value="workstreams">
+            {workstreams.length === 0 ? (
+              <EmptyCard>Approved ideas become workstreams, where agents add tasks.</EmptyCard>
+            ) : (
+              <CardStack>
+                {workstreams.map((workstream) => {
+                  const work = summarizeTasks(tasks.filter((task) => task.workstreamId === workstream.id));
+                  return (
+                    <li key={workstream.id}>
+                      <Link
+                        href={`/dashboard/goals/${goal.id}/workstreams/${workstream.id}`}
+                        className={cn(ITEM_CARD, ITEM_LINK, "flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-10")}
+                      >
+                        <ItemHeading style={KINDS.workstream} title={workstream.title} interactive>
+                          {workstream.description && <Description>{workstream.description}</Description>}
+                          <p className="m-0 text-[13px] text-muted-foreground tabular-nums">
+                            <span className="font-semibold text-foreground">{work.openTasks} open</span> ·{" "}
+                            {work.activeTasks} in progress · from {agentFor(workstream.agentId)?.name ?? "an agent"}&rsquo;s
+                            idea
+                          </p>
+                        </ItemHeading>
+                        <div className="flex items-center gap-5 lg:w-[340px] lg:shrink-0">
+                          <div className="min-w-0 flex-1">
+                            <TaskProgress label={workstream.title} done={work.approvedTasks} total={work.totalTasks} />
                           </div>
-                          <Progress label={workstream.title} done={summary.approvedTasks} total={summary.totalTasks} />
-                          <ChevronRightIcon className="hidden size-4 text-muted-foreground sm:block" aria-hidden="true" />
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </RowList>
-              )}
-            </TabsContent>
-
-            <TabsContent value="ideas">
-              {!isOwner && (
-                <p className="m-0 pt-2 text-xs text-muted-foreground">Only {goal.ownerName} can approve or reject ideas.</p>
-              )}
-              {proposed.length === 0 ? (
-                <QuietEmpty>No ideas waiting. When an agent proposes an approach, it appears here.</QuietEmpty>
-              ) : (
-                <RowList>
-                  {proposed.map((idea) => (
-                    <IdeaRow key={idea.id} idea={idea} agent={agentFor(idea.agentId)}>
-                      {isOwner && (
-                        <div className="flex shrink-0 gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setRejecting(idea)}>
-                            <XIcon data-icon="inline-start" aria-hidden="true" />
-                            Reject
-                          </Button>
-                          <Button variant="secondary" size="sm" onClick={() => approveIdea(idea.id)}>
-                            <CheckIcon data-icon="inline-start" aria-hidden="true" />
-                            Approve
-                          </Button>
+                          <ArrowRightIcon
+                            className="hidden size-5 shrink-0 text-muted-foreground transition-[color,translate] duration-150 group-hover/item:translate-x-0.5 group-hover/item:text-primary-deep lg:block"
+                            aria-hidden="true"
+                          />
                         </div>
-                      )}
-                    </IdeaRow>
-                  ))}
-                </RowList>
-              )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </CardStack>
+            )}
+          </TabsContent>
 
-              <RejectedToggle count={rejected.length}>
-                <RowList>
-                  {rejected.map((idea) => (
-                    <IdeaRow key={idea.id} idea={idea} agent={agentFor(idea.agentId)} />
-                  ))}
-                </RowList>
-              </RejectedToggle>
-            </TabsContent>
-          </Tabs>
-        </section>
+          <TabsContent value="ideas" className="flex flex-col gap-4">
+            {!isOwner && proposed.length > 0 && (
+              <p className="m-0 text-[13px] text-muted-foreground">Only {goal.ownerName} can approve or reject ideas.</p>
+            )}
+            {proposed.length === 0 ? (
+              <EmptyCard>No ideas waiting. When an agent proposes an approach, it appears here.</EmptyCard>
+            ) : (
+              <CardStack>
+                {proposed.map((idea) => (
+                  <IdeaCard key={idea.id} idea={idea} agent={agentFor(idea.agentId)}>
+                    {isOwner ? (
+                      <div className="flex shrink-0 gap-2">
+                        <Button variant="outline" onClick={() => setRejecting(idea)}>
+                          <XIcon data-icon="inline-start" aria-hidden="true" />
+                          Reject
+                        </Button>
+                        <Button variant="secondary" onClick={() => approveIdea(idea.id)}>
+                          <CheckIcon data-icon="inline-start" aria-hidden="true" />
+                          Approve
+                        </Button>
+                      </div>
+                    ) : (
+                      <Badge variant="warning" className="self-start">
+                        Waiting for {goal.ownerName}
+                      </Badge>
+                    )}
+                  </IdeaCard>
+                ))}
+              </CardStack>
+            )}
+
+            <RejectedToggle count={rejected.length}>
+              <CardStack>
+                {rejected.map((idea) => (
+                  <IdeaCard key={idea.id} idea={idea} agent={agentFor(idea.agentId)} />
+                ))}
+              </CardStack>
+            </RejectedToggle>
+          </TabsContent>
+        </Tabs>
       </PageContent>
 
       <RejectDialog
@@ -148,19 +187,24 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
   );
 }
 
-function IdeaRow({ idea, agent, children }: { idea: Idea; agent?: Agent; children?: React.ReactNode }) {
+function IdeaCard({ idea, agent, children }: { idea: Idea; agent?: Agent; children?: React.ReactNode }) {
+  const rejected = idea.status === "rejected";
+
   return (
-    <li className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h3 className="m-0 text-[15px] leading-snug font-bold text-foreground">{idea.title}</h3>
-        {idea.description && <p className="m-0 max-w-[68ch] text-sm text-muted-foreground">{idea.description}</p>}
+    <li className={cn(ITEM_CARD, "flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-8")}>
+      <ItemHeading style={rejected ? KINDS.rejected : KINDS.idea} title={idea.title} muted={rejected}>
+        {idea.description && <Description>{idea.description}</Description>}
         <ByAgent agent={agent} at={idea.proposedAt} />
-        {idea.rejectionReason && (
-          <p className="m-0 mt-1 max-w-[68ch] rounded-xl bg-muted px-3 py-2 text-[13px] text-foreground">
+        {rejected && (
+          <p className="m-0 mt-2 max-w-[68ch] self-start rounded-xl bg-destructive-muted px-3.5 py-2.5 text-[13px] text-foreground">
+            <span className="font-semibold text-destructive">
+              Rejected{idea.decidedBy ? ` by ${idea.decidedBy}` : ""}
+              {idea.rejectionReason ? ": " : ""}
+            </span>
             {idea.rejectionReason}
           </p>
         )}
-      </div>
+      </ItemHeading>
       {children}
     </li>
   );

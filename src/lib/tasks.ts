@@ -11,11 +11,11 @@ export function serializeTask(task: TaskWithRelations) {
     title: task.title,
     description: task.description,
     type: task.type,
-    dueAt: task.dueAt.toISOString(),
+    dueAt: task.dueAt ? task.dueAt.toISOString() : new Date().toISOString(),
     done: task.done,
     completedAt: task.completedAt?.toISOString() ?? null,
     ownerId: task.ownerId,
-    userId: task.userId,
+    userId: task.userId ?? "",
     owner: task.owner
       ? {
           id: task.owner.id,
@@ -32,5 +32,29 @@ export function serializeTask(task: TaskWithRelations) {
       : undefined,
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
+  };
+}
+
+export function serializeTaskOffered(task: {
+  id: string;
+  status: string;
+  offeredToAgentId: string | null;
+  offeredAt: Date | string | null;
+  offerExpiresAt: Date | string | null;
+  assignedAgentId: string | null;
+}) {
+  return {
+    id: task.id,
+    status: task.status,
+    offeredToAgentId: task.offeredToAgentId,
+    offeredAt:
+      task.offeredAt instanceof Date
+        ? task.offeredAt.toISOString()
+        : task.offeredAt ?? null,
+    offerExpiresAt:
+      task.offerExpiresAt instanceof Date
+        ? task.offerExpiresAt.toISOString()
+        : task.offerExpiresAt ?? null,
+    assignedAgentId: task.assignedAgentId,
   };
 }

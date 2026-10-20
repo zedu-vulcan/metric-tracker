@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { ChevronLeftIcon } from "lucide-react";
-import { SignOutButton } from "@/components/AuthButtons";
 import { DashboardSidebarNav } from "@/components/SidebarNav";
 import { BrandMark, Wordmark } from "@/components/Wordmark";
 import { cn } from "@/lib/utils";
 
 const COLLAPSED_KEY = "zedu-amp:sidebar-collapsed";
 
-export function AppSidebar({ name, email, initials }: { name: string; email?: string; initials: string }) {
+export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -59,32 +58,6 @@ export function AppSidebar({ name, email, initials }: { name: string; email?: st
       </div>
 
       <DashboardSidebarNav collapsed={collapsed} />
-
-      <div
-        className={cn(
-          "mt-auto hidden shrink-0 items-center gap-3 rounded-2xl bg-sidebar-accent lg:flex",
-          collapsed ? "lg:flex-col lg:gap-2 lg:bg-transparent lg:p-0" : "p-2.5"
-        )}
-      >
-        <span
-          aria-hidden={!collapsed}
-          title={collapsed ? `${name}${email ? ` · ${email}` : ""}` : undefined}
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground"
-        >
-          {initials}
-        </span>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <p className="m-0 truncate text-sm font-semibold text-sidebar-foreground">{name}</p>
-            {email && email !== name && (
-              <p className="m-0 truncate text-xs text-sidebar-muted-foreground" title={email}>
-                {email}
-              </p>
-            )}
-          </div>
-        )}
-        <SignOutButton />
-      </div>
     </aside>
   );
 }

@@ -12,6 +12,9 @@
     "db:deploy": "prisma migrate deploy",
     "test": "tsx --test \"src/**/*.test.ts\""
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@auth/prisma-adapter": "^1.6.0",

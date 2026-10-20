@@ -1,8 +1,50 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { taskCreateSchema, taskUpdateSchema } from "@/lib/schemas/tasks";
-import { serializeTask } from "@/lib/tasks";
+import {
+  offerAcceptSchema,
+  offerCreateSchema,
+  taskCreateSchema,
+  taskUpdateSchema,
+  taskOfferedSchema,
+  goalTaskCreateSchema,
+} from "@/lib/schemas/tasks";
+import { serializeTask, serializeTaskOffered } from "@/lib/tasks";
 import { getOpenApiDocument } from "@/lib/openapi";
+
+describe("goalTaskCreateSchema", () => {
+  it("validates valid task creation payload", () => {
+    const result = goalTaskCreateSchema.safeParse({
+      title: "Write blog post",
+      description: "SEO optimized content",
+      taskType: "content",
+    });
+    assert.equal(result.success, true);
+  });
+
+  it("rejects missing title", () => {
+    const result = goalTaskCreateSchema.safeParse({
+      taskType: "research",
+    });
+    assert.equal(result.success, false);
+  });
+
+  it("rejects invalid taskType", () => {
+    const result = goalTaskCreateSchema.safeParse({
+      title: "Invalid type task",
+      taskType: "invalid_type",
+    });
+    assert.equal(result.success, false);
+  });
+});
+
+describe("OpenAPI Documentation", () => {
+  it("includes POST /api/workstreams/{id}/tasks route", () => {
+    const doc = getOpenApiDocument();
+    assert.ok(doc.paths);
+    assert.ok(doc.paths["/api/workstreams/{id}/tasks"]);
+    assert.ok(doc.paths["/api/workstreams/{id}/tasks"].post);
+  });
+});
 
 describe("Tasks Validation & Serialization", () => {
   it("validates valid task creation payload with defaults", () => {
@@ -59,9 +101,18 @@ describe("Tasks Validation & Serialization", () => {
   it("serializes task correctly with ISO dates and relations", () => {
     const dummyTask = {
       id: "task-1",
+      workstreamId: null,
+      taskType: null,
       title: "Follow up with client",
       description: "Discuss pricing",
       type: "FollowUp" as const,
+      status: "proposed" as const,
+      assignedAgentId: null,
+      offeredToAgentId: null,
+      offeredAt: null,
+      offerExpiresAt: null,
+      revisionCount: 0,
+      maxRevisions: 2,
       dueAt: new Date("2026-10-25T14:00:00.000Z"),
       done: false,
       completedAt: null,
@@ -89,6 +140,50 @@ describe("Tasks Validation & Serialization", () => {
     assert.equal(serialized.user?.name, "Admin User");
   });
 
+  it("validates offer creation payload and rejects empty agentId", () => {
+    const valid = offerCreateSchema.safeParse({ agentId: "agent-123" });
+    assert.equal(valid.success, true);
+    if (valid.success) {
+      assert.equal(valid.data.agentId, "agent-123");
+    }
+
+    const empty = offerCreateSchema.safeParse({ agentId: "   " });
+    assert.equal(empty.success, false);
+
+    const missing = offerCreateSchema.safeParse({});
+    assert.equal(missing.success, false);
+  });
+
+  it("validates offer acceptance schema", () => {
+    const parsed = offerAcceptSchema.safeParse({});
+    assert.equal(parsed.success, true);
+  });
+
+  it("serializes task offered record with Date objects into ISO strings correctly", () => {
+    const now = new Date("2026-10-20T12:00:00.000Z");
+    const expiry = new Date("2026-10-21T12:00:00.000Z");
+
+    const rawPrismaTask = {
+      id: "task-456",
+      status: "bidding",
+      offeredToAgentId: "agent-abc",
+      offeredAt: now,
+      offerExpiresAt: expiry,
+      assignedAgentId: null,
+    };
+
+    const serialized = serializeTaskOffered(rawPrismaTask);
+    assert.equal(serialized.id, "task-456");
+    assert.equal(serialized.status, "bidding");
+    assert.equal(serialized.offeredToAgentId, "agent-abc");
+    assert.equal(serialized.offeredAt, "2026-10-20T12:00:00.000Z");
+    assert.equal(serialized.offerExpiresAt, "2026-10-21T12:00:00.000Z");
+    assert.equal(serialized.assignedAgentId, null);
+
+    const validated = taskOfferedSchema.safeParse(serialized);
+    assert.equal(validated.success, true);
+  });
+
   it("registers tasks endpoints in OpenAPI document", () => {
     const doc = getOpenApiDocument();
     assert.ok(doc.paths);
@@ -99,5 +194,9 @@ describe("Tasks Validation & Serialization", () => {
     assert.ok(doc.paths["/api/tasks/{id}"].get);
     assert.ok(doc.paths["/api/tasks/{id}"].patch);
     assert.ok(doc.paths["/api/tasks/{id}"].delete);
+    assert.ok(doc.paths["/api/tasks/{id}/offer"]);
+    assert.ok(doc.paths["/api/tasks/{id}/offer"]?.post);
+    assert.ok(doc.paths["/api/tasks/{id}/accept-offer"]);
+    assert.ok(doc.paths["/api/tasks/{id}/accept-offer"]?.post);
   });
 });

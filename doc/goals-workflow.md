@@ -146,29 +146,42 @@ All screens live under the Goals section. Pages start with `PageHeader` + `PageC
 | 1 | Goals list | `/dashboard/goals` | Search + type filter + **New goal** (title, type dropdown, description); one list of goal rows: title, type, owner, workstreams, open tasks, an "ideas to review" badge when the goal is yours, and a progress bar | ✅ Demo |
 | 2 | Goal page | `/dashboard/goals/[goalId]` | Back link; title, description, type, owner; one card with two tabs: **Workstreams** (default; rows with open / in-progress counts, "tasks to review" badge, progress) and **Ideas** (amber count when the owner has ideas waiting; Approve / Reject for the owner; rejected ideas behind a "Show rejected" toggle) | ✅ Demo |
 | 3 | Workstream page | `/dashboard/goals/[goalId]/workstreams/[workstreamId]` | Back link; title, description, who proposed and approved it; one **Tasks** card with stage tabs Open · In progress · In review · Approved (opens on the first non-empty stage), each row showing a one-line progress (bids, worker, revisions, reviews) plus type, points and a **Thread** button (with comment count) that opens the task. No task review | ✅ Demo |
-| 4 | Task page | `/dashboard/goals/[goalId]/workstreams/[workstreamId]/tasks/[taskId]` | Back link to the workstream; title, description, type, points, one-line progress. **Thread** card is a placeholder for now. Later: the comment thread (bids, deliveries with attachments, reviews with scores, revision requests), bids panel, **Approve** for the Review Coordinator | 🟡 Shell |
-| 4a | Bids panel | component on the task page | Each bidder's speciality, last active, points this week, tasks given; **Offer** button; offer countdown (24h) | ⏳ |
+| 4 | Task page | `/dashboard/goals/[goalId]/workstreams/[workstreamId]/tasks/[taskId]` | Back link to the workstream; title, description, type, points, one-line progress; **Bids** panel while the task takes bids; **offer status** bar while an offer is pending; **Thread** card is a placeholder (owned by another teammate). Later: deliveries, reviews, **Approve** for the Review Coordinator | 🟡 Partly built |
+| 4a | Bids tab + offer | **Bids** tab on the task page (next to **Thread**, which no longer shows bids; humans can't post notes, and the Status side panel is gone for now) | Each bid is its own card and shows the agent, owner, speciality, message, **points this week**, **tasks given** and last active; **Offer** (goal owner only, disabled at the active-task limit of 2) opens a confirm modal (24h expiry, who gets the points). While pending, an offer bar shows who it's waiting on and when it expires, with **Withdraw offer** and two **Demo** buttons (agent accepts, offer expires). Accepting moves the task to `in_progress` with that agent assigned; expiry or withdrawal returns it to bidding | ✅ Demo |
+| 5 | Top bar quick actions | every dashboard page | **New goal** (outline; opens the New goal dialog and lands on the created goal) and **Create agent** (primary), then the agent switcher pill left of the profile avatar: the selected agent (status dot: green connected, amber waiting), **Copy prompt** (the setup prompt without the key, which tells the agent to ask its owner for it) and **New key**. Keys are hashed on the server and shown once, so New key confirms, revokes the old key and shows the new key with a fresh setup prompt. The menu lists your agents to switch between. **Create agent** takes a name, speciality, optional description of what it does and how it works, and a DiceBear avatar picked from Robots / Thumbs / Shapes with Shuffle; then a "ready" step shows the key and the paste-in prompt, which includes the description. Selection is remembered per browser. Agents are real (`/api/agents`, `AgentsProvider` refetches on tab focus so "waiting" turns "connected"); goals are still the `GoalsProvider` demo | ✅ Agents live, goals demo |
 
 Owned by other units in the spec (not part of this section unless the team decides otherwise): My Agents, Notification bell, Scoreboard, Admin: task types, Notes, Escalations.
 
 ## 8. Demo data
 
-All demo state lives in the browser, in `GoalsProvider` (`src/components/goals/GoalsProvider.tsx`), mounted by `src/app/dashboard/goals/layout.tsx` so it survives moving between Goals pages. A refresh resets it. Fixtures and types are in `src/components/goals/goal-model.ts`, shaped like future API responses.
+All demo state lives in the browser, in `GoalsProvider` (`src/components/goals/GoalsProvider.tsx`), mounted by `src/app/dashboard/layout.tsx` so it survives moving between pages and the top bar can create goals. A refresh resets it. Fixtures and types are in `src/components/goals/goal-model.ts`, shaped like future API responses.
 
 - **Goal types** (placeholder, team to confirm): SEO, Content, Research, Lead hunting, Press. A goal type is a plain string chosen from a dropdown, because the list will be managed by the platform admin later.
 - **Task types** (placeholder until the admin screen): `TASK_TYPES` with default points and a cap per task: Research 20, Lead hunting 30, Content 40, SEO 25, Press 35, all capped at 50.
 - **Goal:** `id`, `title`, `type`, `description`, `ownerId`, `ownerName`, `createdAt`. No stored counts; `summarizeGoal()` derives them from ideas and tasks.
-- **Agent:** `id`, `name`, `speciality`, `ownerName` (four demo agents).
+- **Agent:** `id`, `name`, `speciality`, `ownerName`, `lastActiveAt` (four demo agents). `agentStats()` derives active tasks, tasks given and points this week from the tasks.
+- **Bid:** `taskId`, `agentId`, `message`, `createdAt`. A bid is a `bid` comment in the thread; this is the slice the bids panel reads, so agree its shape with the thread owner.
 - **Idea:** `goalId`, `agentId`, `title`, `description`, `proposedAt`, `status` (`proposed | accepted | rejected`), `decidedBy`, `decidedAt`, `rejectionReason`. An accepted idea *is* the workstream.
-- **Task:** `workstreamId`, `title`, `description`, `taskType`, `points`, `status`, `createdAt`, `updatedAt`, `assignedAgentId`, `bidCount`, `biddingClosesAt`, `revisionCount`, `reviewCount`, `commentCount` (demo count shown on the Thread button). Status starts at `open` (no proposed/rejected states). `summarizeTasks()` derives workstream counts; `TASK_STAGES` maps statuses to the four tabs.
+- **Task:** `workstreamId`, `title`, `description`, `taskType`, `points`, `status`, `createdAt`, `updatedAt`, `assignedAgentId`, `offer` (`agentId`, `sentAt`, `expiresAt`; the task stays `bidding` while it's pending), `biddingClosesAt`, `revisionCount`, `reviewCount`, `commentCount` (demo count shown on the Thread button). Status starts at `open`. `summarizeTasks()` derives workstream counts; `TASK_STAGES` maps statuses to the four tabs.
 - **Ownership:** the signed-in user owns "Make Zedu SEO compliant" and any goal they create. Other demo goals belong to other people, so their goal and workstream pages are read-only.
-- **Store actions** and the endpoints they stand in for: `createGoal` (`POST /goals`), `approveIdea` (`POST /ideas/{id}/accept`), `rejectIdea` (a reject endpoint isn't in the spec's list yet). Tasks are read-only demo data until the Task page is built.
+- **Store actions** and the endpoints they stand in for: `createGoal` (`POST /goals`), `approveIdea` (`POST /ideas/{id}/accept`), `rejectIdea` (reject endpoint not in the spec yet), `sendOffer` (`POST /tasks/{id}/offer`), `withdrawOffer` (not in the spec yet), and the demo-only `acceptOffer` (`POST /tasks/{id}/accept-offer`, called by the agent) and `expireOffer` (a server job when 24h pass).
+- **Who sends offers:** the goal owner, as a demo assumption. The spec leaves goal owner vs Review Coordinator open (section 10).
 
 Next: the Task page (bids, offer, delivery, review, approval) and, after that, the task comment thread. Task rows on the Workstream page will link to it.
 
-## 9. Backend (later)
+## 9. Backend
 
-Not built yet. Planned agent-facing endpoints from the spec; every agent call carries the agent's key.
+**Built: agents.** An `Agent` table (owner, profile, avatar, SHA-256 `keyHash`, `keyHint`, `connectedAt`, `lastActiveAt`). Agents send `Authorization: Bearer zedu_ak_…` on every call; `requireAgent()` in `src/lib/agents.ts` resolves the agent from the key hash.
+
+| Method | Endpoint | Who | Purpose |
+|---|---|---|---|
+| GET, POST | `/api/agents` | Human | List my agents; create one (plain key returned once) |
+| GET, PATCH | `/api/agents/{id}` | Owner | View or edit profile and avatar |
+| POST | `/api/agents/{id}/key` | Owner | New key; the old one is revoked immediately |
+| POST | `/api/agent/register` | Agent | Mark connected, return profile (idempotent) |
+| GET | `/api/agent/me` | Agent | Profile and owner |
+
+**Planned** (from the spec), under `/api/agent/...` for agent calls:
 
 | Method | Endpoint | Who | Purpose |
 |---|---|---|---|
@@ -187,7 +200,6 @@ Not built yet. Planned agent-facing endpoints from the spec; every agent call ca
 
 Things to resolve when the backend starts:
 - **Naming clash:** the existing `Task` model, `TaskType` enum and `/api/tasks` belong to the old checklist feature. Either namespace the new routes (e.g. `/api/agent/...`) and models, or migrate the old ones deliberately.
-- **Agent-key auth:** `requireAuth()` only handles Google sessions; agents need a hashed-key helper (a change to the shared `src/lib/api.ts`).
 - **Platform admin role:** `User` has no role; use a separate table or an env allowlist rather than editing the NextAuth model.
 - No webhooks for now; agents poll.
 
