@@ -4,10 +4,12 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 import {
   DEMO_AGENTS,
   MAX_REVISIONS,
+  OFFER_HOURS,
   demoGoals,
   demoIdeas,
   demoTasks,
   type Agent,
+  type Bid,
   type DemoUser,
   type Goal,
   type Idea,
@@ -29,22 +31,27 @@ type GoalsContextValue = {
   goals: Goal[];
   ideas: Idea[];
   tasks: Task[];
+  bidsFor: (taskId: string) => Bid[];
   agentFor: (agentId: string) => Agent | undefined;
-  createGoal: (input: NewGoal) => void;
+  createGoal: (input: NewGoal) => Goal;
   approveIdea: (ideaId: string) => void;
   rejectIdea: (ideaId: string, reason: string) => void;
+  sendOffer: (taskId: string, agentId: string) => void;
+  withdrawOffer: (taskId: string) => void;
+  /** Demo stand-ins for what an agent does through the API. */
+  acceptOffer: (taskId: string) => void;
+  expireOffer: (taskId: string) => void;
   threadFor: (taskId: string) => ThreadEntry[];
   assignTask: (taskId: string, agentId: string) => void;
   approveTask: (taskId: string, note: string) => void;
   requestChanges: (taskId: string, feedback: string) => void;
-  addNote: (taskId: string, body: string) => void;
 };
 
 const GoalsContext = createContext<GoalsContextValue | undefined>(undefined);
 
 const EMPTY_THREAD: ThreadEntry[] = [];
 
-/** Demo-only store for the Goals section. State lives in the browser until the backend is connected. */
+/** Demo-only store for the Goals section, mounted by the dashboard layout so the top bar can create goals. */
 export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser; children: React.ReactNode }) {
   const [goals, setGoals] = useState(() => demoGoals(currentUser));
   const [ideas, setIdeas] = useState(() => demoIdeas(currentUser));
@@ -70,17 +77,17 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
   );
 
   const createGoal = useCallback(
-    (input: NewGoal) =>
-      setGoals((previous) => [
-        {
-          ...input,
-          id: `goal_${Date.now()}`,
-          ownerId: currentUser.id,
-          ownerName: currentUser.name,
-          createdAt: new Date().toISOString(),
-        },
-        ...previous,
-      ]),
+    (input: NewGoal) => {
+      const goal: Goal = {
+        ...input,
+        id: `goal_${Date.now()}`,
+        ownerId: currentUser.id,
+        ownerName: currentUser.name,
+        createdAt: new Date().toISOString(),
+      };
+      setGoals((previous) => [goal, ...previous]);
+      return goal;
+    },
     [currentUser]
   );
 
@@ -179,12 +186,37 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
     [baseTasks, append, humanComment, updateTask]
   );
 
-  const addNote = useCallback(
-    (taskId: string, body: string) => {
-      const task = baseTasks.find((candidate) => candidate.id === taskId);
-      if (task) append(taskId, [humanComment(task, "note", "Note", body)]);
+  const agentName = (agentId?: string) => DEMO_AGENTS.find((agent) => agent.id === agentId)?.name ?? "the agent";
+
+  const sendOffer = useCallback(
+    (taskId: string, agentId: string) => {
+      const sentAt = new Date();
+      const expiresAt = new Date(sentAt.getTime() + OFFER_HOURS * 60 * 60 * 1000);
+      updateTask(taskId, { offer: { agentId, sentAt: sentAt.toISOString(), expiresAt: expiresAt.toISOString() } });
+      append(taskId, [systemEvent(taskId, `Offered to ${agentName(agentId)}`)]);
     },
-    [baseTasks, append, humanComment]
+    [append, updateTask]
+  );
+
+  const endOffer = useCallback(
+    (taskId: string, outcome: "accepted" | "withdrawn" | "expired") => {
+      const offer = baseTasks.find((candidate) => candidate.id === taskId)?.offer;
+      if (!offer) return;
+      const name = agentName(offer.agentId);
+      if (outcome === "accepted") {
+        updateTask(taskId, { status: "in_progress", assignedAgentId: offer.agentId, offer: undefined });
+        append(taskId, [systemEvent(taskId, `${name} accepted the offer and started work`)]);
+        return;
+      }
+      updateTask(taskId, { offer: undefined });
+      append(taskId, [
+        systemEvent(
+          taskId,
+          outcome === "withdrawn" ? `Offer to ${name} withdrawn` : `Offer to ${name} expired. The task is open for bids again`
+        ),
+      ]);
+    },
+    [baseTasks, append, updateTask]
   );
 
   const value = useMemo<GoalsContextValue>(
@@ -193,17 +225,26 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
       goals,
       ideas,
       tasks,
+      bidsFor: (taskId) =>
+        (threads[taskId] ?? EMPTY_THREAD).flatMap((entry) =>
+          entry.kind === "comment" && entry.type === "bid" && entry.author.kind === "agent"
+            ? [{ id: entry.id, taskId, agentId: entry.author.agentId, message: entry.body, createdAt: entry.at }]
+            : []
+        ),
       agentFor: (agentId) => DEMO_AGENTS.find((agent) => agent.id === agentId),
       createGoal,
       approveIdea: (ideaId) => decide(ideaId, { status: "accepted" }),
       rejectIdea: (ideaId, reason) => decide(ideaId, { status: "rejected", rejectionReason: reason || undefined }),
+      sendOffer,
+      withdrawOffer: (taskId) => endOffer(taskId, "withdrawn"),
+      acceptOffer: (taskId) => endOffer(taskId, "accepted"),
+      expireOffer: (taskId) => endOffer(taskId, "expired"),
       threadFor: (taskId) => threads[taskId] ?? EMPTY_THREAD,
       assignTask,
       approveTask,
       requestChanges,
-      addNote,
     }),
-    [currentUser, goals, ideas, tasks, threads, createGoal, decide, assignTask, approveTask, requestChanges, addNote]
+    [currentUser, goals, ideas, tasks, threads, createGoal, decide, assignTask, approveTask, requestChanges, addNote, sendOffer, endOffer]
   );
 
   return <GoalsContext.Provider value={value}>{children}</GoalsContext.Provider>;

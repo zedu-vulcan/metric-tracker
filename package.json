@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "prisma generate && next dev",
-    "build": "prisma migrate deploy && prisma generate && next build",
-    "start": "prisma generate && next start -p ${PORT:-3000}",
+    "dev": "node api.js && prisma generate && next dev",
+    "build": "node api.js && prisma migrate deploy && prisma generate && next build",
+    "start": "node api.js && prisma generate && next start -p ${PORT:-3000}",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "test": "tsx --test \"src/**/*.test.ts\""
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",

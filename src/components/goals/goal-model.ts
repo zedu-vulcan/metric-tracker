@@ -1,7 +1,7 @@
 /** Placeholder list. Goal types will be managed by a platform admin, so the UI treats a type as plain data. */
 export const GOAL_TYPES = ["SEO", "Content", "Research", "Lead hunting", "Press"];
 
-export type DemoUser = { id: string; name: string };
+export type DemoUser = { id: string; name: string; image?: string };
 
 export type Goal = {
   id: string;
@@ -18,6 +18,7 @@ export type Agent = {
   name: string;
   speciality: string;
   ownerName: string;
+  lastActiveAt: string;
 };
 
 export type IdeaStatus = "proposed" | "accepted" | "rejected";
@@ -67,11 +68,43 @@ export type Task = {
   updatedAt: string;
   assignedAgentId?: string;
   bidCount: number;
+  /** A pending offer. The task stays in `bidding` until the agent accepts or the offer expires. */
+  offer?: TaskOffer;
   biddingClosesAt?: string;
   revisionCount: number;
   reviewCount: number;
   commentCount: number;
 };
+
+export type TaskOffer = { agentId: string; sentAt: string; expiresAt: string };
+
+/** A `bid` comment from the task thread, as the bids panel reads it. */
+export type Bid = {
+  id: string;
+  taskId: string;
+  agentId: string;
+  message: string;
+  createdAt: string;
+};
+
+export const OFFER_HOURS = 24;
+export const ACTIVE_TASK_LIMIT = 2;
+/** Demo total until the scoreboard exists: all points the signed-in user's agents have earned. */
+export const DEMO_POINTS_TOTAL = 1240;
+
+const ACTIVE_STATUSES: TaskStatus[] = ["in_progress", "changes_requested", "submitted", "in_review"];
+
+/** Fairness info shown on a bid, so whoever picks can see who is behind. */
+export function agentStats(agentId: string, tasks: Task[]) {
+  const given = tasks.filter((task) => task.assignedAgentId === agentId);
+  return {
+    activeTasks: given.filter((task) => ACTIVE_STATUSES.includes(task.status)).length,
+    tasksGiven: given.length,
+    pointsThisWeek: given
+      .filter((task) => task.status === "approved")
+      .reduce((total, task) => total + task.points, 0),
+  };
+}
 
 export type TaskStage = "open" | "in_progress" | "in_review" | "approved";
 
@@ -287,9 +320,17 @@ export function demoIdeas(currentUser: DemoUser): Idea[] {
 type DemoTaskInput = Pick<Task, "id" | "workstreamId" | "title" | "description" | "taskType" | "status"> &
   Partial<Task> & { day: number };
 
+/** How many demo bids each bidding task starts with. */
+const DEMO_BID_COUNTS: Record<string, number> = {
+  task_alt_text: 3,
+  task_internal_links: 1,
+  task_canonical: 2,
+  task_flight_post: 2,
+};
+
 function demoTask({ day, ...task }: DemoTaskInput): Task {
   const at = `2026-10-${String(day).padStart(2, "0")}T09:00:00.000Z`;
-  const bidCount = task.bidCount ?? (task.assignedAgentId ? 2 : 0);
+  const bidCount = task.bidCount ?? DEMO_BID_COUNTS[task.id] ?? (task.assignedAgentId ? 2 : 0);
   const reviewCount = task.reviewCount ?? 0;
   const revisionCount = task.revisionCount ?? 0;
   return {
@@ -304,14 +345,20 @@ function demoTask({ day, ...task }: DemoTaskInput): Task {
   };
 }
 
-/** One line saying where a task stands: bids, who is working on it, revisions or reviews. */
-export function taskProgressLine(task: Task, worker?: Agent) {
+/** One line saying where a task stands: bids, the pending offer, who is working on it, revisions or reviews. */
+export function taskProgressLine(
+  task: Task,
+  { worker, offeredTo, bidCount }: { worker?: Agent; offeredTo?: Agent; bidCount: number }
+) {
   const name = worker?.name ?? "an agent";
+  if (task.offer) {
+    return `Offer sent to ${offeredTo?.name ?? "an agent"} · expires ${shortDateTime.format(new Date(task.offer.expiresAt))}`;
+  }
   switch (task.status) {
     case "open":
       return "Open for bids · no bids yet";
     case "bidding":
-      return `${task.bidCount} ${task.bidCount === 1 ? "bid" : "bids"}${
+      return `${bidCount} ${bidCount === 1 ? "bid" : "bids"}${
         task.biddingClosesAt ? ` · closes ${shortDateTime.format(new Date(task.biddingClosesAt))}` : ""
       }`;
     case "in_progress":

@@ -222,7 +222,7 @@ export default function CampaignsPage() {
 
 ### Add it to the sidebar
 
-Add an entry to the `CHANNELS` list in `src/components/SidebarNav.tsx`:
+Add an entry to `src/components/SidebarNav.tsx`: `MARKETING_CHANNELS` for marketing pages (they appear under the expandable **Marketing** item), or `CHANNELS` for top-level items:
 
 ```tsx
 { href: "/dashboard/campaigns", label: "Campaigns", icon: MegaphoneIcon },
