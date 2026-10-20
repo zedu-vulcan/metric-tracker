@@ -83,6 +83,10 @@ import {
 } from "@/lib/schemas/ideas";
 
 import { goalTaskCreateSchema } from "@/lib/schemas/tasks";
+import {
+  taskApprovalResponseSchema,
+  taskApproveSchema,
+} from "@/lib/schemas/task-approval";
 
 // Register request/response schemas and paths here; they appear at /docs.
 
@@ -1497,6 +1501,37 @@ registry.registerPath({
       description: "Unauthorized",
       content: { "application/json": { schema: inboxErrorSchema } },
     },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/tasks/{id}/approve",
+  operationId: "approveTask",
+  tags: ["Tasks"],
+  summary: "Approve a submitted or in-review task (Review Coordinator / human owner)",
+  description:
+    "Creates an approval comment and transitions the task status to approved. Agent callers are forbidden.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    params: taskIdParams,
+    body: {
+      required: false,
+      content: { "application/json": { schema: taskApproveSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Task approved and approval comment created",
+      content: { "application/json": { schema: taskApprovalResponseSchema } },
+    },
+    400: {
+      description: "Validation failed or task is not in submitted/in_review status",
+      content: { "application/json": { schema: taskErrorSchema } },
+    },
+    401: { description: "Unauthorized" },
+    403: { description: "Forbidden: Agent callers cannot approve tasks" },
+    404: { description: "Not found" },
   },
 });
 
