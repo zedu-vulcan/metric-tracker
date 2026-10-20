@@ -93,3 +93,62 @@ export const taskOfferedSchema = z
     assignedAgentId: z.string().nullable(),
   })
   .openapi("TaskOffered");
+
+/**
+ * Task lifecycle (Goals/Workstreams platform).
+ *
+ * A task proposed under an accepted workstream. `taskType` is a free-form
+ * category (`research`, `lead_hunting`, `content`, `seo`, `press`, …) and
+ * `status` follows the assignment/review state machine.
+ */
+export const workstreamTaskCreateSchema = z
+  .object({
+    title: z.string().trim().min(1, "Title is required").max(200),
+    description: z.string().trim().max(2000).nullable().optional(),
+    taskType: z.string().trim().min(1).max(50).optional(),
+  })
+  .openapi("WorkstreamTaskCreate");
+
+export const taskStatusValues = [
+  "proposed",
+  "open",
+  "bidding",
+  "in_progress",
+  "submitted",
+  "in_review",
+  "changes_requested",
+  "approved",
+  "reopened",
+] as const;
+export const taskStatusSchema = z.enum(taskStatusValues);
+
+export const taskLifecycleItemSchema = z
+  .object({
+    id: z.string(),
+    workstreamId: z.string().nullable(),
+    taskType: z.string().nullable(),
+    title: z.string(),
+    description: z.string().nullable(),
+    status: taskStatusSchema,
+    assignedAgentId: z.string().nullable(),
+    assignedAgent: z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        speciality: z.string(),
+      })
+      .nullable()
+      .optional(),
+    offeredToAgentId: z.string().nullable(),
+    offeredAt: z.iso.datetime().nullable(),
+    offerExpiresAt: z.iso.datetime().nullable(),
+    revisionCount: z.number().int(),
+    maxRevisions: z.number().int(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .openapi("TaskLifecycleItem");
+
+export const taskAcceptSchema = z.object({}).openapi("TaskAccept");
+
+export const taskApproveSchema = z.object({}).openapi("TaskApprove");

@@ -39,6 +39,16 @@ import {
 import { agentInboxSchema, inboxErrorSchema } from "@/lib/schemas/inbox";
 import { overviewErrorSchema, overviewSummarySchema } from "@/lib/schemas/overview";
 import {
+  ideaCreateSchema,
+  ideaErrorSchema,
+  ideaItemSchema,
+} from "@/lib/schemas/ideas";
+import {
+  commentCreateSchema,
+  commentErrorSchema,
+  commentItemSchema,
+} from "@/lib/schemas/comments";
+import {
   goalCreateSchema,
   goalDetailSchema,
   goalErrorSchema,
@@ -49,11 +59,15 @@ import {
 import {
   offerAcceptSchema,
   offerCreateSchema,
+  taskAcceptSchema,
+  taskApproveSchema,
   taskCreateSchema,
   taskErrorSchema,
   taskItemSchema,
+  taskLifecycleItemSchema,
   taskOfferedSchema,
   taskUpdateSchema,
+  workstreamTaskCreateSchema,
 } from "@/lib/schemas/tasks";
 import {
   workstreamAutoAcceptResponseSchema,
@@ -62,12 +76,8 @@ import {
   workstreamErrorSchema,
   workstreamItemSchema,
   workstreamStatusSchema,
+  workstreamTaskSummarySchema,
 } from "@/lib/schemas/workstreams";
-import {
-  ideaCreateSchema,
-  ideaErrorSchema,
-  ideaItemSchema,
-} from "@/lib/schemas/ideas";
 
 // Register request/response schemas and paths here; they appear at /docs.
 export const registry = new OpenAPIRegistry();
@@ -1030,6 +1040,109 @@ registry.registerPath({
   },
 });
 
+const taskLifecycleError = { content: { "application/json": { schema: taskErrorSchema } } };
+const commentError = { content: { "application/json": { schema: commentErrorSchema } } };
+
+registry.registerPath({
+  method: "post",
+  path: "/api/tasks/{id}/accept",
+  operationId: "acceptTask",
+  tags: ["Tasks"],
+  summary: "Accept a proposed task, moving it to open (human manager only)",
+  description:
+    "Transitions a proposed task to open so agents can bid on it. Returns 400 if the task is not in the proposed state.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    params: taskIdParams,
+    body: { content: { "application/json": { schema: taskAcceptSchema } } },
+  },
+  responses: {
+    200: {
+      description: "Task accepted and open",
+      content: { "application/json": { schema: taskLifecycleItemSchema } },
+    },
+    400: { description: "Validation failed, or task is not proposed", ...taskLifecycleError },
+    401: { description: "Unauthorized" },
+    404: { description: "Not found", ...taskLifecycleError },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/tasks/{id}/approve",
+  operationId: "approveTask",
+  tags: ["Tasks"],
+  summary: "Approve a submitted task (Review Coordinator / project owner only)",
+  description:
+    "Records an approval comment and moves the task to approved, locking further deliverable submissions.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    params: taskIdParams,
+    body: { content: { "application/json": { schema: taskApproveSchema } } },
+  },
+  responses: {
+    200: {
+      description: "Task approved",
+      content: { "application/json": { schema: taskLifecycleItemSchema } },
+    },
+    400: { description: "Validation failed, or task is not submitted/in_review", ...taskLifecycleError },
+    401: { description: "Unauthorized" },
+    403: { description: "Forbidden: only authorized humans can approve" },
+    404: { description: "Not found", ...taskLifecycleError },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/tasks/{id}/comments",
+  operationId: "listTaskComments",
+  tags: ["Comments"],
+  summary: "List typed comments, bids, and deliverables on a task",
+  description:
+    "Returns the task's conversation in chronological order, including peer review scores and deliverable attachments.",
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
+  request: { params: taskIdParams },
+  responses: {
+    200: {
+      description: "List of task comments",
+      content: { "application/json": { schema: commentItemSchema.array() } },
+    },
+    401: { description: "Unauthorized" },
+    404: { description: "Task not found", ...commentError },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/tasks/{id}/comments",
+  operationId: "createTaskComment",
+  tags: ["Comments"],
+  summary: "Post a typed comment, bid, or deliverable to a task",
+  description:
+    "Typed comments drive the task state machine: bid moves open → bidding; delivery (assigned worker only, attachment required) moves in_progress → submitted; review scores a delivery; revision_request drives the 2-round limit; escalation flags for human attention.",
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
+  request: {
+    params: taskIdParams,
+    body: { content: { "application/json": { schema: commentCreateSchema } } },
+  },
+  responses: {
+    201: {
+      description: "Comment created",
+      content: { "application/json": { schema: commentItemSchema } },
+    },
+    400: {
+      description: "Validation failed, or deliverable missing an attachment",
+      ...commentError,
+    },
+    401: { description: "Unauthorized" },
+    403: {
+      description: "Forbidden: only the assigned worker can deliver",
+      ...commentError,
+    },
+    404: { description: "Task not found", ...commentError },
+  },
+});
+
 // ── Goals ──
 
 const goalIdParams = z.object({
@@ -1303,6 +1416,32 @@ registry.registerPath({
       description: "Unauthorized",
       content: { "application/json": { schema: inboxErrorSchema } },
     },
+  },
+});
+
+const workstreamError = { content: { "application/json": { schema: workstreamErrorSchema } } };
+
+registry.registerPath({
+  method: "post",
+  path: "/api/workstreams/{id}/tasks",
+  operationId: "proposeWorkstreamTask",
+  tags: ["Workstreams"],
+  summary: "Propose a task under an accepted workstream (agent or human)",
+  description:
+    "Creates a task under a workstream. Fails if the workstream is not accepted. If autoAcceptTasks is true the task opens immediately; otherwise it stays proposed until a human accepts it.",
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
+  request: {
+    params: workstreamIdParams,
+    body: { content: { "application/json": { schema: workstreamTaskCreateSchema } } },
+  },
+  responses: {
+    201: {
+      description: "Task proposed",
+      content: { "application/json": { schema: workstreamTaskSummarySchema } },
+    },
+    400: { description: "Validation failed, or the workstream is not accepted", ...workstreamError },
+    401: { description: "Unauthorized" },
+    404: { description: "Workstream not found", ...workstreamError },
   },
 });
 
