@@ -115,6 +115,8 @@ import {
   projectMemberSchema,
   projectSummarySchema,
   projectUpdateSchema,
+  transferOwnershipResponseSchema,
+  transferOwnershipSchema,
 } from "@/lib/schemas/projects";
 
 // Register request/response schemas and paths here; they appear at /docs.
@@ -411,6 +413,28 @@ registry.registerPath({
     200: { description: "Members", content: { "application/json": { schema: projectMemberSchema.array() } } },
     401: { description: "Unauthorized" },
     404: { description: "Not found" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/projects/{id}/transfer-ownership",
+  operationId: "transferProjectOwnership",
+  tags: ["Projects"],
+  summary: "Transfer project ownership",
+  description: "Promotes an existing project member to owner and demotes the current owner to admin in one transaction.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    params: projectIdParams,
+    body: { content: { "application/json": { schema: transferOwnershipSchema } } },
+  },
+  responses: {
+    200: { description: "Ownership transferred", content: { "application/json": { schema: transferOwnershipResponseSchema } } },
+    400: { description: "Validation failed or target is the current owner" },
+    401: { description: "Unauthorized" },
+    403: { description: "Owner only" },
+    404: { description: "Target is not an eligible project member" },
+    409: { description: "Ownership changed while the request was being processed" },
   },
 });
 

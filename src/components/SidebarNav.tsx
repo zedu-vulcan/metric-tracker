@@ -8,6 +8,7 @@ import {
   FileTextIcon,
   FolderOpenIcon,
   LayoutDashboardIcon,
+  BriefcaseBusinessIcon,
   MegaphoneIcon,
   NewspaperIcon,
   ScanSearchIcon,
@@ -103,6 +104,14 @@ export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean
         icon={<LayoutDashboardIcon aria-hidden="true" />}
       >
         Overview
+      </SidebarNavLink>
+      <SidebarNavLink
+        aria-current={current(projectPath("/work"))}
+        href={projectPath("/work")}
+        collapsed={collapsed}
+        icon={<BriefcaseBusinessIcon aria-hidden="true" />}
+      >
+        My Work
       </SidebarNavLink>
       <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-sidebar-border lg:mx-3 lg:my-1.5 lg:h-px lg:w-auto" />
       <SidebarNavGroup
