@@ -105,7 +105,7 @@ export function buildNotifications(feed: NotificationFeed, readKeys: ReadonlySet
       title: `${agentName} was offered a task`,
       message: `“${task.title}”. ${agentName} needs to accept it before the offer runs out.`,
       href: taskHref(task),
-      needsAction: false,
+      needsAction: true,
       createdAt: offeredAt,
     });
   }

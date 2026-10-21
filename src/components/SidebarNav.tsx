@@ -8,6 +8,7 @@ import {
   FileTextIcon,
   FolderOpenIcon,
   LayoutDashboardIcon,
+  ListChecksIcon,
   MegaphoneIcon,
   NewspaperIcon,
   ScanSearchIcon,
@@ -24,6 +25,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useNotifications } from "@/components/profile/useNotifications";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +53,7 @@ export function SidebarNavLink({ icon, badge, collapsed = false, children, class
       title={collapsed && typeof children === "string" ? children : undefined}
       className={cn(
         NAV_ITEM,
-        "aria-[current=page]:bg-sidebar-primary aria-[current=page]:font-semibold aria-[current=page]:text-sidebar-primary-foreground aria-[current=page]:shadow-[0_8px_20px_rgb(125_104_249/0.35)]",
+        "relative aria-[current=page]:bg-sidebar-primary aria-[current=page]:font-semibold aria-[current=page]:text-sidebar-primary-foreground aria-[current=page]:shadow-[0_8px_20px_rgb(125_104_249/0.35)]",
         collapsed && "lg:size-11 lg:justify-center lg:self-center lg:px-0",
         className
       )}
@@ -62,6 +64,12 @@ export function SidebarNavLink({ icon, badge, collapsed = false, children, class
       {badge != null && !collapsed && (
         <span className="ml-auto shrink-0 rounded-full bg-sidebar-accent px-2 text-xs font-semibold text-sidebar-foreground group-aria-[current=page]/nav:bg-white/20">
           {badge}
+        </span>
+      )}
+      {/* The collapsed rail has no room for a number, so a dot says something is waiting. */}
+      {badge != null && collapsed && (
+        <span className="absolute top-2 right-2 hidden size-2.5 rounded-full bg-warning ring-2 ring-sidebar lg:block">
+          <span className="sr-only">{badge} waiting</span>
         </span>
       )}
     </a>
@@ -89,7 +97,9 @@ const CHANNELS: NavItem[] = [
 export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
   const { href: projectPath } = useProject();
+  const { actionCount } = useNotifications();
   const overview = projectPath();
+  const yourMove = projectPath("/todo");
   const isCurrent = (href: string) => (href === overview ? pathname === href : pathname.startsWith(href));
   const current = (href: string) => (isCurrent(href) ? "page" : undefined);
   const inProject = (items: NavItem[]) => items.map((item) => ({ ...item, href: projectPath(item.href) }));
@@ -103,6 +113,15 @@ export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean
         icon={<LayoutDashboardIcon aria-hidden="true" />}
       >
         Overview
+      </SidebarNavLink>
+      <SidebarNavLink
+        aria-current={current(yourMove)}
+        href={yourMove}
+        collapsed={collapsed}
+        icon={<ListChecksIcon aria-hidden="true" />}
+        badge={actionCount > 0 ? (actionCount > 99 ? "99+" : actionCount) : undefined}
+      >
+        Awaiting You
       </SidebarNavLink>
       <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-sidebar-border lg:mx-3 lg:my-1.5 lg:h-px lg:w-auto" />
       <SidebarNavGroup
