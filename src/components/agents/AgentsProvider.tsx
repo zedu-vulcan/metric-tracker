@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { requestJson } from "@/lib/request-json";
+import { apiFetch, requestJson } from "@/lib/request-json";
 import type { AgentAvatar, MyAgent } from "./agent-model";
 
 const SELECTED_KEY = "zedu-amp:selected-agent";
@@ -17,6 +17,7 @@ type AgentsContextValue = {
   select: (agentId: string) => void;
   createAgent: (input: NewAgent) => Promise<AgentWithKey>;
   regenerateKey: (agentId: string) => Promise<AgentWithKey>;
+  removeAgent: (agentId: string) => Promise<void>;
 };
 
 const AgentsContext = createContext<AgentsContextValue | undefined>(undefined);
@@ -86,6 +87,12 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     return renewed;
   }, []);
 
+  const removeAgent = useCallback(async (agentId: string) => {
+    const response = await apiFetch(`/api/agents/${agentId}`, { method: "DELETE" });
+    if (!response.ok && response.status !== 404) throw new Error("Couldn't delete the agent. Try again.");
+    setAgents((previous) => previous.filter((agent) => agent.id !== agentId));
+  }, []);
+
   const value = useMemo<AgentsContextValue>(
     () => ({
       agents,
@@ -94,8 +101,9 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
       select,
       createAgent,
       regenerateKey,
+      removeAgent,
     }),
-    [agents, loading, selectedId, select, createAgent, regenerateKey]
+    [agents, loading, selectedId, select, createAgent, regenerateKey, removeAgent]
   );
 
   return <AgentsContext.Provider value={value}>{children}</AgentsContext.Provider>;

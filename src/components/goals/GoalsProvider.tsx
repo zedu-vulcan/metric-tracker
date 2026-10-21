@@ -86,12 +86,17 @@ type ApiIdea = {
   proposedByAgent?: ApiAgentRef | null;
   acceptedBy?: { name: string | null; email: string | null } | null;
   rejectionReason?: string | null;
-  upvotes?: { id: string; agent: ApiAgentRef; reason: string; createdAt: string }[];
+  upvotes?: ApiVote[];
+  downvotes?: ApiVote[];
   /** Only the goal detail includes these. */
   tasks?: { status: TaskStatus }[];
   createdAt: string;
   updatedAt: string;
 };
+
+type ApiVote = { id: string; agent: ApiAgentRef; reason: string; createdAt: string };
+
+const toVote = (vote: ApiVote) => ({ id: vote.id, agentId: vote.agent.id, reason: vote.reason, at: vote.createdAt });
 
 type ApiGoalDetail = { acceptedWorkstreams: ApiIdea[]; pendingIdeas: ApiIdea[]; rejectedIdeas?: ApiIdea[] };
 
@@ -108,12 +113,8 @@ function toIdea(idea: ApiIdea): Idea {
     // There's no decision timestamp yet; the record's last update is when it was decided.
     decidedAt: idea.status === "proposed" ? undefined : idea.updatedAt,
     rejectionReason: idea.rejectionReason ?? undefined,
-    upvotes: (idea.upvotes ?? []).map((upvote) => ({
-      id: upvote.id,
-      agentId: upvote.agent.id,
-      reason: upvote.reason,
-      at: upvote.createdAt,
-    })),
+    upvotes: (idea.upvotes ?? []).map(toVote),
+    downvotes: (idea.downvotes ?? []).map(toVote),
     taskStatuses: idea.tasks?.map((task) => task.status) ?? [],
   };
 }
@@ -244,6 +245,7 @@ type GoalsContextValue = {
   bidsFor: (taskId: string) => Bid[];
   agentFor: (agentId: string) => Agent | undefined;
   createGoal: (input: NewGoal) => Promise<Goal>;
+  deleteGoal: (goalId: string) => Promise<void>;
   approveIdea: (ideaId: string) => Promise<void>;
   rejectIdea: (ideaId: string, reason: string) => Promise<void>;
   sendOffer: (taskId: string, agentId: string) => Promise<void>;
@@ -300,6 +302,11 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
     return goal;
   }, []);
 
+  const deleteGoal = useCallback(async (goalId: string) => {
+    await requestJson(`/api/goals/${goalId}`, { method: "DELETE" });
+    setGoals((previous) => previous.filter((goal) => goal.id !== goalId));
+  }, []);
+
   const rememberAgents = useCallback((refs: (ApiAgentRef | null | undefined)[], fallbackActiveAt: string) => {
     const seen = refs.flatMap((ref) => (ref ? [toAgent(ref, fallbackActiveAt)] : []));
     if (seen.length > 0) setApiAgents((previous) => ({ ...previous, ...Object.fromEntries(seen.map((agent) => [agent.id, agent])) }));
@@ -312,7 +319,10 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
         .then((detail) => {
           const records = [...detail.acceptedWorkstreams, ...detail.pendingIdeas, ...(detail.rejectedIdeas ?? [])];
           records.forEach((record) =>
-            rememberAgents([record.proposedByAgent, ...(record.upvotes ?? []).map((upvote) => upvote.agent)], record.createdAt)
+            rememberAgents(
+              [record.proposedByAgent, ...[...(record.upvotes ?? []), ...(record.downvotes ?? [])].map((vote) => vote.agent)],
+              record.createdAt
+            )
           );
           setIdeas((previous) => [...previous.filter((idea) => idea.goalId !== goalId), ...records.map(toIdea)]);
           setIdeaStatuses((previous) => ({ ...previous, [goalId]: "ready" }));
@@ -430,6 +440,7 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
         ),
       agentFor: (agentId) => apiAgents[agentId],
       createGoal,
+      deleteGoal,
       approveIdea: (ideaId) => decide(ideaId, "accept"),
       rejectIdea: (ideaId, reason) => decide(ideaId, "reject", reason),
       sendOffer: (taskId, agentId) => changeOffer(taskId, "POST", agentId),
@@ -453,6 +464,7 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
       loadThread,
       apiAgents,
       createGoal,
+      deleteGoal,
       decide,
       changeOffer,
       postNote,

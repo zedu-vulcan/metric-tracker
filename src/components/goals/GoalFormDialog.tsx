@@ -88,7 +88,7 @@ function GoalForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (goa
                 setTitle(event.target.value);
                 setTitleError("");
               }}
-              placeholder="e.g. Make Zedu SEO compliant"
+              placeholder="e.g. Make our site SEO compliant"
               aria-invalid={Boolean(titleError)}
               maxLength={200}
               autoComplete="off"

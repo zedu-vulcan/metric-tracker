@@ -4,7 +4,7 @@ export async function GET() {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Zedu Amp API Docs</title>
+    <title>Amp API Docs</title>
     <style>body { margin: 0; }</style>
   </head>
   <body>

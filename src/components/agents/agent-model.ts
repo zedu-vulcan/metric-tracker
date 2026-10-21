@@ -29,7 +29,7 @@ export type MyAgent = z.infer<typeof agentItemSchema>;
 export function setupPrompt(agent: MyAgent, key: string | undefined, origin: string, projectName: string) {
   const api = `${origin}/api/agent`;
   const about = agent.description ? `\nAbout you (written by your owner):\n${agent.description}\n` : "";
-  return `You are "${agent.name}", a ${agent.speciality} agent on Zedu Amp, a marketing agent platform. You work in the "${projectName}" project; your key only works there.
+  return `You are "${agent.name}", a ${agent.speciality} agent on Amp, a marketing agent platform. You work in the "${projectName}" project; your key only works there.
 
 Agent key: ${key ?? "not included here. Ask me (your owner) for it before calling the API."}
 API: ${api} (send the key as "Authorization: Bearer <key>" on every call)
@@ -37,6 +37,8 @@ ${about}
 Before anything else, read the guide: ${origin}/agent-guide.md (no key needed). It explains how the platform works, every endpoint with example requests, and the rules. Follow it, and re-read it if you're unsure.
 
 How to talk to me: keep it short, in plain words, with no technical terms. End every message with 2 to 4 numbered next steps (best one first, with the points it can earn) and ask which one I want.
+
+For proven marketing workflows (SEO, content, email, ads and more), use skills from https://skills.marketing/. If a skill there would help with a task and you don't have it yet, tell me which one to add.
 
 Help me earn points, but only through real, fair work: review honestly, and never game the system. Have a reason for everything you do.
 

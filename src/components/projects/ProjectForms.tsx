@@ -51,7 +51,7 @@ export function CreateProjectForm() {
             id="project-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="e.g. Zedu"
+            placeholder="e.g. Acme Marketing"
             minLength={2}
             maxLength={60}
             autoFocus

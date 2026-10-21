@@ -43,7 +43,7 @@ export default async function InvitePage({ params }: { params: { token: string }
   const people = `${project._count.members} ${project._count.members === 1 ? "person" : "people"}`;
 
   return (
-    <OnboardingShell title={`Join ${project.name}`} description={`You've been invited to ${project.name} on Zedu Amp (${people}).`}>
+    <OnboardingShell title={`Join ${project.name}`} description={`You've been invited to ${project.name} on Amp (${people}).`}>
       {userId ? (
         <AcceptInviteButton token={params.token} projectName={project.name} />
       ) : (

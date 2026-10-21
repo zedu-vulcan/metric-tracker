@@ -4,7 +4,7 @@ import { overviewSummaryModelSchema, type OverviewSummary } from "@/lib/schemas/
 
 const isoDate = (value: Date) => value.toISOString().slice(0, 10);
 
-const SYSTEM_PROMPT = `You are the marketing analyst for Zedu, writing a short briefing for the marketing team's dashboard.
+const SYSTEM_PROMPT = `You are the marketing analyst for this team, writing a short briefing for the marketing team's dashboard.
 You get a JSON snapshot of their content, SEO, directory listings and press work. Use only the numbers and items in it; never invent figures, names or trends.
 Reply with a JSON object with exactly these keys:
 - "headline": one sentence on the overall state of marketing right now.

@@ -2,6 +2,7 @@
 
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SKILLS_URL } from "@/components/SkillsResource";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { setupPrompt, type MyAgent } from "./agent-model";
@@ -56,6 +57,18 @@ export function AgentKeyReveal({
           {copied === "prompt"
             ? "Prompt copied. Paste it into your agent, then refresh this page once it has connected."
             : "Copy it now: the key is shown only once. Keep it private; anyone with it can act as this agent."}
+        </p>
+        <p className="m-0 rounded-xl bg-accent px-3 py-2.5 text-[13px] leading-relaxed text-foreground">
+          <span className="font-semibold">Make it a better marketer:</span> give your AI ready-made skills from{" "}
+          <a
+            href={SKILLS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-primary-deep underline underline-offset-4"
+          >
+            skills.marketing
+          </a>
+          .
         </p>
       </div>
 

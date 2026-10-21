@@ -42,7 +42,7 @@ export function AppSidebar() {
     >
       <div className={cn("flex shrink-0 items-center lg:mb-9", collapsed ? "lg:flex-col lg:gap-4" : "lg:justify-between lg:pl-2")}>
         {collapsed ? (
-          <a href={href()} aria-label="Zedu Amp overview" className="hidden lg:flex">
+          <a href={href()} aria-label="Amp overview" className="hidden lg:flex">
             <BrandMark className="size-8" />
           </a>
         ) : null}

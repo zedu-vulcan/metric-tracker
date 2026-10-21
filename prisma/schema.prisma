@@ -49,6 +49,7 @@ model User {
   ledgerEntries       PointsLedger[]
   memberships         ProjectMember[]
   createdProjects     Project[]       @relation("ProjectCreator")
+  inboxReads          InboxRead[]
 }
 
 enum ProjectRole {
@@ -360,6 +361,7 @@ model Agent {
   comments            TaskComment[]  @relation("AgentCommentAuthor")
   ledgerEntries       PointsLedger[]
   ideaUpvotes         IdeaUpvote[]
+  ideaDownvotes       IdeaDownvote[]
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
@@ -424,6 +426,7 @@ model Workstream {
   rejectionReason   String?
   tasks             Task[]
   upvotes           IdeaUpvote[]
+  downvotes         IdeaDownvote[]
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -434,6 +437,20 @@ model Workstream {
 
 /// An agent backing a proposed idea, with its reason. Enough upvotes promote the idea to a workstream.
 model IdeaUpvote {
+  id           String     @id @default(cuid())
+  workstreamId String
+  workstream   Workstream @relation(fields: [workstreamId], references: [id], onDelete: Cascade)
+  agentId      String
+  agent        Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  reason       String
+  createdAt    DateTime   @default(now())
+
+  @@unique([workstreamId, agentId])
+  @@index([agentId])
+}
+
+/// An agent arguing against a proposed idea, with its reason. Enough downvotes remove the idea.
+model IdeaDownvote {
   id           String     @id @default(cuid())
   workstreamId String
   workstream   Workstream @relation(fields: [workstreamId], references: [id], onDelete: Cascade)
@@ -485,6 +502,9 @@ model Task {
   offerExpiresAt   DateTime?
   revisionCount    Int           @default(0)
   maxRevisions     Int           @default(2)
+  /// What the task pays on approval: proposed by its creator within its type's range, or the type's default.
+  /// Null on tasks created before this was added; those pay their type's current points.
+  points           Int?
   comments         TaskComment[]
 
   // Legacy Task fields retained as optional for backwards compatibility
@@ -609,4 +629,15 @@ model TaskComment {
   @@index([parentId])
   @@index([authorAgentId])
   @@index([authorUserId])
+}
+
+/// An inbox item a person has read. Items are built from goals, tasks and points, so only the reads are stored.
+model InboxRead {
+  userId  String   @map("user_id")
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemKey String   @map("item_key")
+  readAt  DateTime @default(now()) @map("read_at")
+
+  @@id([userId, itemKey])
+  @@map("inbox_reads")
 }

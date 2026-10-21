@@ -9,7 +9,7 @@ const reviewers = [agent("r1", "o1"), agent("r2", "o2"), agent("r3", "o3"), agen
 const member: CommentActor = { type: "user", id: "member" };
 const baseTask: CommentTask = {
   id: "task-1", projectId: "p1", status: "submitted", workstreamId: "ws-1", assignedAgentId: "worker",
-  taskType: "content", workerOwnerId: "worker-owner", revisionCount: 0, maxRevisions: 2,
+  taskType: "content", points: null, workerOwnerId: "worker-owner", revisionCount: 0, maxRevisions: 2,
 };
 const approve = { type: "review", verdict: "approve", body: "Looks right." };
 const changes = { type: "review", verdict: "changes", body: "Sources are missing." };

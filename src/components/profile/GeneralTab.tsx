@@ -1,7 +1,15 @@
-import { KpiCard } from "@/components/KpiCard";
+"use client";
+
+import Link from "next/link";
+import { ArrowUpRightIcon, BotIcon, TrophyIcon } from "lucide-react";
+import { AgentAvatar } from "@/components/agents/AgentAvatar";
+import { useProject } from "@/components/projects/ProjectProvider";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Separator } from "@/components/ui/separator";
+import { formatPoints, type AgentPoints } from "./AgentsTab";
 
 export type ProfileDetails = {
   name: string | null;
@@ -9,7 +17,6 @@ export type ProfileDetails = {
   image: string | null;
   emailVerified: boolean;
   providers: string[];
-  agentCount: number;
 };
 
 const PROVIDER_LABELS: Record<string, string> = { google: "Google" };
@@ -26,7 +33,7 @@ function largeAvatar(url: string) {
   return url.replace(/=s\d+-c$/, "=s256-c");
 }
 
-export function GeneralTab({ profile }: { profile: ProfileDetails }) {
+export function GeneralTab({ profile, agents }: { profile: ProfileDetails; agents: AgentPoints[] }) {
   const displayName = profile.name ?? profile.email ?? "Your profile";
   const providers = profile.providers.map((id) => PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1));
 
@@ -85,11 +92,102 @@ export function GeneralTab({ profile }: { profile: ProfileDetails }) {
         </CardContent>
       </Card>
 
-      <KpiCard
-        title="Your agents"
-        value={profile.agentCount.toLocaleString()}
-        context={profile.agentCount === 1 ? "Agent connected to your account" : "Agents connected to your account"}
-      />
+      <AgentsCard agents={agents} />
     </div>
+  );
+}
+
+const MAX_FACES = 5;
+
+/** Beside the profile: how many agents you have, and the one earning the most. */
+function AgentsCard({ agents }: { agents: AgentPoints[] }) {
+  const { href } = useProject();
+  const connected = agents.filter((agent) => agent.connected).length;
+  const top = agents[0]?.total > 0 ? agents[0] : null;
+  const others = agents.filter((agent) => agent !== top);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Your agents</CardTitle>
+        <CardDescription>
+          {agents.length === 0
+            ? "None in this project yet"
+            : `${agents.length} in this project · ${connected} connected`}
+        </CardDescription>
+        {agents.length > 0 && (
+          <CardAction>
+            <Link
+              href={href("/profile?tab=agents")}
+              aria-label="See all your agents"
+              title="See all your agents"
+              className={buttonVariants({ variant: "outline", size: "icon" })}
+            >
+              <ArrowUpRightIcon aria-hidden="true" />
+            </Link>
+          </CardAction>
+        )}
+      </CardHeader>
+
+      <CardContent className="flex flex-1 flex-col gap-4">
+        {agents.length === 0 ? (
+          <Empty className="border-0 p-0 py-4">
+            <EmptyHeader>
+              <EmptyMedia className="size-12 rounded-full bg-accent text-primary-deep [&_svg]:size-5">
+                <BotIcon aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyTitle className="text-[15px] font-bold">No agents yet</EmptyTitle>
+              <EmptyDescription>Create one from the top bar. It bids on tasks and earns you points.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : top ? (
+          <div className="flex flex-col gap-4 rounded-2xl bg-accent p-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <AgentAvatar avatar={top.avatar} className="size-14 bg-card ring-4 ring-card" />
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="truncate text-base font-bold tracking-[-0.02em] text-foreground">{top.name}</span>
+                <span className="truncate text-[13px] text-muted-foreground">{top.speciality}</span>
+              </div>
+              <Badge variant="success" className="ml-auto shrink-0">
+                <TrophyIcon data-icon="inline-start" aria-hidden="true" />
+                Top earner
+              </Badge>
+            </div>
+            <dl className="m-0 grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <dt className="text-[13px] font-medium text-muted-foreground">Total points</dt>
+                <dd className="m-0 text-[26px] leading-none font-extrabold tracking-[-0.035em] text-foreground tabular-nums">
+                  {formatPoints(top.total)}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1">
+                <dt className="text-[13px] font-medium text-muted-foreground">This week</dt>
+                <dd className="m-0 text-[26px] leading-none font-extrabold tracking-[-0.035em] text-primary-deep tabular-nums">
+                  {top.thisWeek > 0 ? `+${formatPoints(top.thisWeek)}` : "0"}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        ) : (
+          <p className="m-0 rounded-2xl bg-muted px-4 py-3.5 text-[13px] text-muted-foreground">
+            No points earned yet. Agents earn them by delivering approved work, reviewing fairly and suggesting ideas that get accepted.
+          </p>
+        )}
+
+        {others.length > 0 && (
+          <div className="mt-auto flex items-center gap-3">
+            <div className="flex" aria-hidden="true">
+              {others.slice(0, MAX_FACES).map((agent) => (
+                <AgentAvatar key={agent.id} avatar={agent.avatar} className="-ml-2 size-8 ring-2 ring-card first:ml-0" />
+              ))}
+            </div>
+            <span className="min-w-0 truncate text-[13px] text-muted-foreground">
+              {top ? "Also working: " : ""}
+              {others.map((agent) => agent.name).join(", ")}
+            </span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

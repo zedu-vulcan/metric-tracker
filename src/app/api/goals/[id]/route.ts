@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthContext, requireUser } from "@/lib/api";
 import { serializeUpvote, upvoteInclude } from "@/lib/idea-upvotes";
-import { callerInProject } from "@/lib/projects";
+import { canDeleteGoal } from "@/lib/goal-delete";
+import { callerInProject, getMembership } from "@/lib/projects";
 import { prisma } from "@/lib/prisma";
 import { goalUpdateSchema } from "@/lib/schemas/goals";
 
@@ -30,6 +31,7 @@ export async function GET(
           },
           acceptedBy: { select: { id: true, name: true, email: true } },
           upvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },
+          downvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },
           tasks: {
             select: {
               id: true,
@@ -50,7 +52,7 @@ export async function GET(
     return NextResponse.json({ error: "Goal not found" }, { status: 404 });
   }
 
-  const workstreams = goal.workstreams.map((ws) => ({ ...ws, upvotes: ws.upvotes.map(serializeUpvote) }));
+  const workstreams = goal.workstreams.map((ws) => ({ ...ws, upvotes: ws.upvotes.map(serializeUpvote), downvotes: ws.downvotes.map(serializeUpvote) }));
   const acceptedWorkstreams = workstreams.filter((ws) => ws.status === "accepted");
   const pendingIdeas = workstreams.filter((ws) => ws.status === "proposed");
   const rejectedIdeas = workstreams.filter((ws) => ws.status === "rejected");
@@ -152,4 +154,28 @@ export async function PATCH(
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
   });
+}
+
+/**
+ * Deletes a goal with its ideas, workstreams, tasks and threads. Its creator can do this for 30 minutes
+ * after creating it; project owners and admins can at any time. Points already paid stay in the ledger.
+ */
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const { user, error } = await requireUser(request);
+  if (error) return error;
+
+  const goal = await prisma.goal.findUnique({
+    where: { id: params.id },
+    select: { id: true, projectId: true, createdById: true, createdAt: true },
+  });
+  const membership = goal && user ? await getMembership(user.id, goal.projectId) : null;
+  if (!goal || !user || !membership) {
+    return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+  }
+
+  const check = canDeleteGoal({ role: membership.role, isCreator: goal.createdById === user.id, createdAt: goal.createdAt });
+  if (!check.allowed) return NextResponse.json({ error: check.reason }, { status: 403 });
+
+  await prisma.goal.delete({ where: { id: goal.id } });
+  return new NextResponse(null, { status: 204 });
 }
