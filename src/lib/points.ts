@@ -112,9 +112,9 @@ export type PointRule = {
 
 /** Award rules every new project starts with. Each review pays 5 (decision 20 Oct 2026). */
 export const DEFAULT_POINT_RULES: PointRule[] = [
-  { ruleKey: "review_submitted", amount: 5, enabled: true, weeklyCap: null },
-  { ruleKey: "idea_accepted", amount: 2, enabled: true, weeklyCap: null },
-  { ruleKey: "idea_upvoted", amount: 0.5, enabled: true, weeklyCap: null },
+  { ruleKey: "review_submitted", amount: 6, enabled: true, weeklyCap: null },
+  { ruleKey: "idea_accepted", amount: 3, enabled: true, weeklyCap: null },
+  { ruleKey: "idea_upvoted", amount: 1.5, enabled: true, weeklyCap: null },
   { ruleKey: "task_proposal_accepted", amount: 5, enabled: false, weeklyCap: null },
   // These two are percentages of the approved task's points, not fixed amounts.
   { ruleKey: "goal_task_approved", amount: 5, enabled: true, weeklyCap: null },
@@ -126,15 +126,24 @@ export const WEEKLY_TARGET_RULE = "weekly_target";
 
 // ── Task types ───────────────────────────────────────────────────────────────
 
-/** Task types every new project starts with; its owner and admins edit them afterwards. */
+/**
+ * Task types every new project starts with; its owner and admins edit them afterwards. `points` is the
+ * default and the lowest a task of that type can pay; whoever creates a task can propose up to `maxPoints`.
+ */
 export const DEFAULT_TASK_TYPES = [
-  { slug: "research", name: "Research", description: "Investigate and report findings", points: 20, maxPoints: 50 },
-  { slug: "lead_hunting", name: "Lead hunting", description: "Find and qualify contacts", points: 30, maxPoints: 50 },
-  { slug: "content", name: "Content", description: "Articles, posts, guides", points: 40, maxPoints: 50 },
-  { slug: "seo", name: "SEO", description: "On-page and technical fixes", points: 25, maxPoints: 50 },
-  { slug: "press", name: "Press", description: "Pitches and media outreach", points: 35, maxPoints: 50 },
-  { slug: "other", name: "Other", description: "Anything that fits no other type", points: 10, maxPoints: 30 },
+  { slug: "content", name: "Content", description: "Articles, posts, guides", points: 60, maxPoints: 120 },
+  { slug: "press", name: "Press", description: "Pitches and media outreach", points: 50, maxPoints: 100 },
+  { slug: "lead_hunting", name: "Lead hunting", description: "Find and qualify contacts", points: 50, maxPoints: 100 },
+  { slug: "seo", name: "SEO", description: "On-page and technical fixes", points: 40, maxPoints: 80 },
+  { slug: "research", name: "Research", description: "Investigate and report findings", points: 30, maxPoints: 60 },
+  { slug: "other", name: "Other", description: "Anything that fits no other type", points: 20, maxPoints: 40 },
 ];
+
+/** Why `points` is outside the range a task of this type may pay, or null when it fits. */
+export function taskPointsError(points: number, type: { name: string; points: number; maxPoints: number }): string | null {
+  if (Number.isInteger(points) && points >= type.points && points <= type.maxPoints) return null;
+  return `A ${type.name} task pays between ${type.points} and ${type.maxPoints} points`;
+}
 
 export type TaskTypeConfig = {
   id: string;
@@ -174,7 +183,7 @@ export function shareOfTaskPoints(points: number, percent: number): number {
   return Math.round((points * percent) / 10) / 10;
 }
 
-/** A task pays its snapshot, clamped to the type's cap. Snapshot is fixed at "open" time. */
+/** A task pays the points set when it was created, clamped to its type's current cap. */
 export function clampTaskPoints(pointsSnapshot: number, maxPoints: number): number {
   if (!Number.isInteger(pointsSnapshot) || !Number.isInteger(maxPoints)) return 0;
   return Math.max(0, Math.min(pointsSnapshot, maxPoints));

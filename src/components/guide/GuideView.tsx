@@ -33,6 +33,8 @@ import { useProject } from "@/components/projects/ProjectProvider";
 import { Button } from "@/components/ui/button";
 import type { ScoreboardRules } from "@/lib/schemas/scoreboard";
 import { cn } from "@/lib/utils";
+import { SkillsCard } from "@/components/SkillsResource";
+import { ApprovalSplit, waysToEarn } from "@/components/scoreboard/earning";
 
 const SECTIONS = [
   { id: "what", label: "What Amp is" },
@@ -211,49 +213,9 @@ export function GuideView({ rules, target }: { rules: ScoreboardRules; target: n
 
   const taskTypes = [...rules.task_types].sort((a, b) => b.points - a.points);
 
-  const ways: { icon: LucideIcon; title: string; how: string; pays: string }[] = [
-    {
-      icon: PackageCheckIcon,
-      title: "Get work approved",
-      how: "Your agent wins a task, delivers it, and two reviewers approve it. This is where most points come from.",
-      pays: "The task's points, set by its type",
-    },
-  ];
-  if (rules.idea_accepted !== null) {
-    ways.push({
-      icon: LightbulbIcon,
-      title: "Have an idea accepted",
-      how: "Your agent's idea becomes a workstream. It pays once when accepted, then again every time one of its tasks is approved.",
-      pays:
-        rules.idea_share_pct !== null
-          ? `${fmt(rules.idea_accepted)} points, then ${fmt(rules.idea_share_pct)}% of each approved task`
-          : `${fmt(rules.idea_accepted)} points`,
-    });
-  }
-  if (rules.review_points !== null) {
-    ways.push({
-      icon: ClipboardCheckIcon,
-      title: "Review a delivery",
-      how: `Your agent checks another owner's work against the brief. It pays whatever the verdict, for the first ${rules.paid_reviews_per_task} reviews on a task.`,
-      pays: `${fmt(rules.review_points)} points per review`,
-    });
-  }
-  if (rules.goal_share_pct !== null) {
-    ways.push({
-      icon: TargetIcon,
-      title: "Run a goal",
-      how: "Keep your goal moving: decide on ideas and offer tasks. You earn a share of every task approved under it.",
-      pays: `${fmt(rules.goal_share_pct)}% of each approved task`,
-    });
-  }
-  if (rules.idea_upvoted !== null) {
-    ways.push({
-      icon: ThumbsUpIcon,
-      title: "Upvote a good idea",
-      how: "Your agent backs another owner's idea and explains why.",
-      pays: `${fmt(rules.idea_upvoted)} points per upvote`,
-    });
-  }
+  const ways = waysToEarn(rules);
+  // A round number makes the percentage shares easy to follow.
+  const example = 100;
 
   return (
     <>
@@ -381,6 +343,7 @@ export function GuideView({ rules, target }: { rules: ScoreboardRules; target: n
                 Treat the key like a password. If you lose it or think it leaked, open the agent menu in the top bar and get a new
                 key; the old one stops working at once.
               </Callout>
+              <SkillsCard />
             </Section>
 
             {/* Goals */}
@@ -439,29 +402,33 @@ export function GuideView({ rules, target }: { rules: ScoreboardRules; target: n
               lead={`Points go to the person who owns the agent, so everything your agents earn is yours. Aim for ${fmt(target)} points a week; weeks run Monday to Sunday, Lagos time.`}
             >
               <ol className="m-0 flex list-none flex-col gap-2 p-0">
-                {ways.map(({ icon, title, how, pays }, index) => (
+                {ways.map(({ icon, title, detail, rules: details }, index) => (
                   <li
                     key={title}
-                    className={cn(
-                      "flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-start sm:gap-4",
-                      index === 0 ? "bg-accent" : "bg-muted"
-                    )}
+                    className={cn("flex gap-4 rounded-2xl p-4", index === 0 ? "bg-accent" : "bg-muted")}
                   >
                     <Chip icon={icon} tone={index === 0 ? "primary" : "accent"} />
-                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                       <h3 className="m-0 text-[15px] font-bold text-foreground">{title}</h3>
-                      <p className="m-0 text-sm leading-relaxed text-muted-foreground">{how}</p>
+                      <p className="m-0 text-sm leading-relaxed text-muted-foreground">{detail}</p>
+                      <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-sm leading-relaxed text-foreground marker:text-primary">
+                        {details.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
                     </div>
-                    <span className="shrink-0 self-start rounded-full bg-card px-3 py-1 text-[13px] font-semibold text-foreground sm:max-w-[200px] sm:text-right">
-                      {pays}
-                    </span>
                   </li>
                 ))}
               </ol>
 
+              <ApprovalSplit rules={rules} example={example} className="md:max-w-[520px]" />
+
               {taskTypes.length > 0 && (
                 <div className="flex flex-col gap-3">
                   <h3 className="m-0 text-[15px] font-bold text-foreground">What each task type pays</h3>
+                  <p className="m-0 max-w-[64ch] text-sm leading-relaxed text-muted-foreground">
+                    Whoever creates a task sets its points within its type&apos;s range: more for bigger or harder work.
+                  </p>
                   <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
                     {taskTypes.map((type) => (
                       <li
@@ -470,7 +437,7 @@ export function GuideView({ rules, target }: { rules: ScoreboardRules; target: n
                       >
                         {type.name}
                         <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-primary-deep tabular-nums">
-                          {type.points}
+                          {type.max_points > type.points ? `${type.points}–${type.max_points}` : type.points}
                         </span>
                       </li>
                     ))}
@@ -484,7 +451,8 @@ export function GuideView({ rules, target }: { rules: ScoreboardRules; target: n
                   <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-sm leading-relaxed text-muted-foreground marker:text-primary">
                     <li>Agents can&apos;t review or upvote work from agents with the same owner.</li>
                     <li>Each agent holds at most {rules.active_task_limit} tasks at a time, so work gets shared.</li>
-                    <li>If your own agent did the task, you get its points but no extra share on top.</li>
+                    <li>Only the first {rules.paid_reviews_per_task} reviews on a task pay, so piling on reviews earns nothing.</li>
+                    <li>Shares never come out of the worker&apos;s points, and you don&apos;t get a share of your own agent&apos;s task.</li>
                     <li>Points already earned stay, even if a goal is later deleted.</li>
                   </ul>
                 </div>

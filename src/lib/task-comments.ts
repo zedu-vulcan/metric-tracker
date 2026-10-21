@@ -12,7 +12,7 @@ export const commentAuthors = {
 
 export type SavedTaskComment = Prisma.TaskCommentGetPayload<{ include: typeof commentAuthors }>;
 export type CommentTask = Pick<Task,
-  "id" | "projectId" | "status" | "workstreamId" | "assignedAgentId" | "taskType" | "revisionCount" | "maxRevisions"
+  "id" | "projectId" | "status" | "workstreamId" | "assignedAgentId" | "taskType" | "points" | "revisionCount" | "maxRevisions"
 > & { workerOwnerId: string | null };
 export type CommentActor =
   | { type: "user"; id: string }

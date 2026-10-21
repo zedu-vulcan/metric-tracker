@@ -12,7 +12,7 @@ export function createTaskCommentStore(tx: Prisma.TransactionClient): TaskCommen
       const task = await tx.task.findUnique({
         where: { id },
         select: {
-          id: true, projectId: true, status: true, workstreamId: true, assignedAgentId: true, taskType: true,
+          id: true, projectId: true, status: true, workstreamId: true, assignedAgentId: true, taskType: true, points: true,
           revisionCount: true, maxRevisions: true,
           assignedAgent: { select: { ownerId: true } },
         },
@@ -76,7 +76,7 @@ export function createTaskCommentStore(tx: Prisma.TransactionClient): TaskCommen
         where: { projectId_slug: { projectId: task.projectId, slug: task.taskType } },
         select: { points: true, maxPoints: true },
       });
-      const points = type ? clampTaskPoints(type.points, type.maxPoints) : 0;
+      const points = type ? clampTaskPoints(task.points ?? type.points, type.maxPoints) : 0;
       if (points === 0) return;
       await awardPoints(
         task.projectId,

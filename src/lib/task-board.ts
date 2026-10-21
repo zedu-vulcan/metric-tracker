@@ -63,7 +63,7 @@ export async function taskBoardExtras(projectId: string, tasks: Task[]) {
       return [
         task.id,
         {
-          points: task.taskType ? (points.get(task.taskType) ?? null) : null,
+          points: task.points ?? (task.taskType ? (points.get(task.taskType) ?? null) : null),
           bidCount: own.filter((comment) => comment.type === "bid").length,
           commentCount: own.length,
           reviewsThisRound:

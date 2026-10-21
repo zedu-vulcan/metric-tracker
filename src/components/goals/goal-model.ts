@@ -83,7 +83,7 @@ export type Task = {
   description: string;
   /** Task type slug, e.g. `seo`. */
   taskType: string | null;
-  /** From the task type; null when the task has no type. */
+  /** What the task pays: set when it was created, or its type's points for older tasks; null without a type. */
   points: number | null;
   status: TaskStatus;
   createdAt: string;

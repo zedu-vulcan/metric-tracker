@@ -486,6 +486,9 @@ model Task {
   offerExpiresAt   DateTime?
   revisionCount    Int           @default(0)
   maxRevisions     Int           @default(2)
+  /// What the task pays on approval: proposed by its creator within its type's range, or the type's default.
+  /// Null on tasks created before this was added; those pay their type's current points.
+  points           Int?
   comments         TaskComment[]
 
   // Legacy Task fields retained as optional for backwards compatibility
