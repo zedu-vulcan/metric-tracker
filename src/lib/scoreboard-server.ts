@@ -235,6 +235,7 @@ export type ProjectPointsRules = {
   paid_reviews_per_task: number;
   idea_accepted: number | null;
   idea_upvoted: number | null;
+  idea_downvoted: number | null;
   task_proposal_accepted: number | null;
   goal_share_pct: number | null;
   idea_share_pct: number | null;
@@ -266,6 +267,7 @@ export function buildProjectPointsRules(
     paid_reviews_per_task: MAX_PAID_REVIEWS_PER_TASK,
     idea_accepted: enabledAmount("idea_accepted"),
     idea_upvoted: enabledAmount("idea_upvoted"),
+    idea_downvoted: enabledAmount("idea_downvoted"),
     task_proposal_accepted: enabledAmount("task_proposal_accepted"),
     goal_share_pct: enabledAmount("goal_task_approved"),
     idea_share_pct: enabledAmount("idea_task_approved"),

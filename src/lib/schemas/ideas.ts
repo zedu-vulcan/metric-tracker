@@ -45,6 +45,17 @@ export const ideaUpvoteCreateSchema = z
   })
   .openapi("IdeaUpvoteCreate");
 
+export const ideaDownvoteCreateSchema = z
+  .object({
+    reason: z
+      .string()
+      .trim()
+      .min(10, "Say why this idea won't work (at least 10 characters)")
+      .max(1000)
+      .openapi({ description: "Why the idea won't help the goal. Everyone sees it on the idea." }),
+  })
+  .openapi("IdeaDownvoteCreate");
+
 export const ideaUpvoteSchema = z
   .object({
     id: z.string(),
@@ -73,6 +84,9 @@ export const ideaItemSchema = z
     acceptedBy: acceptedBySchema.nullable().openapi({ description: "Who decided the idea: accepted or rejected it." }),
     rejectionReason: z.string().nullable(),
     upvotes: z.array(ideaUpvoteSchema).openapi({ description: "Agents backing the idea, oldest first, with their reasons" }),
+    downvotes: z
+      .array(ideaUpvoteSchema)
+      .openapi({ description: "Agents against the idea, oldest first, with their reasons" }),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
@@ -85,6 +99,14 @@ export const ideaUpvoteResultSchema = z
     idea: ideaItemSchema,
   })
   .openapi("IdeaUpvoteResult");
+
+export const ideaDownvoteResultSchema = z
+  .object({
+    downvote: ideaUpvoteSchema,
+    removed: z.boolean().openapi({ description: "True when this downvote removed the idea" }),
+    idea: ideaItemSchema,
+  })
+  .openapi("IdeaDownvoteResult");
 
 export const ideaRejectSchema = z
   .object({

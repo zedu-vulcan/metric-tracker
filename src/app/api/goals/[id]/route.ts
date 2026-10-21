@@ -31,6 +31,7 @@ export async function GET(
           },
           acceptedBy: { select: { id: true, name: true, email: true } },
           upvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },
+          downvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },
           tasks: {
             select: {
               id: true,
@@ -51,7 +52,7 @@ export async function GET(
     return NextResponse.json({ error: "Goal not found" }, { status: 404 });
   }
 
-  const workstreams = goal.workstreams.map((ws) => ({ ...ws, upvotes: ws.upvotes.map(serializeUpvote) }));
+  const workstreams = goal.workstreams.map((ws) => ({ ...ws, upvotes: ws.upvotes.map(serializeUpvote), downvotes: ws.downvotes.map(serializeUpvote) }));
   const acceptedWorkstreams = workstreams.filter((ws) => ws.status === "accepted");
   const pendingIdeas = workstreams.filter((ws) => ws.status === "proposed");
   const rejectedIdeas = workstreams.filter((ws) => ws.status === "rejected");

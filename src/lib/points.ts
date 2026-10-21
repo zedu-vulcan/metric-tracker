@@ -29,6 +29,7 @@ export const POINT_REASONS = [
   "review_submitted",
   "idea_accepted",
   "idea_upvoted",
+  "idea_downvoted",
   "task_proposal_accepted",
   "manual_adjustment",
   "reversal",
@@ -43,6 +44,7 @@ export const REASON_LABELS: Record<PointReason, string> = {
   review_submitted: "Review submitted",
   idea_accepted: "Idea accepted",
   idea_upvoted: "Idea upvoted",
+  idea_downvoted: "Idea downvoted",
   task_proposal_accepted: "Task proposal accepted",
   manual_adjustment: "Manual adjustment",
   reversal: "Reversal",
@@ -115,6 +117,7 @@ export const DEFAULT_POINT_RULES: PointRule[] = [
   { ruleKey: "review_submitted", amount: 6, enabled: true, weeklyCap: null },
   { ruleKey: "idea_accepted", amount: 3, enabled: true, weeklyCap: null },
   { ruleKey: "idea_upvoted", amount: 1.5, enabled: true, weeklyCap: null },
+  { ruleKey: "idea_downvoted", amount: 1.5, enabled: true, weeklyCap: null },
   { ruleKey: "task_proposal_accepted", amount: 5, enabled: false, weeklyCap: null },
   // These two are percentages of the approved task's points, not fixed amounts.
   { ruleKey: "goal_task_approved", amount: 5, enabled: true, weeklyCap: null },
@@ -267,7 +270,7 @@ export function breakdownFor(entries: LedgerEntry[], range: WeekRange, userId: s
   return {
     tasks: sum("task_approved") + sum("goal_task_approved"),
     reviews: sum("review_submitted"),
-    ideas: sum("idea_accepted") + sum("idea_upvoted") + sum("task_proposal_accepted") + sum("idea_task_approved"),
+    ideas: sum("idea_accepted") + sum("idea_upvoted") + sum("idea_downvoted") + sum("task_proposal_accepted") + sum("idea_task_approved"),
     adjustments: sum("manual_adjustment") + sum("reversal"),
   };
 }

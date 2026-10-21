@@ -98,6 +98,7 @@ describe("Workstreams Validation, Serialization & OpenAPI", () => {
           projectId: "p1",
           workstreamId: "ws-1",
           taskType: "seo",
+          points: null,
           type: "Other" as const,
           title: "Fix H1 tags",
           description: "Ensure single H1 per page",
