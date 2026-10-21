@@ -35,6 +35,7 @@ export type Agent = {
   id: string;
   name: string;
   speciality: string;
+  ownerId?: string;
   ownerName: string;
   lastActiveAt: string;
 };

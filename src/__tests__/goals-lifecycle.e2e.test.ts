@@ -428,9 +428,22 @@ describe("full lifecycle: goal → idea → workstream → task → bid → deli
     assert.equal(idea.status, 404);
   });
 
-  it("step 2 — an agent proposes an idea and the goal owner accepts it", async () => {
+  it("blocks accepting an idea proposed by the caller's own agent (conflict of interest)", async () => {
     const proposed = await call("POST", `/api/goals/${ctx.goalId}/ideas`, {
       agent: ctx.fx!.agentA,
+      body: { title: `E2E Self-Approval Idea ${RUN_ID}` },
+    });
+    assert.equal(proposed.status, 201, errorText(proposed));
+    const ownIdeaId = asObject(proposed).id as string;
+
+    const res = await call("POST", `/api/ideas/${ownIdeaId}/accept`);
+    assert.equal(res.status, 403);
+    assert.match(errorText(res), /conflict of interest/i);
+  });
+
+  it("step 2 — an agent proposes an idea and the goal owner accepts it", async () => {
+    const proposed = await call("POST", `/api/goals/${ctx.goalId}/ideas`, {
+      agent: ctx.fx!.agentB,
       body: { title: `E2E Workstream ${RUN_ID}`, description: "Fix on-page SEO" },
     });
     assert.equal(proposed.status, 201, errorText(proposed));
@@ -440,7 +453,7 @@ describe("full lifecycle: goal → idea → workstream → task → bid → deli
     assert.equal(accepted.status, 200, errorText(accepted));
 
     const pay = await ledger(`idea:${ctx.workstreamId}`);
-    assert.equal(pay?.userId, ctx.fx!.agentA.ownerId, "an accepted idea pays its proposer's owner");
+    assert.equal(pay?.userId, ctx.fx!.agentB.ownerId, "an accepted idea pays its proposer's owner");
     assert.equal(Number(pay?.amount), 2);
   });
 

@@ -1843,7 +1843,7 @@ registry.registerPath({
   tags: ["Ideas"],
   summary: "Accept an idea, turning it into an active workstream",
   description:
-    "The goal's owner only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it. The proposing agent's owner earns the project's `idea_accepted` points (2 by default).",
+    "The goal's owner or a project admin. An idea proposed by the caller's own agent cannot be accepted (conflict of interest). The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it. The proposing agent's owner earns the project's `idea_accepted` points (2 by default).",
   security: [{ sessionCookie: [] }],
   request: { params: ideaIdParams },
   responses: {
@@ -1856,7 +1856,7 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
-    403: { description: "Only the goal owner can decide its ideas", ...ideaError },
+    403: { description: "Conflict of interest (own agent's idea) or not the goal owner / project admin", ...ideaError },
     404: { description: "Idea not found", ...ideaError },
     409: {
       description: "Idea was rejected and cannot be accepted (or changed concurrently)",
@@ -1872,7 +1872,7 @@ registry.registerPath({
   tags: ["Ideas"],
   summary: "Reject an idea",
   description:
-    "The goal's owner only. The record's status moves from `proposed` to `rejected` and stays visible as rejected, with the optional reason.",
+    "The goal's owner or a project admin. The record's status moves from `proposed` to `rejected` and stays visible as rejected, with the optional reason.",
   security: [{ sessionCookie: [] }],
   request: {
     params: ideaIdParams,
@@ -1888,7 +1888,7 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
-    403: { description: "Only the goal owner can decide its ideas", ...ideaError },
+    403: { description: "Only the goal owner or a project admin can decide its ideas", ...ideaError },
     404: { description: "Idea not found", ...ideaError },
     409: {
       description: "Idea already accepted and cannot be rejected (or changed concurrently)",
