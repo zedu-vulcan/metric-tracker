@@ -100,11 +100,15 @@ One family, **Manrope** (`font-sans`), used heavy. **JetBrains Mono** (`font-mon
 - **Sidebar (`lg` and up):** `AppSidebar`, `w-[248px]` (`w-[84px]` collapsed to an icon rail), `bg-sidebar`, sticky and full height.
   - **Top:** `Wordmark tone="inverse"` with a 26px round collapse button (`‹`) on the right edge.
   - **Middle:** Overview, a thin divider, then the channel pages. No section labels.
-  - **Bottom:** the account block (initials avatar, name, email, sign-out icon). Collapsed, it shows just the avatar and sign-out. Add a Help item only once a help page exists.
+  - **Bottom:** empty. The account lives in the top bar (3.2). Add a Help item only once a help page exists.
 - **Sidebar (below `lg`):** a sticky top bar (`h-14`) with the mark on the left and a horizontally scrolling row of nav pills.
 - **Main:** `min-w-0 px-4 py-5 sm:px-6 sm:py-6`, with an inner `w-full flex flex-col gap-4`.
 
-### 3.2 Page header (every page)
+### 3.2 Top bar and page header (every page)
+
+- **Top bar** (`TopBar`, rendered by the dashboard layout above every page): `h-16`, `border-b border-border`, with only the **profile button** at the right end. That's a 40px round avatar (the Google photo, or initials on `bg-primary`) that opens a `DropdownMenu` with the name, the email and Sign out. Add items to that menu (e.g. My agents) instead of adding more buttons to the bar.
+
+Then the page header:
 
 ```
 Title (26 / extrabold)                                     (⌕) (🔔3) [◯ Name  email ▾]
@@ -112,7 +116,7 @@ Subtitle (14 / muted)
 ```
 
 - **Left:** the title and a one-line subtitle. On the Overview the title is the greeting, "Welcome back, {first name}!".
-- **Right, on Overview only:** round icon buttons (`size-11 rounded-full border border-border`) and an **account pill**. Only show icon buttons that do something real; no decorative search or bell. The account pill is `rounded-full border border-border p-1 pr-4` holding a 36px avatar, the name (14 bold) and the email (12 muted). It opens a `DropdownMenu` with Sign out.
+- **Right:** page actions only. The account is in the top bar, so there is no account pill here. Only show icon buttons that do something real; no decorative search or bell.
 - Feature pages leave the right side empty; their actions go in the toolbar.
 
 ### 3.3 Toolbar (under the header)
@@ -279,6 +283,7 @@ All buttons are pills.
 - **Item:** `h-11 rounded-full px-4 gap-3 text-[15px] font-medium text-sidebar-muted-foreground` with a 20px icon. Hover is `bg-sidebar-accent text-sidebar-foreground`.
 - **Active:** **a solid `bg-sidebar-primary` pill with white semibold text** and a soft shadow, exactly like FinSet's active item. Set it with `aria-current="page"`.
 - **Count badge:** `ml-auto rounded-full bg-white/12 px-2 text-xs font-semibold`.
+- **Groups:** related items sit under one parent (today: **Marketing** holds Content, Directories, SEO checker and Press & Media). On the full desktop sidebar the parent expands in place, with its children indented behind a hairline `border-sidebar-border` guide; it opens automatically on a child's page, and shows the active pill itself only when closed. On the mobile bar and the collapsed rail it opens a dropdown menu instead.
 
 ### 4.13 Forms & dialogs *(exist; restyle)*
 
@@ -297,7 +302,7 @@ All buttons are pills.
 ### 5.1 Overview
 
 ```
-Header:  Welcome back, {name}!  ·  account pill
+Header:  Welcome back, {name}!
 Toolbar: (📅)(This month ▾)                              (＋ Add content)
 Row 1:   KPI Content pieces · KPI Drafts & scheduled · KPI SEO score · KPI Open press
 Row 2:   [BarChartCard "Content output" — published vs drafted, by week   ] [DonutCard "Content mix" by type]
@@ -349,8 +354,8 @@ Keep motion short and purposeful. Hover colour changes take 120ms. Chart series 
 |---|---|
 | Tokens (`globals.css`) | ✅ Live |
 | `Wordmark` / `BrandMark` | ✅ Exists |
-| Sidebar shell (`AppSidebar`) + `SidebarNavLink` | ✅ Restyled to 4.12: 44px pills, solid violet active pill, collapsible icon rail (remembered per browser), account block at the bottom. No Help link until a help page exists |
-| `PageHeader` / `PageContent` | ✅ Title + subtitle only (no eyebrow), 26px title, full width, 16px gaps. Still to add: the account pill (3.2) and toolbar slot (3.3) |
+| Sidebar shell (`AppSidebar`) + `SidebarNavLink` | ✅ Restyled to 4.12: 44px pills, solid violet active pill, collapsible icon rail (remembered per browser). The account moved to the top bar. No Help link until a help page exists |
+| `PageHeader` / `PageContent` | ✅ Title + subtitle only (no eyebrow), 26px title, full width, 16px gaps. Still to add: the toolbar slot (3.3). `TopBar` with the profile menu is ✅ built |
 | `Button` | ✅ Restyled to 4.9 (all variants and sizes) |
 | `Table` | ✅ `variant="pill"` built to 4.8; used on Content. Other tables switch when their page is redesigned |
 | `Skeleton` | ✅ Added (shadcn) |
