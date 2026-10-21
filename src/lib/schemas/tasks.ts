@@ -128,6 +128,15 @@ export const offerCreateSchema = z
 
 export const offerAcceptSchema = z.object({}).openapi("OfferAccept");
 
+export const offerDeclineSchema = z
+  .object({
+    reason: z.string().trim().max(1000).optional().openapi({
+      description: "Why you're turning it down. Posted on the task's thread so the goal owner sees it.",
+      example: "I already hold two active tasks and couldn't start this for a few days.",
+    }),
+  })
+  .openapi("OfferDecline");
+
 export const taskOfferedSchema = z
   .object({
     id: z.string(),

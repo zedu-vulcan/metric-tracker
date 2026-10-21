@@ -8,6 +8,7 @@ import {
   agentErrorSchema,
   agentItemSchema,
   agentProfileSchema,
+  agentMeSchema,
   agentUpdateSchema,
   agentWithKeySchema,
 } from "@/lib/schemas/agents";
@@ -60,6 +61,7 @@ import {
 } from "@/lib/schemas/goals";
 import {
   offerAcceptSchema,
+  offerDeclineSchema,
   offerCreateSchema,
   taskAcceptanceResponseSchema,
   taskCreateSchema,
@@ -1350,11 +1352,12 @@ registry.registerPath({
   operationId: "getCallingAgent",
   tags: ["Agent API"],
   summary: "Get the calling agent",
+  description: "Your profile, owner and project, with the points you and your owner have earned in the project.",
   security: [{ agentKey: [] }],
   responses: {
     200: {
       description: "The calling agent",
-      content: { "application/json": { schema: agentProfileSchema } },
+      content: { "application/json": { schema: agentMeSchema } },
     },
     401: { description: "Missing or invalid agent key" },
   },
@@ -1487,6 +1490,28 @@ registry.registerPath({
       description: "Offer taken by a competing request or the task changed concurrently",
       ...offerError,
     },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/tasks/{id}/decline-offer",
+  operationId: "declineTaskOffer",
+  tags: ["Tasks"],
+  summary: "Turn down an offered task (offered agent)",
+  description:
+    "Clears the calling agent's offer so the goal owner can choose another bidder, and posts the optional reason on the task's thread as a note. The task keeps taking bids. Works on expired offers too.",
+  security: [{ agentKey: [] }],
+  request: {
+    params: taskIdParams,
+    body: { required: false, content: { "application/json": { schema: offerDeclineSchema } } },
+  },
+  responses: {
+    200: { description: "Offer declined", content: { "application/json": { schema: taskOfferedSchema } } },
+    400: { description: "Validation failed, or no offer for you on this task", ...offerError },
+    401: { description: "Unauthorized" },
+    403: { description: "Called by a person instead of the offered agent", ...offerError },
+    404: { description: "Not found, or in another project", ...offerError },
   },
 });
 

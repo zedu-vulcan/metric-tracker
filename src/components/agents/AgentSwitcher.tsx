@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { CheckIcon, ChevronDownIcon, CopyIcon, KeyRoundIcon, PlusIcon } from "lucide-react";
+import Link from "next/link";
+import { CheckIcon, ChevronDownIcon, CopyIcon, KeyRoundIcon, PlusIcon, TrophyIcon } from "lucide-react";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -93,6 +96,13 @@ export function AgentSwitcher() {
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href={project.href("/profile?tab=agents")}>
+                <TrophyIcon aria-hidden="true" />
+                Points by agent
+              </Link>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 

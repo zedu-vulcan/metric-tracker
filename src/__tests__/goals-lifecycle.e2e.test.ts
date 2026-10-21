@@ -535,6 +535,13 @@ describe("full lifecycle: goal → idea → workstream → task → bid → deli
 
   it("step 7 — after re-delivery, two approvals approve the task and pay the worker's owner", async () => {
     await deliver(ctx.taskId!, ctx.fx!.agentB, "https://storage.zedu.test/v2.md");
+    const view = await call("GET", `/api/agent/tasks/${ctx.taskId}`, { agent: ctx.fx!.agentC });
+    assert.equal(view.status, 200, errorText(view));
+    const reviewerView = asObject(view);
+    assert.equal(reviewerView.deliveryRound, 2);
+    assert.equal((reviewerView.currentDelivery as Json).attachment, "https://storage.zedu.test/v2.md", "reviewers see the new delivery");
+    assert.equal((reviewerView.changesToCheck as Json[]).length, 2, "and the changes it was meant to fix");
+    assert.equal(reviewerView.canReview, true, "a reviewer of the old delivery can review the new one");
     await review(ctx.taskId!, ctx.fx!.agentC, "approve");
     await review(ctx.taskId!, ctx.fx!.agentD, "approve");
     const task = await taskFromWorkstream(ctx.taskId!);
@@ -553,6 +560,12 @@ describe("full lifecycle: goal → idea → workstream → task → bid → deli
     assert.equal(scoreboard.status, 200, errorText(scoreboard));
     const row = (asObject(scoreboard).rows as Json[]).find((r) => r.user_id === ctx.fx!.agentB.ownerId);
     assert.equal(row?.points, 40.5, "the task payout plus half a point for an upvote");
+
+    const me = await call("GET", "/api/agent/me", { agent: ctx.fx!.agentB });
+    assert.equal(me.status, 200, errorText(me));
+    const points = asObject(me).points as { you: Json; owner: Json };
+    assert.deepEqual(points.you, { total: 40.5, thisWeek: 40.5 }, "the agent sees what it earned");
+    assert.deepEqual(points.owner, { total: 40.5, thisWeek: 40.5 }, "and its owner's points");
   });
 
   it("threads replies under the comment they answer", async () => {
@@ -594,6 +607,38 @@ describe("edge case: two failed revision rounds reopen the task", () => {
     const rebid = await comment(taskId, ctx.fx!.agentC, { type: "bid", body: "New bidder after reopen" });
     assert.equal(rebid.status, 201, errorText(rebid));
     assert.equal((await taskFromWorkstream(taskId)).status, "bidding");
+  });
+});
+
+describe("edge case: the offered agent declines", () => {
+  it("clears the offer, posts the reason, and lets the owner offer it to someone else", async () => {
+    const taskId = await createTask(`E2E Declined Task ${RUN_ID}`);
+    for (const bidder of [ctx.fx!.agentC, ctx.fx!.agentD]) {
+      const bid = await comment(taskId, bidder, { type: "bid", body: "I can do this" });
+      assert.equal(bid.status, 201, errorText(bid));
+    }
+    const offer = await call("POST", `/api/tasks/${taskId}/offer`, { body: { agentId: ctx.fx!.agentC.id } });
+    assert.equal(offer.status, 200, errorText(offer));
+
+    const decline = (agent?: Actor, body?: Json) => call("POST", `/api/tasks/${taskId}/decline-offer`, { agent, body });
+    assert.equal((await decline()).status, 403, "people can't decline for an agent");
+    assert.equal((await decline(ctx.fx!.agentD)).status, 400, "only the offered agent can decline");
+    assert.equal((await decline(ctx.fx!.outsider)).status, 404);
+
+    const reason = "I already hold two active tasks.";
+    const declined = await decline(ctx.fx!.agentC, { reason });
+    assert.equal(declined.status, 200, errorText(declined));
+    assert.equal(asObject(declined).offeredToAgentId, null);
+    assert.equal(asObject(declined).status, "bidding");
+    assert.equal((await decline(ctx.fx!.agentC)).status, 400, "nothing left to decline");
+
+    const thread = await call("GET", `/api/tasks/${taskId}/comments`);
+    const note = (thread.body as Json[]).find((c) => c.title === "Declined the offer");
+    assert.equal(note?.body, reason);
+    assert.equal(note?.authorAgentId, ctx.fx!.agentC.id);
+
+    const next = await call("POST", `/api/tasks/${taskId}/offer`, { body: { agentId: ctx.fx!.agentD.id } });
+    assert.equal(next.status, 200, errorText(next));
   });
 });
 

@@ -273,6 +273,38 @@ export async function getUserPoints(
   return db.sumLedger({ projectId, userId, range });
 }
 
+export type PointTotals = { total: number; thisWeek: number };
+
+/** A user's all-time and this-week points in one project. */
+export async function getUserPointTotals(projectId: string, userId: string, now = new Date()): Promise<PointTotals> {
+  const [total, thisWeek] = await Promise.all([
+    getUserPoints(projectId, userId),
+    getUserPoints(projectId, userId, getWeekRange(now)),
+  ]);
+  return { total, thisWeek };
+}
+
+/** All-time and this-week points earned by each agent in one project; agents with none get zeros. */
+export async function getAgentPointTotals(
+  projectId: string,
+  agentIds: string[],
+  now = new Date()
+): Promise<Map<string, PointTotals>> {
+  const totals = new Map(agentIds.map((id) => [id, { total: 0, thisWeek: 0 }]));
+  if (agentIds.length === 0) return totals;
+  const { prisma } = await import("@/lib/prisma");
+  const week = getWeekRange(now);
+  const rows = await prisma.$queryRaw<{ agent_id: string; total: number; this_week: number }[]>`
+    SELECT agent_id,
+           SUM(amount)::float8 AS total,
+           COALESCE(SUM(amount) FILTER (WHERE created_at >= ${week.start} AND created_at < ${week.end}), 0)::float8 AS this_week
+    FROM points_ledger
+    WHERE project_id = ${projectId} AND agent_id IN (${Prisma.join(agentIds)})
+    GROUP BY agent_id`;
+  for (const row of rows) totals.set(row.agent_id, { total: row.total, thisWeek: row.this_week });
+  return totals;
+}
+
 /** Points attributed to one agent (unit 1's agent card), optionally within a week. */
 export async function getAgentPoints(agentId: string, range?: WeekRange, options?: AwardOptions): Promise<number> {
   const db = await resolveDb(options);

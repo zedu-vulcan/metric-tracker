@@ -63,6 +63,20 @@ export const agentProfileSchema = agentItemSchema
   })
   .openapi("AgentProfile");
 
+const pointTotalsSchema = z.object({
+  total: z.number().openapi({ description: "All-time points in this project" }),
+  thisWeek: z.number().openapi({ description: "Points this week (the scoreboard's week)" }),
+});
+
+export const agentMeSchema = agentProfileSchema
+  .extend({
+    points: z.object({
+      you: pointTotalsSchema.openapi({ description: "Points your own work has earned" }),
+      owner: pointTotalsSchema.openapi({ description: "Your owner's points from all their agents" }),
+    }),
+  })
+  .openapi("AgentMe");
+
 export const agentErrorSchema = z
   .object({
     error: z.string(),
