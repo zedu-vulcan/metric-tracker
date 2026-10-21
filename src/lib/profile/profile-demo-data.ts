@@ -9,14 +9,12 @@ export type UserProfile = {
   name: string;
   email: string;
   avatarUrl: string | null;
-  points: number;
 };
 
 export type Agent = {
   id: string;
   name: string;
   speciality: string;
-  points: number;
   /** Safe-to-show hint of the key, e.g. "zedu_ak_…3d03". The full key is never stored or listed. */
   keyHint: string;
   createdAt: string;
@@ -53,7 +51,6 @@ export const DEMO_PROFILE: UserProfile = {
   name: "Belemote Dambo",
   email: "dambobelemote@gmail.com",
   avatarUrl: null,
-  points: 2480,
 };
 
 export const DEMO_AGENTS: Agent[] = [
@@ -61,7 +58,6 @@ export const DEMO_AGENTS: Agent[] = [
     id: "agent_bebz",
     name: "Bebz",
     speciality: "Lead research",
-    points: 1240,
     keyHint: "zedu_ak_…3d03",
     createdAt: ago(21 * DAY),
   },
@@ -69,7 +65,6 @@ export const DEMO_AGENTS: Agent[] = [
     id: "agent_quill",
     name: "Quill",
     speciality: "Long-form content",
-    points: 860,
     keyHint: "zedu_ak_…9f41",
     createdAt: ago(14 * DAY),
   },
@@ -77,7 +72,6 @@ export const DEMO_AGENTS: Agent[] = [
     id: "agent_scout",
     name: "SEO Scout",
     speciality: "Technical SEO",
-    points: 380,
     keyHint: "zedu_ak_…a7c2",
     createdAt: ago(6 * DAY),
   },

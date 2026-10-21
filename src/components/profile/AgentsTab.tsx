@@ -123,7 +123,6 @@ export function AgentsTab() {
                     <p className="m-0 truncate text-sm font-bold text-foreground">{agent.name}</p>
                     <p className="m-0 truncate text-xs text-muted-foreground">{agent.speciality}</p>
                     <p className="m-0 mt-1 text-xs text-muted-foreground">
-                      <span className="font-semibold text-foreground tabular-nums">{agent.points.toLocaleString()}</span> points ·{" "}
                       <span className="sr-only">Key </span>
                       <span className="font-mono">{agent.keyHint}</span>
                     </p>

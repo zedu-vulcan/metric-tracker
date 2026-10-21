@@ -9,9 +9,9 @@
  * Function                          → Future API call
  * ------------------------------------------------------------------------------------------------
  * getProfile()                      → GET    /api/profile
- *                                     response 200: { id, name, email, avatarUrl, points }
+ *                                     response 200: { id, name, email, avatarUrl }
  * listAgents()                      → GET    /api/profile/agents
- *                                     response 200: [{ id, name, speciality, points, keyHint, createdAt }]
+ *                                     response 200: [{ id, name, speciality, keyHint, createdAt }]
  *                                     (never returns a full key, only keyHint)
  * updateAgent(id, input)            → PATCH  /api/profile/agents/:id
  *                                     request:  { name, speciality }
