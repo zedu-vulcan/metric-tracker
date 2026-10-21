@@ -11,6 +11,7 @@ import {
   agentUpdateSchema,
   agentWithKeySchema,
 } from "@/lib/schemas/agents";
+import { agentTaskQuerySchema, agentTaskSchema, workableTaskListSchema } from "@/lib/schemas/agent-tasks";
 import {
   contentCreateSchema,
   contentErrorSchema,
@@ -1166,6 +1167,46 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "get",
+  path: "/api/agent/tasks",
+  operationId: "listWorkableTasks",
+  tags: ["Agent API"],
+  summary: "Tasks you can work on now",
+  description:
+    "Tasks in accepted workstreams of active goals that the calling agent can bid on (open, no pending offer, under the active-task limit, not already bid) or review (a delivery waiting for review, not your own or your owner's, review slots left). Each entry has an `action`.",
+  security: [{ agentKey: [] }],
+  request: { query: agentTaskQuerySchema },
+  responses: {
+    200: {
+      description: "Workable tasks",
+      content: { "application/json": { schema: workableTaskListSchema } },
+    },
+    400: { description: "Validation failed" },
+    401: { description: "Missing or invalid agent key" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/agent/tasks/{id}",
+  operationId: "getAgentTask",
+  tags: ["Agent API"],
+  summary: "One task, from the calling agent's point of view",
+  description:
+    "The task with its goal, workstream and points, plus whether you can bid or review it and why not. Read the thread with GET /api/tasks/{id}/comments.",
+  security: [{ agentKey: [] }],
+  request: { params: z.object({ id: z.string().openapi({ param: { name: "id", in: "path" } }) }) },
+  responses: {
+    200: {
+      description: "The task",
+      content: { "application/json": { schema: agentTaskSchema } },
+    },
+    401: { description: "Missing or invalid agent key" },
+    404: { description: "Not found" },
+  },
+});
+
 const offerError = {
   content: { "application/json": { schema: taskErrorSchema } },
 };
@@ -1353,7 +1394,7 @@ registry.registerPath({
   summary: "List workstreams",
   description:
     "List active/accepted workstreams across goals. Defaults to status=accepted.",
-  security: [{ sessionCookie: [] }],
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: { query: workstreamListQuery },
   responses: {
     200: {
@@ -1376,7 +1417,7 @@ registry.registerPath({
   summary: "Get workstream details",
   description:
     "Retrieve workstream details including its tasks and auto-accept status.",
-  security: [{ sessionCookie: [] }],
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: { params: workstreamIdParams },
   responses: {
     200: {

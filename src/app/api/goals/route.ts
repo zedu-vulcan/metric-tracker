@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { requireAuth, requireUser } from "@/lib/api";
+import { getAuthContext, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { goalCreateSchema, goalFilterSchema, goalTypeValues, goalStatusValues } from "@/lib/schemas/goals";
 
 export const dynamic = "force-dynamic";
 
+/** Goals with workstream and task counts. Readable with a session or an agent key. */
 export async function GET(request: Request) {
-  const { error } = await requireAuth();
+  const { error } = await getAuthContext(request);
   if (error) return error;
 
   const { searchParams } = new URL(request.url);
