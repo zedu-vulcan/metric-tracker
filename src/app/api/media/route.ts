@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
 import {
   articleTypeToDb,
   dateOrNull,
@@ -10,17 +9,18 @@ import {
   submissionStatusToDb,
 } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { mediaInputSchema } from "@/lib/schemas/media";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const { error } = await requireAuth();
+export async function GET(request: Request) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   const [coverages, submissions] = await Promise.all([
-    prisma.pressCoverage.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.pressSubmission.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.pressCoverage.findMany({ where: { projectId }, orderBy: { createdAt: "desc" } }),
+    prisma.pressSubmission.findMany({ where: { projectId }, orderBy: { createdAt: "desc" } }),
   ]);
 
   const records = [...coverages.map(normalizeCoverage), ...submissions.map(normalizeSubmission)];
@@ -28,7 +28,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { error } = await requireAuth();
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   let body: unknown;
@@ -44,13 +44,14 @@ export async function POST(request: Request) {
   }
 
   const payload = parsed.data;
-  const outletId = await resolveOutletId(prisma, payload.outlet);
+  const outletId = await resolveOutletId(prisma, projectId, payload.outlet);
   const articleType = articleTypeToDb(payload.articleType);
   const articleTypeOther = articleType === "Other" ? payload.articleTypeOther || null : null;
 
   if (payload.recordType === "Press Coverage") {
     const coverage = await prisma.pressCoverage.create({
       data: {
+        projectId,
         title: payload.title,
         outlet: payload.outlet,
         outletId,
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
   const status = submissionStatusToDb(payload.status);
   const submission = await prisma.pressSubmission.create({
     data: {
+      projectId,
       title: payload.title,
       outlet: payload.outlet,
       outletId,

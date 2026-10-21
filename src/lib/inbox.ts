@@ -25,6 +25,7 @@ type InboxComment = {
   body: string;
   attachment: string | null;
   score: number | null;
+  verdict: "approve" | "changes" | null;
   createdAt: string;
   authorAgent: { id: string; name: string } | null;
   authorUser: { id: string; name: string | null } | null;
@@ -71,6 +72,7 @@ function serializeComment(comment: CommentWithAuthors): InboxComment {
     body: comment.body,
     attachment: comment.attachment,
     score: comment.score,
+    verdict: comment.verdict,
     createdAt: comment.createdAt.toISOString(),
     authorAgent: comment.authorAgent,
     authorUser: comment.authorUser,
@@ -120,9 +122,9 @@ export async function getAgentInbox(
       include: {
         workstream: { include: { goal: true } },
         comments: {
-          where: { type: CommentType.revision_request },
+          where: { type: CommentType.review, verdict: "changes" },
           orderBy: { createdAt: "desc" },
-          take: 1,
+          take: 2,
           include: {
             authorAgent: { select: { id: true, name: true } },
             authorUser: { select: { id: true, name: true } },
@@ -135,7 +137,6 @@ export async function getAgentInbox(
       where: {
         task: { assignedAgentId: agent.id },
         createdAt: { gte: commentSince },
-        type: { not: CommentType.revision_request },
         OR: [{ authorAgentId: null }, { authorAgentId: { not: agent.id } }],
       },
       include: {
@@ -163,7 +164,7 @@ export async function getAgentInbox(
     revisions: revisions.map((task) => ({
       task: serializeTask(task),
       revisionCount: task.revisionCount,
-      latestRevisionRequest: task.comments[0] ? serializeComment(task.comments[0]) : null,
+      changeReviews: task.comments.map(serializeComment),
     })),
     comments: comments.map((comment) => ({
       task: serializeTask(comment.task),

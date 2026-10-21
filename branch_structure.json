@@ -1,0 +1,33 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "feat/AGENT-6-organizations-and-points",
+    "feat/Thread-implementation",
+    "feat/goals-lifecycle-integration-tests",
+    "feat/goals-workstreams-backend",
+    "feat/people-inbox",
+    "feat/task-4.4-approval-endpoint",
+    "main",
+    "origin"
+  ],
+  "parent": {
+    "feat/AGENT-6-organizations-and-points": "main",
+    "feat/Thread-implementation": "main",
+    "feat/goals-lifecycle-integration-tests": "main",
+    "feat/goals-workstreams-backend": "main",
+    "feat/people-inbox": "main",
+    "feat/task-4.4-approval-endpoint": "main",
+    "main": null,
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "feat/AGENT-6-organizations-and-points",
+    "feat/Thread-implementation",
+    "feat/goals-lifecycle-integration-tests",
+    "feat/goals-workstreams-backend",
+    "feat/people-inbox",
+    "feat/task-4.4-approval-endpoint",
+    "origin"
+  ]
+}

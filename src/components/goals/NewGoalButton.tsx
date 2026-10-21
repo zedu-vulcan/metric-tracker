@@ -1,5 +1,6 @@
 "use client";
 
+import { useProject } from "@/components/projects/ProjectProvider";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusIcon, TargetIcon } from "lucide-react";
@@ -9,6 +10,7 @@ import { useGoals } from "./GoalsProvider";
 
 /** Top-bar shortcut: create a goal from any page, then land on it. */
 export function NewGoalButton() {
+  const { href } = useProject();
   const { createGoal } = useGoals();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -25,7 +27,7 @@ export function NewGoalButton() {
       <GoalFormDialog
         open={open}
         onOpenChange={setOpen}
-        onCreate={async (input) => router.push(`/dashboard/goals/${(await createGoal(input)).id}`)}
+        onCreate={async (input) => router.push(href(`/goals/${(await createGoal(input)).id}`))}
       />
     </>
   );

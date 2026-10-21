@@ -1,5 +1,6 @@
 "use client";
 
+import { useProject } from "@/components/projects/ProjectProvider";
 import { useEffect, useState } from "react";
 import { ClockIcon, HandIcon, ListTodoIcon, MessageSquareIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
@@ -108,6 +109,7 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
     sendOffer,
     withdrawOffer,
   } = useGoals();
+  const { href } = useProject();
   const [offering, setOffering] = useState<Agent | null>(null);
 
   const goal = goals.find((candidate) => candidate.id === goalId);
@@ -126,7 +128,7 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
 
   const workstream = ideas.find((idea) => idea.id === workstreamId && idea.goalId === goalId);
   const task = tasks.find((candidate) => candidate.id === taskId && candidate.workstreamId === workstreamId);
-  const workstreamHref = `/dashboard/goals/${goalId}/workstreams/${workstreamId}`;
+  const workstreamHref = href(`/goals/${goalId}/workstreams/${workstreamId}`);
   const bids = bidsFor(taskId);
   const bidderStats = useBidderStats(bids.map((bid) => bid.agentId));
 
@@ -154,7 +156,7 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
         title="Task not found"
         description="This task doesn't exist in this workstream."
         icon={ListTodoIcon}
-        backHref={workstream ? workstreamHref : `/dashboard/goals/${goalId}`}
+        backHref={workstream ? workstreamHref : href(`/goals/${goalId}`)}
         backLabel={workstream ? `Back to ${workstream.title}` : "Back to goal"}
       />
     );

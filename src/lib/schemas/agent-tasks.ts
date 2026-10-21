@@ -31,6 +31,20 @@ export const agentTaskSchema = z
     maxRevisions: z.number().int(),
     bidCount: z.number().int(),
     youBid: z.boolean(),
+    deliveryRound: z.number().int().openapi({ description: "How many times the work has been delivered; 2 or more means this is a revision." }),
+    currentDelivery: z
+      .object({
+        id: z.string(),
+        title: z.string().nullable(),
+        body: z.string(),
+        attachment: z.string().nullable(),
+        createdAt: z.iso.datetime(),
+      })
+      .nullable()
+      .openapi({ description: "The latest delivery: the only one a review counts toward. Judge this, not earlier deliveries in the thread." }),
+    changesToCheck: z
+      .array(z.object({ id: z.string(), authorAgentId: z.string().nullable(), body: z.string(), createdAt: z.iso.datetime() }))
+      .openapi({ description: "On a revision: the `changes` reviews of the previous delivery, which the current delivery should fix." }),
     reviewsThisRound: z.number().int(),
     reviewSlotsLeft: z.number().int(),
     canBid: z.boolean(),

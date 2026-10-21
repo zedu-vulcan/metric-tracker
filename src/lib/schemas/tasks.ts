@@ -25,7 +25,11 @@ export const goalTaskCreateSchema = z
   .object({
     title: z.string().trim().min(1, "Title is required").max(200),
     description: z.string().trim().max(2000).nullable().optional(),
-    taskType: goalTaskTypeSchema,
+    taskType: z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9_]+$/, "Use a task type slug from GET /api/task-types")
+      .openapi({ description: "Slug of one of the project's active task types (GET /api/task-types)" }),
     bountyUSD: z.number().min(0).optional(),
     estimatedHours: z.number().min(0).optional(),
   })
@@ -123,6 +127,15 @@ export const offerCreateSchema = z
   .openapi("OfferCreate");
 
 export const offerAcceptSchema = z.object({}).openapi("OfferAccept");
+
+export const offerDeclineSchema = z
+  .object({
+    reason: z.string().trim().max(1000).optional().openapi({
+      description: "Why you're turning it down. Posted on the task's thread so the goal owner sees it.",
+      example: "I already hold two active tasks and couldn't start this for a few days.",
+    }),
+  })
+  .openapi("OfferDecline");
 
 export const taskOfferedSchema = z
   .object({

@@ -1,4 +1,4 @@
-import type { Prisma, Task } from "@prisma/client";
+import type { Prisma, ReviewVerdict, Task } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { commentCreateSchema } from "@/lib/schemas/comments";
 import { commentAuthorAgentSelect, serializeAgentRef } from "@/lib/task-board";
@@ -12,29 +12,41 @@ export const commentAuthors = {
 
 export type SavedTaskComment = Prisma.TaskCommentGetPayload<{ include: typeof commentAuthors }>;
 export type CommentTask = Pick<Task,
-  "id" | "status" | "workstreamId" | "assignedAgentId" | "revisionCount" | "maxRevisions"
+  "id" | "projectId" | "status" | "workstreamId" | "assignedAgentId" | "taskType" | "revisionCount" | "maxRevisions"
 > & { workerOwnerId: string | null };
 export type CommentActor =
-  | { type: "user"; id: string; coordinator: boolean }
-  | { type: "agent"; id: string; ownerId: string };
+  | { type: "user"; id: string }
+  | { type: "agent"; id: string; ownerId: string; projectId: string };
+export type RoundReview = { authorAgentId: string | null; verdict: ReviewVerdict | null };
 
 export interface TaskCommentStore {
+  /** Loads the task and holds its row lock until the transaction ends, so reviews are counted one at a time. */
   findTask(id: string): Promise<CommentTask | null>;
+  userInProject(userId: string, projectId: string): Promise<boolean>;
+  findComment(id: string): Promise<{ taskId: string; parentId: string | null } | null>;
   changeTask(task: CommentTask, data: Prisma.TaskUncheckedUpdateManyInput): Promise<boolean>;
   createComment(data: Prisma.TaskCommentUncheckedCreateInput): Promise<SavedTaskComment>;
-  countReviewsSinceLastDelivery?(taskId: string): Promise<number>;
+  /** Reviews posted since the latest delivery (the current round), oldest first. */
+  roundReviews(taskId: string): Promise<RoundReview[]>;
+  /** Pays the reviewer's owner for one review; safe to call twice. */
+  payReview(task: CommentTask, commentId: string, reviewer: { id: string; ownerId: string }): Promise<void>;
+  /** Pays the task's points to the worker's owner; safe to call twice. */
+  payTask(task: CommentTask): Promise<void>;
 }
 
 type CommentInput = z.infer<typeof commentCreateSchema>;
+
+/** Reviews that count (and pay) per delivery round. */
+export const MAX_REVIEWS_PER_ROUND = 4;
+/** Matching verdicts in one round that decide a task. */
+export const VERDICTS_TO_DECIDE = 2;
+/** Revision rounds a worker gets before the task is reopened to other bidders. */
+export const MAX_REVISION_ROUNDS = 2;
 
 export class TaskCommentError extends Error {
   constructor(message: string, readonly status: number, readonly details?: Record<string, string[]>) {
     super(message);
   }
-}
-
-export function isReviewCoordinator(userId: string, configuredIds = process.env.REVIEW_COORDINATOR_USER_IDS) {
-  return (configuredIds ?? "").split(",").some((id) => id.trim() === userId && userId.length > 0);
 }
 
 export function serializeTaskComment(comment: SavedTaskComment) {
@@ -46,41 +58,16 @@ export function serializeTaskComment(comment: SavedTaskComment) {
   };
 }
 
-/** Called inside one transaction: a failed comment insert must roll back its state change. */
-export async function writeTaskComment(
-  store: TaskCommentStore,
-  actor: CommentActor,
-  taskId: string,
-  input: CommentInput,
-) {
-  const task = await store.findTask(taskId);
-  if (!task) throw new TaskCommentError("Not found", 404);
+/** What a review does to the task, given the verdicts already in this round. */
+function reviewOutcome(task: CommentTask, verdicts: (ReviewVerdict | null)[]): Prisma.TaskUncheckedUpdateManyInput | undefined {
+  const approvals = verdicts.filter((verdict) => verdict === "approve").length;
+  const changes = verdicts.filter((verdict) => verdict === "changes").length;
 
-  let change: Prisma.TaskUncheckedUpdateManyInput | undefined;
-
-  // Bids, deliveries, reviews and escalations are the agents' work; people reply with notes.
-  if (actor.type === "user" && input.type !== "note" && input.type !== "revision_request") {
-    throw new TaskCommentError("People can only post notes on a task thread", 403);
-  }
-
-  if (input.type === "revision_request") {
-    if (actor.type === "user" && !actor.coordinator) {
-      throw new TaskCommentError("Only a Review Coordinator or peer reviewer can request revisions", 403);
-    }
-    if (!task.workstreamId || !task.assignedAgentId || !task.workerOwnerId) {
-      throw new TaskCommentError("Revisions require a workstream task with an assigned worker", 400);
-    }
-    if (actor.type === "agent" &&
-      (actor.id === task.assignedAgentId || actor.ownerId === task.workerOwnerId)) {
-      throw new TaskCommentError("Revision reviewers must belong to a different user than the worker", 403);
-    }
-    if (task.status !== "submitted" && task.status !== "in_review") {
-      throw new TaskCommentError("Task must be submitted or in review to request revisions", 400);
-    }
-
-    // The stored default is two; never allow a larger value to bypass the PRD's cap.
-    const revisionLimit = Math.min(task.maxRevisions, 2);
-    change = task.revisionCount < revisionLimit
+  if (approvals >= VERDICTS_TO_DECIDE) return { status: "approved", done: true, completedAt: new Date() };
+  if (changes >= VERDICTS_TO_DECIDE) {
+    // The stored default is two; never allow a larger value to stretch the cap.
+    const limit = Math.min(task.maxRevisions, MAX_REVISION_ROUNDS);
+    return task.revisionCount < limit
       ? { status: "changes_requested", revisionCount: task.revisionCount + 1 }
       : {
           status: "reopened",
@@ -91,6 +78,43 @@ export async function writeTaskComment(
           offerExpiresAt: null,
         };
   }
+  return task.status === "submitted" ? { status: "in_review" } : undefined;
+}
+
+/** Called inside one transaction: a failed comment insert must roll back its state change and payouts. */
+export async function writeTaskComment(
+  store: TaskCommentStore,
+  actor: CommentActor,
+  taskId: string,
+  input: CommentInput,
+) {
+  const task = await store.findTask(taskId);
+  if (!task) throw new TaskCommentError("Not found", 404);
+  const inProject = actor.type === "agent"
+    ? actor.projectId === task.projectId
+    : await store.userInProject(actor.id, task.projectId);
+  if (!inProject) throw new TaskCommentError("Not found", 404);
+
+  // Bids, deliveries, reviews and escalations are the agents' work; people reply with notes.
+  if (actor.type === "user" && input.type !== "note") {
+    throw new TaskCommentError("People can only post notes on a task thread", 403);
+  }
+  if (input.type === "revision_request" || input.type === "approval") {
+    throw new TaskCommentError("Post a review with a verdict instead; two matching verdicts decide the task", 400);
+  }
+
+  // Replies are notes, kept one level deep: replying to a reply joins its top-level comment.
+  let parentId: string | null = null;
+  if (input.parentId) {
+    if (input.type !== "note") throw new TaskCommentError("Replies are notes; post bids, deliveries and reviews on the thread", 400);
+    const parent = await store.findComment(input.parentId);
+    if (!parent || parent.taskId !== taskId) {
+      throw new TaskCommentError("Validation failed", 400, { parentId: ["No comment with this id on this task"] });
+    }
+    parentId = parent.parentId ?? input.parentId;
+  }
+
+  let change: Prisma.TaskUncheckedUpdateManyInput | undefined;
 
   if (input.type === "delivery") {
     if (actor.type !== "agent" || actor.id !== task.assignedAgentId) {
@@ -111,26 +135,34 @@ export async function writeTaskComment(
     change = { status: "bidding" };
   }
 
-  if (input.type === "review") {
+  if (input.type === "review" && actor.type === "agent") {
     if (task.status !== "submitted" && task.status !== "in_review") {
-      throw new TaskCommentError("Task is not in a reviewable state", 400);
+      throw new TaskCommentError("Task has no delivery waiting for review", 400);
     }
-    if (task.assignedAgentId && actor.type === "agent" && actor.id === task.assignedAgentId) {
+    if (!task.assignedAgentId || !task.workerOwnerId) {
+      throw new TaskCommentError("Task has no assigned worker to review", 400);
+    }
+    if (actor.id === task.assignedAgentId) {
       throw new TaskCommentError("Assigned worker cannot review their own task", 403);
     }
-    if (store.countReviewsSinceLastDelivery) {
-      const reviewCount = await store.countReviewsSinceLastDelivery(taskId);
-      if (reviewCount >= 4) {
-        throw new TaskCommentError("Maximum 4 peer reviews per delivery round reached", 400);
-      }
+    if (actor.ownerId === task.workerOwnerId) {
+      throw new TaskCommentError("Reviewers must belong to a different user than the worker", 403);
     }
+    const reviews = await store.roundReviews(taskId);
+    if (reviews.some((review) => review.authorAgentId === actor.id)) {
+      throw new TaskCommentError("You already reviewed this delivery", 409);
+    }
+    if (reviews.length >= MAX_REVIEWS_PER_ROUND) {
+      throw new TaskCommentError(`Maximum ${MAX_REVIEWS_PER_ROUND} peer reviews per delivery round reached`, 400);
+    }
+    change = reviewOutcome(task, [...reviews.map((review) => review.verdict), input.verdict ?? null]);
   }
 
   if (change && !await store.changeTask(task, change)) {
     throw new TaskCommentError("Task changed while posting the comment; reload and try again", 409);
   }
 
-  return store.createComment({
+  const comment = await store.createComment({
     taskId,
     type: input.type,
     tag: input.tag ?? null,
@@ -138,9 +170,18 @@ export async function writeTaskComment(
     body: input.body,
     attachment: input.attachment ?? null,
     score: input.score ?? null,
+    verdict: input.type === "review" ? input.verdict ?? null : null,
+    parentId,
     authorAgentId: actor.type === "agent" ? actor.id : null,
     authorUserId: actor.type === "user" ? actor.id : null,
   });
+
+  if (input.type === "review" && actor.type === "agent") {
+    await store.payReview(task, comment.id, actor);
+    if (change?.status === "approved") await store.payTask(task);
+  }
+
+  return comment;
 }
 
 type CommentDependencies = {

@@ -1,4 +1,5 @@
 import type { Prisma, Workstream } from "@prisma/client";
+import { serializeUpvote, upvoteInclude } from "@/lib/idea-upvotes";
 import { ideaItemSchema } from "@/lib/schemas/ideas";
 import type { z } from "@/lib/zod";
 
@@ -11,6 +12,7 @@ export type IdeaRecord = Workstream & {
     owner: { name: string | null };
   } | null;
   acceptedBy: { id: string; name: string | null; email: string | null } | null;
+  upvotes: Prisma.IdeaUpvoteGetPayload<{ include: typeof upvoteInclude }>[];
 };
 
 export const ideaInclude = {
@@ -18,6 +20,7 @@ export const ideaInclude = {
     select: { id: true, name: true, speciality: true, lastActiveAt: true, owner: { select: { name: true } } },
   },
   acceptedBy: { select: { id: true, name: true, email: true } },
+  upvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },
 } satisfies Prisma.WorkstreamInclude;
 
 export function toIdeaItem(workstream: IdeaRecord): z.infer<typeof ideaItemSchema> {
@@ -38,6 +41,7 @@ export function toIdeaItem(workstream: IdeaRecord): z.infer<typeof ideaItemSchem
     acceptedById: workstream.acceptedById,
     acceptedBy: workstream.acceptedBy ?? null,
     rejectionReason: workstream.rejectionReason,
+    upvotes: workstream.upvotes.map(serializeUpvote),
     createdAt: workstream.createdAt.toISOString(),
     updatedAt: workstream.updatedAt.toISOString(),
   };

@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { apiFetch } from "@/lib/request-json";
 
 export interface SavedCopyBlock {
   id: string;
@@ -67,7 +68,7 @@ export function SavedCopyWidget({
     setIsLoading(true);
     setLoadError("");
     try {
-      const response = await fetch("/api/directories/copy", { cache: "no-store" });
+      const response = await apiFetch("/api/directories/copy", { cache: "no-store" });
       if (!response.ok) throw new Error();
       setBlocks((await response.json()) as SavedCopyBlock[]);
     } catch {
@@ -131,7 +132,7 @@ export function SavedCopyWidget({
     setIsSaving(true);
     setFormError("");
     try {
-      const response = await fetch(editingBlock ? `/api/directories/copy/${editingBlock.id}` : "/api/directories/copy", {
+      const response = await apiFetch(editingBlock ? `/api/directories/copy/${editingBlock.id}` : "/api/directories/copy", {
         method: editingBlock ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ label: formLabel.trim(), text: formText.trim() }),
@@ -159,7 +160,7 @@ export function SavedCopyWidget({
     setActionError("");
     setBlocks((previous) => previous.filter((item) => item.id !== block.id));
     try {
-      const response = await fetch(`/api/directories/copy/${block.id}`, { method: "DELETE" });
+      const response = await apiFetch(`/api/directories/copy/${block.id}`, { method: "DELETE" });
       if (!response.ok && response.status !== 404) throw new Error();
     } catch {
       setBlocks((previous) => [...previous, block].sort((a, b) => a.position - b.position));

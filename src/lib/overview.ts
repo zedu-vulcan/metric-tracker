@@ -42,10 +42,14 @@ export type UpcomingItem = {
   meta: string;
 };
 
-/** Everything the overview page shows, computed in one place so the AI summary sees the same numbers. */
-export async function getOverview() {
+/**
+ * Everything one project's overview page shows, computed in one place so the AI summary sees the same numbers.
+ * `basePath` is the project's dashboard path (`/p/<slug>`), for the "needs attention" links.
+ */
+export async function getOverview(projectId: string, basePath: string) {
   const [content, latestCheck, coverage, featuredPitches, openSubmissions, pitchStatuses, directories] = await Promise.all([
     prisma.contentItem.findMany({
+      where: { projectId },
       select: {
         id: true,
         title: true,
@@ -59,23 +63,27 @@ export async function getOverview() {
       orderBy: [{ createdDate: "desc" }, { createdAt: "desc" }],
     }),
     prisma.seoCheck.findFirst({
+      where: { projectId },
       orderBy: { createdAt: "desc" },
       select: { score: true, url: true, normalizedUrl: true, createdAt: true, results: true },
     }),
-    prisma.pressCoverage.findMany({ select: { outlet: true, publicationDate: true } }),
+    prisma.pressCoverage.findMany({ where: { projectId }, select: { outlet: true, publicationDate: true } }),
     // Older pitches marked Published without their own coverage record still count as features.
-    prisma.pressSubmission.findMany({ where: { status: "Published", coverageId: null }, select: { outlet: true } }),
     prisma.pressSubmission.findMany({
-      where: { status: { notIn: [...CLOSED_SUBMISSION] } },
+      where: { projectId, status: "Published", coverageId: null },
+      select: { outlet: true },
+    }),
+    prisma.pressSubmission.findMany({
+      where: { projectId, status: { notIn: [...CLOSED_SUBMISSION] } },
       select: { id: true, title: true, outlet: true, status: true, followUpDate: true },
     }),
-    prisma.pressSubmission.groupBy({ by: ["status"], where: { coverageId: null }, _count: { _all: true } }),
-    prisma.directory.findMany({ select: { id: true, name: true, status: true, dateSubmitted: true } }),
+    prisma.pressSubmission.groupBy({ by: ["status"], where: { projectId, coverageId: null }, _count: { _all: true } }),
+    prisma.directory.findMany({ where: { projectId }, select: { id: true, name: true, status: true, dateSubmitted: true } }),
   ]);
 
   const previousCheck = latestCheck
     ? await prisma.seoCheck.findFirst({
-        where: { normalizedUrl: latestCheck.normalizedUrl, createdAt: { lt: latestCheck.createdAt } },
+        where: { projectId, normalizedUrl: latestCheck.normalizedUrl, createdAt: { lt: latestCheck.createdAt } },
         orderBy: { createdAt: "desc" },
         select: { score: true },
       })
@@ -162,7 +170,7 @@ export async function getOverview() {
         tone: "warning",
         title: `Follow up with ${pitch.outlet}`,
         detail: `${pitch.title || "Pitch"} · ${late === 0 ? "due today" : `${late} ${late === 1 ? "day" : "days"} overdue`}`,
-        href: "/dashboard/media",
+        href: `${basePath}/media`,
         rank: 0,
       });
     }
@@ -173,7 +181,7 @@ export async function getOverview() {
         tone: "warning",
         title: `${pitch.outlet} asked for changes`,
         detail: pitch.title || "Pitch",
-        href: "/dashboard/media",
+        href: `${basePath}/media`,
         rank: 1,
       });
     }
@@ -189,7 +197,7 @@ export async function getOverview() {
         tone: "destructive",
         title: result.label,
         detail: `${seo.host} · SEO error ${index + 1} of ${errors.length}`,
-        href: "/dashboard/seo",
+        href: `${basePath}/seo`,
         rank: 0,
       })
     );
@@ -201,7 +209,7 @@ export async function getOverview() {
         tone: "warning",
         title: `SEO check is ${age} days old`,
         detail: `Run a fresh check of ${seo.host}`,
-        href: "/dashboard/seo",
+        href: `${basePath}/seo`,
         rank: 2,
       });
     }
@@ -214,7 +222,7 @@ export async function getOverview() {
         tone: "destructive",
         title: `Missed publish date: ${item.title || "Untitled"}`,
         detail: `Was scheduled for ${shortDate(item.publishDate)}`,
-        href: "/dashboard/content",
+        href: `${basePath}/content`,
         rank: 0,
       });
     }
@@ -226,7 +234,7 @@ export async function getOverview() {
         tone: "warning",
         title: `Draft untouched for ${idle} days`,
         detail: item.title || "Untitled",
-        href: "/dashboard/content",
+        href: `${basePath}/content`,
         rank: 2,
       });
     }
@@ -239,7 +247,7 @@ export async function getOverview() {
         tone: "warning",
         title: `${directory.name} asked for changes`,
         detail: "Update the listing and resubmit",
-        href: "/dashboard/directories",
+        href: `${basePath}/directories`,
         rank: 1,
       });
     }
@@ -251,7 +259,7 @@ export async function getOverview() {
         tone: "warning",
         title: `${directory.name} still pending review`,
         detail: `Submitted ${waiting} days ago`,
-        href: "/dashboard/directories",
+        href: `${basePath}/directories`,
         rank: 2,
       });
     }

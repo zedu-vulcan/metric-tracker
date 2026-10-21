@@ -37,14 +37,14 @@ export const commentAuthorAgentSelect = agentRefSelect;
  * Per-task numbers for the dashboard's task lists: points from the task type, thread counts,
  * reviews on the latest delivery, and the worker and offered agent.
  */
-export async function taskBoardExtras(tasks: Task[]) {
+export async function taskBoardExtras(projectId: string, tasks: Task[]) {
   const ids = tasks.map((task) => task.id);
   const agentIds = [
     ...new Set(tasks.flatMap((task) => [task.assignedAgentId, task.offeredToAgentId]).filter((id): id is string => Boolean(id))),
   ];
 
   const [types, comments, agents] = await Promise.all([
-    prismaTaskTypesStore(prisma).list(false),
+    prismaTaskTypesStore(prisma, projectId).list(false),
     prisma.taskComment.findMany({
       where: { taskId: { in: ids } },
       select: { taskId: true, type: true, createdAt: true },

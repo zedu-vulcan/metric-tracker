@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import { APIError } from "openai";
-import { requireAuth } from "@/lib/api";
 import { getOverview } from "@/lib/overview";
+import { prisma } from "@/lib/prisma";
+import { projectHref } from "@/lib/project-paths";
+import { requireProjectAccess } from "@/lib/projects";
 import { AiNotConfiguredError, generateOverviewSummary } from "@/lib/overview-summary";
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
-  const { error } = await requireAuth();
+export async function POST(request: Request) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   try {
-    const summary = await generateOverviewSummary(await getOverview());
+    const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId }, select: { slug: true } });
+    const summary = await generateOverviewSummary(await getOverview(projectId, projectHref(project.slug)));
     return NextResponse.json(summary);
   } catch (cause) {
     if (cause instanceof AiNotConfiguredError) {

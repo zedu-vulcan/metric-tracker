@@ -1,5 +1,6 @@
 "use client";
 
+import { useProject } from "@/components/projects/ProjectProvider";
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { ArrowRightIcon, FolderTreeIcon, LayersIcon, MessageSquareIcon } from "lucide-react";
@@ -29,6 +30,7 @@ import { useGoals } from "./GoalsProvider";
 export function WorkstreamView({ goalId, workstreamId }: { goalId: string; workstreamId: string }) {
   const { goals, goalsLoading, ideasStatus, loadIdeas, ideas, tasks, tasksStatus, loadWorkstream, currentUser, agentFor } =
     useGoals();
+  const { href } = useProject();
 
   const goal = goals.find((candidate) => candidate.id === goalId);
   useEffect(() => loadIdeas(goalId), [goalId, loadIdeas]);
@@ -56,7 +58,7 @@ export function WorkstreamView({ goalId, workstreamId }: { goalId: string; works
         title="Workstream not found"
         description="This workstream doesn't exist, or its idea hasn't been approved yet."
         icon={FolderTreeIcon}
-        backHref={goal ? `/dashboard/goals/${goal.id}` : "/dashboard/goals"}
+        backHref={goal ? href(`/goals/${goal.id}`) : href("/goals")}
         backLabel={goal ? `Back to ${goal.title}` : "Back to goals"}
       />
     );
@@ -73,7 +75,7 @@ export function WorkstreamView({ goalId, workstreamId }: { goalId: string; works
 
   return (
     <>
-      <BackLink href={`/dashboard/goals/${goal.id}`} label={goal.title} />
+      <BackLink href={href(`/goals/${goal.id}`)} label={goal.title} />
       <PageHeader title={workstream.title} description={workstream.description || undefined} className="pt-2" />
 
       <PageContent>
@@ -131,7 +133,7 @@ export function WorkstreamView({ goalId, workstreamId }: { goalId: string; works
                         key={task.id}
                         task={task}
                         style={STAGE_STYLES[stage.value]}
-                        href={`/dashboard/goals/${goal.id}/workstreams/${workstream.id}/tasks/${task.id}`}
+                        href={href(`/goals/${goal.id}/workstreams/${workstream.id}/tasks/${task.id}`)}
                         progress={taskProgressLine(task, {
                           worker: task.assignedAgentId ? agentFor(task.assignedAgentId) : undefined,
                           offeredTo: task.offer ? agentFor(task.offer.agentId) : undefined,

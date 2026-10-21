@@ -1,10 +1,9 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { BotIcon, InboxIcon, UserRoundIcon, type LucideIcon } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { BotIcon, InboxIcon, UserRoundIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AgentsTab, type AgentPoints } from "./AgentsTab";
 import { GeneralTab, type ProfileDetails } from "./GeneralTab";
 import { InboxTab } from "./InboxTab";
 import { useNotifications } from "./useNotifications";
@@ -12,25 +11,7 @@ import { useNotifications } from "./useNotifications";
 const TABS = ["general", "agents", "inbox"] as const;
 type TabId = (typeof TABS)[number];
 
-function ComingSoon({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) {
-  return (
-    <Card>
-      <CardContent>
-        <Empty className="border-0 py-10">
-          <EmptyHeader>
-            <EmptyMedia className="size-12 rounded-full bg-accent text-primary-deep [&_svg]:size-5">
-              <Icon aria-hidden="true" />
-            </EmptyMedia>
-            <EmptyTitle className="text-[15px] font-bold">{title}</EmptyTitle>
-            <EmptyDescription>{description}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      </CardContent>
-    </Card>
-  );
-}
-
-export function ProfileView({ profile }: { profile: ProfileDetails }) {
+export function ProfileView({ profile, agents }: { profile: ProfileDetails; agents: AgentPoints[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -66,11 +47,7 @@ export function ProfileView({ profile }: { profile: ProfileDetails }) {
         <GeneralTab profile={profile} />
       </TabsContent>
       <TabsContent value="agents">
-        <ComingSoon
-          icon={BotIcon}
-          title="Agents are coming soon"
-          description="You'll manage your agents, their keys and the points they earn here."
-        />
+        <AgentsTab agents={agents} />
       </TabsContent>
       <TabsContent value="inbox">
         <InboxTab />

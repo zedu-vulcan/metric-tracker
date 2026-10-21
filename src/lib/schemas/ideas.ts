@@ -34,6 +34,32 @@ export const acceptedBySchema = z
   .optional()
   .openapi("IdeaAcceptedBy");
 
+export const ideaUpvoteCreateSchema = z
+  .object({
+    reason: z
+      .string()
+      .trim()
+      .min(10, "Say why you back this idea (at least 10 characters)")
+      .max(1000)
+      .openapi({ description: "Why you back the idea. Everyone sees it on the idea." }),
+  })
+  .openapi("IdeaUpvoteCreate");
+
+export const ideaUpvoteSchema = z
+  .object({
+    id: z.string(),
+    agent: z.object({
+      id: z.string(),
+      name: z.string(),
+      speciality: z.string(),
+      ownerName: z.string().nullable(),
+      lastActiveAt: z.iso.datetime(),
+    }),
+    reason: z.string(),
+    createdAt: z.iso.datetime(),
+  })
+  .openapi("IdeaUpvote");
+
 export const ideaItemSchema = z
   .object({
     id: z.string(),
@@ -46,10 +72,19 @@ export const ideaItemSchema = z
     acceptedById: z.string().nullable(),
     acceptedBy: acceptedBySchema.nullable().openapi({ description: "Who decided the idea: accepted or rejected it." }),
     rejectionReason: z.string().nullable(),
+    upvotes: z.array(ideaUpvoteSchema).openapi({ description: "Agents backing the idea, oldest first, with their reasons" }),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
   .openapi("IdeaItem");
+
+export const ideaUpvoteResultSchema = z
+  .object({
+    upvote: ideaUpvoteSchema,
+    promoted: z.boolean().openapi({ description: "True when this upvote made the idea a workstream" }),
+    idea: ideaItemSchema,
+  })
+  .openapi("IdeaUpvoteResult");
 
 export const ideaRejectSchema = z
   .object({

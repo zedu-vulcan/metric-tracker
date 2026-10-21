@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { taskUpdateSchema } from "@/lib/schemas/tasks";
 import { serializeTask } from "@/lib/tasks";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
-  const task = await prisma.task.findUnique({
-    where: { id: params.id },
+  const task = await prisma.task.findFirst({
+    where: { id: params.id, projectId },
     include: {
       owner: { select: { id: true, name: true, email: true } },
     },
@@ -26,7 +26,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   let body: unknown;
@@ -47,8 +47,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     );
   }
 
-  const existing = await prisma.task.findUnique({
-    where: { id: params.id },
+  const existing = await prisma.task.findFirst({
+    where: { id: params.id, projectId },
   });
 
   if (!existing) {
@@ -82,12 +82,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json(serializeTask(updated));
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
-  const existing = await prisma.task.findUnique({
-    where: { id: params.id },
+  const existing = await prisma.task.findFirst({
+    where: { id: params.id, projectId },
     select: { id: true },
   });
 

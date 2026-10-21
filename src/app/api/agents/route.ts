@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
 import { generateAgentKey, serializeAgent } from "@/lib/agents";
-import { requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { agentCreateSchema } from "@/lib/schemas/agents";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const { session, error } = await requireAuth();
+/** The signed-in user's agents in the current project. */
+export async function GET(request: Request) {
+  const { projectId, user, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
-
-  const userId = (session.user as { id?: string }).id;
+  const userId = user?.id;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const agents = await prisma.agent.findMany({
-    where: { ownerId: userId },
+    where: { ownerId: userId, projectId },
     orderBy: { createdAt: "asc" },
   });
 
@@ -24,10 +24,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { session, error } = await requireAuth();
+  const { projectId, user, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
-  const userId = (session.user as { id?: string }).id;
+  const userId = user?.id;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -63,6 +63,7 @@ export async function POST(request: Request) {
       keyHash,
       keyHint,
       ownerId: userId,
+      projectId,
     },
   });
 

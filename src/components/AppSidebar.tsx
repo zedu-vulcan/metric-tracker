@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronLeftIcon } from "lucide-react";
+import { useProject } from "@/components/projects/ProjectProvider";
 import { DashboardSidebarNav } from "@/components/SidebarNav";
 import { BrandMark, Wordmark } from "@/components/Wordmark";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,7 @@ const COLLAPSED_KEY = "zedu-amp:sidebar-collapsed";
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const { href } = useProject();
 
   useEffect(() => {
     try {
@@ -40,11 +42,11 @@ export function AppSidebar() {
     >
       <div className={cn("flex shrink-0 items-center lg:mb-9", collapsed ? "lg:flex-col lg:gap-4" : "lg:justify-between lg:pl-2")}>
         {collapsed ? (
-          <a href="/dashboard" aria-label="Zedu Amp overview" className="hidden lg:flex">
+          <a href={href()} aria-label="Zedu Amp overview" className="hidden lg:flex">
             <BrandMark className="size-8" />
           </a>
         ) : null}
-        <Wordmark href="/dashboard" tone="inverse" className={cn("text-[17px] [&_svg]:size-8", collapsed && "lg:hidden")} />
+        <Wordmark href={href()} tone="inverse" className={cn("text-[17px] [&_svg]:size-8", collapsed && "lg:hidden")} />
         <button
           type="button"
           onClick={toggle}

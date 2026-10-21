@@ -1,5 +1,4 @@
 import type { Agent, Goal, Task, User, Workstream } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
 
 export type WorkstreamWithListRelations = Workstream & {
   goal: Pick<Goal, "id" | "title" | "type" | "status">;
@@ -19,32 +18,6 @@ export type WorkstreamWithDetailRelations = Workstream & {
     tasks: number;
   };
 };
-
-import { extractAgentKey, hashAgentKey, touchAgentActivity } from "@/lib/agents";
-
-export function extractAgentApiKey(request: Request): string | null {
-  return extractAgentKey(request);
-}
-
-export async function authenticateAgentRequest(request: Request): Promise<Agent | null> {
-  const apiKey = extractAgentApiKey(request);
-  if (!apiKey) return null;
-
-  const agent = await prisma.agent.findUnique({
-    where: { keyHash: hashAgentKey(apiKey) },
-  });
-
-  if (!agent) return null;
-
-  // lastActiveAt is refreshed at most once a minute; connectedAt is set on first contact.
-  const touched = await touchAgentActivity(agent);
-  if (agent.connectedAt) return touched;
-
-  return prisma.agent.update({
-    where: { id: agent.id },
-    data: { connectedAt: new Date() },
-  });
-}
 
 export function serializeWorkstreamTask(task: Task) {
   return {

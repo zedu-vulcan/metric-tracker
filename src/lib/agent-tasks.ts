@@ -25,16 +25,18 @@ const taskInclude = {
   assignedAgent: { select: { id: true, name: true, ownerId: true } },
   comments: {
     where: { type: { in: ["bid", "delivery", "review"] } },
-    select: { type: true, authorAgentId: true, createdAt: true },
+    select: {
+      id: true, type: true, title: true, body: true, attachment: true, verdict: true, authorAgentId: true, createdAt: true,
+    },
     orderBy: { createdAt: "asc" },
   },
 } satisfies Prisma.TaskInclude;
 
 type LoadedTask = Prisma.TaskGetPayload<{ include: typeof taskInclude }>;
 
-/** Points per task type slug, from the admin-managed `task_types` table. */
-async function pointsBySlug() {
-  const types = await prismaTaskTypesStore(prisma).list(false);
+/** Points per task type slug, from the project's `task_types`. */
+async function pointsBySlug(projectId: string) {
+  const types = await prismaTaskTypesStore(prisma, projectId).list(false);
   return new Map(types.map((type) => [type.slug, type.points]));
 }
 
@@ -48,7 +50,19 @@ function activeTaskCount(agentId: string) {
  */
 function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number>, activeTasks: number) {
   const now = Date.now();
-  const lastDelivery = [...task.comments].reverse().find((comment) => comment.type === "delivery");
+  const deliveries = task.comments.filter((comment) => comment.type === "delivery");
+  const lastDelivery = deliveries.at(-1);
+  const previousDelivery = deliveries.at(-2);
+  // The "changes" reviews the latest delivery was meant to fix.
+  const changesToCheck = previousDelivery && lastDelivery
+    ? task.comments.filter(
+        (comment) =>
+          comment.type === "review" &&
+          comment.verdict === "changes" &&
+          comment.createdAt > previousDelivery.createdAt &&
+          comment.createdAt < lastDelivery.createdAt
+      )
+    : [];
   const roundReviews = task.comments.filter(
     (comment) => comment.type === "review" && (!lastDelivery || comment.createdAt > lastDelivery.createdAt)
   );
@@ -108,6 +122,22 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
     maxRevisions: task.maxRevisions,
     bidCount: bids.length,
     youBid: bids.some((comment) => comment.authorAgentId === agent.id),
+    deliveryRound: deliveries.length,
+    currentDelivery: lastDelivery
+      ? {
+          id: lastDelivery.id,
+          title: lastDelivery.title,
+          body: lastDelivery.body,
+          attachment: lastDelivery.attachment,
+          createdAt: lastDelivery.createdAt.toISOString(),
+        }
+      : null,
+    changesToCheck: changesToCheck.map((review) => ({
+      id: review.id,
+      authorAgentId: review.authorAgentId,
+      body: review.body,
+      createdAt: review.createdAt.toISOString(),
+    })),
     reviewsThisRound: roundReviews.length,
     reviewSlotsLeft: REVIEWABLE.includes(task.status) ? Math.max(MAX_REVIEWS_PER_ROUND - roundReviews.length, 0) : 0,
     canBid: bidBlocker === null,
@@ -130,13 +160,14 @@ export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) 
   const [tasks, points, activeTasks] = await Promise.all([
     prisma.task.findMany({
       where: {
+        projectId: agent.projectId,
         status: { in: statuses },
         workstream: { status: "accepted", goal: { status: "active" } },
       },
       include: taskInclude,
       orderBy: { createdAt: "asc" },
     }),
-    pointsBySlug(),
+    pointsBySlug(agent.projectId),
     activeTaskCount(agent.id),
   ]);
 
@@ -155,8 +186,8 @@ export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) 
 /** One task with everything an agent needs before acting on it, or null if it isn't a workstream task. */
 export async function getAgentTask(agent: Agent, taskId: string) {
   const [task, points, activeTasks] = await Promise.all([
-    prisma.task.findUnique({ where: { id: taskId }, include: taskInclude }),
-    pointsBySlug(),
+    prisma.task.findFirst({ where: { id: taskId, projectId: agent.projectId }, include: taskInclude }),
+    pointsBySlug(agent.projectId),
     activeTaskCount(agent.id),
   ]);
   if (!task?.workstream) return null;

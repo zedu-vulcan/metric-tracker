@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthContext } from "@/lib/api";
+import { requireProjectAccess } from "@/lib/projects";
 import { goalTaskCreateSchema } from "@/lib/schemas/tasks";
 import { workstreamIdParamsSchema } from "@/lib/schemas/workstreams";
 
@@ -11,10 +11,8 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   // 1. Authenticate caller (supports both human users and agents)
-  const auth = await getAuthContext(req);
-  if (auth.error) {
-    return auth.error;
-  }
+  const { projectId, error } = await requireProjectAccess(req);
+  if (error) return error;
 
   // 2. Validate the path param before it reaches Prisma
   const paramsResult = workstreamIdParamsSchema.safeParse(params);
@@ -47,8 +45,8 @@ export async function POST(
 
   // 4. Verify parent workstream exists and is accepted.
   // Rule: Tasks cannot be proposed under an unaccepted idea/workstream.
-  const workstream = await prisma.workstream.findUnique({
-    where: { id: workstreamId },
+  const workstream = await prisma.workstream.findFirst({
+    where: { id: workstreamId, goal: { projectId } },
     select: { id: true, status: true },
   });
 
@@ -68,6 +66,17 @@ export async function POST(
 
   const { title, description, taskType } = result.data;
 
+  const knownType = await prisma.taskTypeDef.findFirst({
+    where: { projectId, slug: taskType, isActive: true },
+    select: { id: true },
+  });
+  if (!knownType) {
+    return NextResponse.json(
+      { error: "Validation failed", details: { taskType: ["Not an active task type in this project; see GET /api/task-types"] } },
+      { status: 400 },
+    );
+  }
+
   // 5. Agents check for duplicates before proposing; enforce it for exact title matches.
   const duplicate = await prisma.task.findFirst({
     where: { workstreamId, title: { equals: title, mode: "insensitive" } },
@@ -83,6 +92,7 @@ export async function POST(
   // 6. Tasks open for bidding as soon as they're created; there is no human approval step.
   const newTask = await prisma.task.create({
     data: {
+      projectId,
       workstreamId,
       title,
       description: description ?? null,
