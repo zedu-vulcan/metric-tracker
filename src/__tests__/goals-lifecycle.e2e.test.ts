@@ -87,6 +87,8 @@ interface Actor {
 
 interface Fixtures {
   owner: { id: string; sessionToken: string };
+  admin: { id: string; sessionToken: string };
+  member: { id: string; sessionToken: string };
   projectId: string;
   agentA: Actor; // the goal owner's agent: proposes ideas and tasks
   agentB: Actor; // worker
@@ -178,14 +180,18 @@ async function provisionFreshDatabase(databaseUrl: string): Promise<void> {
 }
 
 /** Calls the API as the project owner (session + project header) or as an agent (key only). */
-async function call(method: string, pathAndQuery: string, options: { body?: unknown; agent?: Actor } = {}): Promise<ApiResult> {
+async function call(
+  method: string,
+  pathAndQuery: string,
+  options: { body?: unknown; agent?: Actor; sessionToken?: string } = {}
+): Promise<ApiResult> {
   const fx = ctx.fx;
   assert.ok(fx, "fixtures ready");
   const headers: Record<string, string> = {};
   if (options.agent) {
     headers["x-agent-key"] = options.agent.key;
   } else {
-    headers["cookie"] = `next-auth.session-token=${fx.owner.sessionToken}`;
+    headers["cookie"] = `next-auth.session-token=${options.sessionToken ?? fx.owner.sessionToken}`;
     headers["x-project-id"] = fx.projectId;
   }
   if (options.body !== undefined) headers["content-type"] = "application/json";
@@ -328,6 +334,20 @@ before(
       data: { sessionToken, userId: owner.id, expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
     });
 
+    await prisma.projectMember.update({
+      where: { projectId_userId: { projectId: project.id, userId: ownerC.id } },
+      data: { role: "admin" },
+    });
+    const adminSessionToken = randomBytes(32).toString("hex");
+    await prisma.session.create({
+      data: { sessionToken: adminSessionToken, userId: ownerC.id, expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
+    });
+
+    const memberSessionToken = randomBytes(32).toString("hex");
+    await prisma.session.create({
+      data: { sessionToken: memberSessionToken, userId: ownerB.id, expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
+    });
+
     const mkAgent = async (label: string, ownerId: string, projectId = project.id): Promise<Actor> => {
       const key = `zedu_ak_e2e_${label}_${randomBytes(8).toString("hex")}`;
       const agent = await prisma.agent.create({
@@ -338,6 +358,8 @@ before(
 
     ctx.fx = {
       owner: { id: owner.id, sessionToken },
+      admin: { id: ownerC.id, sessionToken: adminSessionToken },
+      member: { id: ownerB.id, sessionToken: memberSessionToken },
       projectId: project.id,
       agentA: await mkAgent("a", owner.id),
       agentB: await mkAgent("b", ownerB.id),
@@ -692,5 +714,43 @@ describe("edge case: agents can hold at most 2 active tasks", () => {
     const offer = await call("POST", `/api/tasks/${third}/offer`, { body: { agentId: ctx.fx!.agentA.id } });
     assert.equal(offer.status, 400, "the goal owner can't offer past the active-task limit");
     assert.match(errorText(offer), /2 active/i);
+  });
+});
+
+describe("task offer permissions: project admin vs non-admin member", () => {
+  it("allows a project admin to send and withdraw offers while blocking non-admin members", async () => {
+    const taskId = await createTask(`E2E Admin Offer Task ${RUN_ID}`);
+    const bid = await comment(taskId, ctx.fx!.agentD, { type: "bid", body: "I want this task" });
+    assert.equal(bid.status, 201, errorText(bid));
+
+    // A regular member who did not create the goal cannot send offers
+    const forbiddenOffer = await call("POST", `/api/tasks/${taskId}/offer`, {
+      sessionToken: ctx.fx!.member.sessionToken,
+      body: { agentId: ctx.fx!.agentD.id },
+    });
+    assert.equal(forbiddenOffer.status, 403);
+    assert.match(errorText(forbiddenOffer), /Only the goal owner or a project admin can send offers/);
+
+    // A project admin who did not create the goal CAN send an offer
+    const adminOffer = await call("POST", `/api/tasks/${taskId}/offer`, {
+      sessionToken: ctx.fx!.admin.sessionToken,
+      body: { agentId: ctx.fx!.agentD.id },
+    });
+    assert.equal(adminOffer.status, 200, errorText(adminOffer));
+    assert.equal(asObject(adminOffer).offeredToAgentId, ctx.fx!.agentD.id);
+
+    // A regular member cannot withdraw the offer
+    const forbiddenWithdraw = await call("DELETE", `/api/tasks/${taskId}/offer`, {
+      sessionToken: ctx.fx!.member.sessionToken,
+    });
+    assert.equal(forbiddenWithdraw.status, 403);
+    assert.match(errorText(forbiddenWithdraw), /Only the goal owner or a project admin can withdraw offers/);
+
+    // A project admin CAN withdraw the offer
+    const adminWithdraw = await call("DELETE", `/api/tasks/${taskId}/offer`, {
+      sessionToken: ctx.fx!.admin.sessionToken,
+    });
+    assert.equal(adminWithdraw.status, 200, errorText(adminWithdraw));
+    assert.equal(asObject(adminWithdraw).offeredToAgentId, null);
   });
 });
