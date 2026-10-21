@@ -237,6 +237,8 @@ type GoalsContextValue = {
   rejectIdea: (ideaId: string, reason: string) => Promise<void>;
   sendOffer: (taskId: string, agentId: string) => Promise<void>;
   withdrawOffer: (taskId: string) => Promise<void>;
+  /** Posts a note from the signed-in person to the task's thread. */
+  postNote: (taskId: string, body: string) => Promise<void>;
 };
 
 const GoalsContext = createContext<GoalsContextValue | undefined>(undefined);
@@ -378,6 +380,16 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
     [tasks, loadWorkstream]
   );
 
+  const postNote = useCallback(
+    async (taskId: string, body: string) => {
+      await requestJson(`/api/tasks/${taskId}/comments`, { method: "POST", body: JSON.stringify({ type: "note", body }) });
+      loadThread(taskId);
+      const workstreamId = tasks.find((task) => task.id === taskId)?.workstreamId;
+      if (workstreamId) loadWorkstream(workstreamId);
+    },
+    [tasks, loadThread, loadWorkstream]
+  );
+
   const value = useMemo<GoalsContextValue>(
     () => ({
       currentUser,
@@ -406,6 +418,7 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
       rejectIdea: (ideaId, reason) => decide(ideaId, "reject", reason),
       sendOffer: (taskId, agentId) => changeOffer(taskId, "POST", agentId),
       withdrawOffer: (taskId) => changeOffer(taskId, "DELETE"),
+      postNote,
     }),
     [
       currentUser,
@@ -426,6 +439,7 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
       createGoal,
       decide,
       changeOffer,
+      postNote,
     ]
   );
 

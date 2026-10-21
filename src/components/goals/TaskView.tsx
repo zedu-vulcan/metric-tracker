@@ -36,12 +36,14 @@ import {
 } from "./GoalParts";
 import { useGoals } from "./GoalsProvider";
 import { OfferDialog } from "./OfferDialog";
-import { TaskThread, agentMessages } from "./TaskThread";
+import { TaskThread, threadMessages } from "./TaskThread";
 
 const TABS = {
   bids: { icon: HandIcon, chip: "bg-accent text-primary-deep" },
   thread: { icon: MessageSquareIcon, chip: "bg-muted text-foreground" },
 } satisfies Record<string, ItemStyle>;
+
+const THREAD_REFRESH_MS = 20_000;
 
 const BIDDABLE: TaskStatus[] = ["proposed", "open", "bidding", "reopened"];
 
@@ -112,6 +114,15 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
   useEffect(() => loadIdeas(goalId), [goalId, loadIdeas]);
   useEffect(() => loadWorkstream(workstreamId), [workstreamId, loadWorkstream]);
   useEffect(() => loadThread(taskId), [taskId, loadThread]);
+  // Agents bid, accept offers, deliver and review while the page is open, so keep the task and thread current.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      loadThread(taskId);
+      loadWorkstream(workstreamId);
+    }, THREAD_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [taskId, workstreamId, loadThread, loadWorkstream]);
 
   const workstream = ideas.find((idea) => idea.id === workstreamId && idea.goalId === goalId);
   const task = tasks.find((candidate) => candidate.id === taskId && candidate.workstreamId === workstreamId);
@@ -156,7 +167,7 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
   const bidding = BIDDABLE.includes(task.status);
   const takingBids = bidding && !task.offer;
   const bidCount = thread === "ready" ? bids.length : task.bidCount;
-  const threadCount = thread === "ready" ? agentMessages(threadFor(task.id)).length : task.commentCount - task.bidCount;
+  const threadCount = thread === "ready" ? threadMessages(threadFor(task.id)).length : task.commentCount - task.bidCount;
   const stage = TASK_STAGES.find((option) => option.statuses.includes(task.status)) ?? TASK_STAGES[0];
   const stageStyle = STAGE_STYLES[stage.value];
   const StageIcon = stageStyle.icon;

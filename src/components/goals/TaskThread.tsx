@@ -8,16 +8,20 @@ import {
   LinkIcon,
   MessagesSquareIcon,
   PackageCheckIcon,
+  SendIcon,
   StarIcon,
   StickyNoteIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { shortDateTime, type Agent, type Task } from "./goal-model";
-import { ColorTab, EmptyCard, type ItemStyle } from "./GoalParts";
+import { ColorTab, type ItemStyle } from "./GoalParts";
 import { useGoals } from "./GoalsProvider";
 import {
   COMMENT_TYPES,
@@ -30,9 +34,9 @@ import {
 
 type Filter = "all" | CommentType;
 
-/** What the agents themselves posted. Bids have their own tab; human decisions aren't shown in the thread. */
-export function agentMessages(comments: ThreadComment[]): ThreadComment[] {
-  return comments.filter((comment) => comment.author.kind === "agent" && comment.type !== "bid");
+/** Everything in the thread except bids, which have their own tab. */
+export function threadMessages(comments: ThreadComment[]): ThreadComment[] {
+  return comments.filter((comment) => comment.type !== "bid");
 }
 
 /**
@@ -48,16 +52,12 @@ const MESSAGE_STYLES: Partial<Record<CommentType, ItemStyle & { bubble: string }
 
 const ALL_STYLE: ItemStyle = { icon: MessagesSquareIcon, chip: "bg-foreground text-background" };
 
-/** The agents' conversation about the task, newest last, filterable by message type. */
+/** The conversation about the task, newest last, filterable by message type, with a reply box for people. */
 export function TaskThread({ task }: { task: Task }) {
   const { threadFor, agentFor } = useGoals();
   const all = threadFor(task.id);
-  const messages = useMemo(() => agentMessages(all), [all]);
+  const messages = useMemo(() => threadMessages(all), [all]);
   const [filter, setFilter] = useState<Filter>("all");
-
-  if (messages.length === 0) {
-    return <EmptyCard>No messages yet. Once an agent takes the task, its delivery, reviews and questions show up here.</EmptyCard>;
-  }
 
   const counts = new Map<CommentType, number>();
   for (const message of messages) counts.set(message.type, (counts.get(message.type) ?? 0) + 1);
@@ -66,40 +66,97 @@ export function TaskThread({ task }: { task: Task }) {
 
   return (
     <section className="flex flex-col gap-5 rounded-[22px] border border-border bg-card p-5 sm:p-6" aria-label="Thread">
-      <div className="flex flex-wrap items-center gap-3">
-        {filters.length > 2 && (
-          <Tabs value={filter} onValueChange={(value) => setFilter(value as Filter)} className="max-w-full">
-            <TabsList className="h-11! max-w-full justify-start overflow-x-auto p-1" aria-label="Filter the thread by message type">
-              {filters.map((value) => (
-                <ColorTab
-                  key={value}
-                  value={value}
-                  style={value === "all" ? ALL_STYLE : (MESSAGE_STYLES[value] ?? ALL_STYLE)}
-                  label={value === "all" ? "All" : COMMENT_TYPES[value].plural}
-                  count={value === "all" ? messages.length : (counts.get(value) ?? 0)}
-                  highlight={value === "escalation"}
-                />
-              ))}
-            </TabsList>
-          </Tabs>
-        )}
-        <p className="m-0 ml-auto text-[13px] text-muted-foreground tabular-nums" aria-live="polite">
-          {filter === "all"
-            ? `${messages.length} ${messages.length === 1 ? "message" : "messages"}`
-            : `${visible.length} of ${messages.length} messages`}
+      {messages.length === 0 ? (
+        <p className="m-0 text-sm text-muted-foreground">
+          No messages yet. Once an agent takes the task, its delivery, reviews and questions show up here.
         </p>
-      </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            {filters.length > 2 && (
+              <Tabs value={filter} onValueChange={(value) => setFilter(value as Filter)} className="max-w-full">
+                <TabsList className="h-11! max-w-full justify-start overflow-x-auto p-1" aria-label="Filter the thread by message type">
+                  {filters.map((value) => (
+                    <ColorTab
+                      key={value}
+                      value={value}
+                      style={value === "all" ? ALL_STYLE : (MESSAGE_STYLES[value] ?? ALL_STYLE)}
+                      label={value === "all" ? "All" : COMMENT_TYPES[value].plural}
+                      count={value === "all" ? messages.length : (counts.get(value) ?? 0)}
+                      highlight={value === "escalation"}
+                    />
+                  ))}
+                </TabsList>
+              </Tabs>
+            )}
+            <p className="m-0 ml-auto text-[13px] text-muted-foreground tabular-nums" aria-live="polite">
+              {filter === "all"
+                ? `${messages.length} ${messages.length === 1 ? "message" : "messages"}`
+                : `${visible.length} of ${messages.length} messages`}
+            </p>
+          </div>
 
-      <ol className="relative m-0 flex list-none flex-col gap-6 p-0 before:absolute before:top-5 before:bottom-5 before:left-5 before:w-px before:bg-border">
-        {visible.map((message) => (
-          <Message
-            key={message.id}
-            message={message}
-            agent={message.author.kind === "agent" ? agentFor(message.author.agentId) : undefined}
-          />
-        ))}
-      </ol>
+          <ol className="relative m-0 flex list-none flex-col gap-6 p-0 before:absolute before:top-5 before:bottom-5 before:left-5 before:w-px before:bg-border">
+            {visible.map((message) => (
+              <Message
+                key={message.id}
+                message={message}
+                agent={message.author.kind === "agent" ? agentFor(message.author.agentId) : undefined}
+              />
+            ))}
+          </ol>
+        </>
+      )}
+
+      <ReplyBox taskId={task.id} />
     </section>
+  );
+}
+
+/** People answer escalations and add context with notes; agents read them in the thread and their inbox. */
+function ReplyBox({ taskId }: { taskId: string }) {
+  const { postNote } = useGoals();
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = `reply-${taskId}`;
+
+  const send = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const text = body.trim();
+    if (!text) return;
+    setSending(true);
+    setError(null);
+    try {
+      await postNote(taskId, text);
+      setBody("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Couldn't post your reply. Try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <form onSubmit={send} className="flex flex-col gap-3 border-t border-border pt-5">
+      <Field data-invalid={error ? true : undefined}>
+        <FieldLabel htmlFor={id}>Reply</FieldLabel>
+        <Textarea
+          id={id}
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          placeholder="Answer a question, share access details or add context for the agents."
+          rows={3}
+          maxLength={10000}
+          aria-invalid={error ? true : undefined}
+        />
+        {error && <FieldError>{error}</FieldError>}
+      </Field>
+      <Button type="submit" variant="secondary" className="self-end" disabled={sending || !body.trim()}>
+        {sending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" aria-hidden="true" />}
+        Post reply
+      </Button>
+    </form>
   );
 }
 
@@ -114,12 +171,16 @@ function initials(name: string) {
 
 function Message({ message, agent }: { message: ThreadComment; agent?: Agent }) {
   const type = COMMENT_TYPES[message.type];
-  const name = agent?.name ?? "Unknown agent";
+  const person = message.author.kind === "human";
+  const name = message.author.kind === "human" ? message.author.name : (agent?.name ?? "Unknown agent");
 
   return (
     <li className="flex gap-3 sm:gap-4">
       <span
-        className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-[13px] font-bold text-primary-deep ring-4 ring-card"
+        className={cn(
+          "relative flex size-10 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ring-4 ring-card",
+          person ? "bg-primary text-primary-foreground" : "bg-accent text-primary-deep"
+        )}
         aria-hidden="true"
       >
         {initials(name) || "?"}
@@ -128,10 +189,14 @@ function Message({ message, agent }: { message: ThreadComment; agent?: Agent }) 
       <article className="flex min-w-0 flex-1 flex-col gap-2" aria-label={`${type.label} from ${name}`}>
         <header className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pt-2">
           <span className="text-sm font-bold text-foreground">{name}</span>
-          {agent && (
-            <span className="text-xs text-muted-foreground">
-              {agent.speciality} · {agent.ownerName}
-            </span>
+          {person ? (
+            <span className="text-xs text-muted-foreground">Team</span>
+          ) : (
+            agent && (
+              <span className="text-xs text-muted-foreground">
+                {agent.speciality} · {agent.ownerName}
+              </span>
+            )
           )}
           <time dateTime={message.at} className="ml-auto text-xs text-muted-foreground tabular-nums">
             {shortDateTime.format(new Date(message.at))}

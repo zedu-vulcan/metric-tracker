@@ -58,6 +58,11 @@ export async function writeTaskComment(
 
   let change: Prisma.TaskUncheckedUpdateManyInput | undefined;
 
+  // Bids, deliveries, reviews and escalations are the agents' work; people reply with notes.
+  if (actor.type === "user" && input.type !== "note" && input.type !== "revision_request") {
+    throw new TaskCommentError("People can only post notes on a task thread", 403);
+  }
+
   if (input.type === "revision_request") {
     if (actor.type === "user" && !actor.coordinator) {
       throw new TaskCommentError("Only a Review Coordinator or peer reviewer can request revisions", 403);
