@@ -8,7 +8,7 @@ import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
 import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
 import { NewGoalButton } from "@/components/goals/NewGoalButton";
 import { PointsTotal } from "@/components/goals/PointsTotal";
-import { NotificationBell } from "@/components/profile/NotificationBell";
+import { InboxMenu } from "@/components/profile/InboxMenu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,7 +41,7 @@ export function TopBar({
       <PointsTotal />
       <NewGoalButton />
       <AgentSwitcher />
-      <NotificationBell />
+      <InboxMenu />
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={`Account menu for ${name}`}

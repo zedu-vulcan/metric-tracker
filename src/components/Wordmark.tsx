@@ -31,12 +31,7 @@ export function Wordmark({
       href={href}
     >
       <BrandMark />
-      <span>
-        Zedu{" "}
-        <span className={cn("font-semibold", tone === "inverse" ? "text-sidebar-muted-foreground" : "text-primary-deep")}>
-          Amp
-        </span>
-      </span>
+      <span>Amp</span>
     </a>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * Points & scoreboard domain logic for the Zedu agent platform.
+ * Points & scoreboard domain logic for the Amp agent platform.
  *
  * Pure, database-free logic shared by the screens and the server contracts.
  * The database-backed implementations (`awardPoints`, `awardForRule`,
@@ -24,9 +24,12 @@ export const ACTIVE_TASK_LIMIT = 2;
 
 export const POINT_REASONS = [
   "task_approved",
+  "goal_task_approved",
+  "idea_task_approved",
   "review_submitted",
   "idea_accepted",
   "idea_upvoted",
+  "idea_downvoted",
   "task_proposal_accepted",
   "manual_adjustment",
   "reversal",
@@ -36,9 +39,12 @@ export type PointReason = (typeof POINT_REASONS)[number];
 
 export const REASON_LABELS: Record<PointReason, string> = {
   task_approved: "Task approved",
+  goal_task_approved: "Task on your goal approved",
+  idea_task_approved: "Task from your idea approved",
   review_submitted: "Review submitted",
   idea_accepted: "Idea accepted",
   idea_upvoted: "Idea upvoted",
+  idea_downvoted: "Idea downvoted",
   task_proposal_accepted: "Task proposal accepted",
   manual_adjustment: "Manual adjustment",
   reversal: "Reversal",
@@ -108,10 +114,14 @@ export type PointRule = {
 
 /** Award rules every new project starts with. Each review pays 5 (decision 20 Oct 2026). */
 export const DEFAULT_POINT_RULES: PointRule[] = [
-  { ruleKey: "review_submitted", amount: 5, enabled: true, weeklyCap: null },
-  { ruleKey: "idea_accepted", amount: 2, enabled: true, weeklyCap: null },
-  { ruleKey: "idea_upvoted", amount: 0.5, enabled: true, weeklyCap: null },
+  { ruleKey: "review_submitted", amount: 6, enabled: true, weeklyCap: null },
+  { ruleKey: "idea_accepted", amount: 3, enabled: true, weeklyCap: null },
+  { ruleKey: "idea_upvoted", amount: 1.5, enabled: true, weeklyCap: null },
+  { ruleKey: "idea_downvoted", amount: 1.5, enabled: true, weeklyCap: null },
   { ruleKey: "task_proposal_accepted", amount: 5, enabled: false, weeklyCap: null },
+  // These two are percentages of the approved task's points, not fixed amounts.
+  { ruleKey: "goal_task_approved", amount: 5, enabled: true, weeklyCap: null },
+  { ruleKey: "idea_task_approved", amount: 8, enabled: true, weeklyCap: null },
 ];
 
 /** Stored as a `point_rules` row so each project can set its own; `amount` is the target. */
@@ -119,15 +129,24 @@ export const WEEKLY_TARGET_RULE = "weekly_target";
 
 // ── Task types ───────────────────────────────────────────────────────────────
 
-/** Task types every new project starts with; its owner and admins edit them afterwards. */
+/**
+ * Task types every new project starts with; its owner and admins edit them afterwards. `points` is the
+ * default and the lowest a task of that type can pay; whoever creates a task can propose up to `maxPoints`.
+ */
 export const DEFAULT_TASK_TYPES = [
-  { slug: "research", name: "Research", description: "Investigate and report findings", points: 20, maxPoints: 50 },
-  { slug: "lead_hunting", name: "Lead hunting", description: "Find and qualify contacts", points: 30, maxPoints: 50 },
-  { slug: "content", name: "Content", description: "Articles, posts, guides", points: 40, maxPoints: 50 },
-  { slug: "seo", name: "SEO", description: "On-page and technical fixes", points: 25, maxPoints: 50 },
-  { slug: "press", name: "Press", description: "Pitches and media outreach", points: 35, maxPoints: 50 },
-  { slug: "other", name: "Other", description: "Anything that fits no other type", points: 10, maxPoints: 30 },
+  { slug: "content", name: "Content", description: "Articles, posts, guides", points: 60, maxPoints: 120 },
+  { slug: "press", name: "Press", description: "Pitches and media outreach", points: 50, maxPoints: 100 },
+  { slug: "lead_hunting", name: "Lead hunting", description: "Find and qualify contacts", points: 50, maxPoints: 100 },
+  { slug: "seo", name: "SEO", description: "On-page and technical fixes", points: 40, maxPoints: 80 },
+  { slug: "research", name: "Research", description: "Investigate and report findings", points: 30, maxPoints: 60 },
+  { slug: "other", name: "Other", description: "Anything that fits no other type", points: 20, maxPoints: 40 },
 ];
+
+/** Why `points` is outside the range a task of this type may pay, or null when it fits. */
+export function taskPointsError(points: number, type: { name: string; points: number; maxPoints: number }): string | null {
+  if (Number.isInteger(points) && points >= type.points && points <= type.maxPoints) return null;
+  return `A ${type.name} task pays between ${type.points} and ${type.maxPoints} points`;
+}
 
 export type TaskTypeConfig = {
   id: string;
@@ -158,7 +177,16 @@ export function validateTaskType(input: { points: number; maxPoints: number }): 
   return errors;
 }
 
-/** A task pays its snapshot, clamped to the type's cap. Snapshot is fixed at "open" time. */
+/** Only the first reviews on a task pay their reviewers, so review pay can't outgrow the task. */
+export const MAX_PAID_REVIEWS_PER_TASK = 4;
+
+/** A percentage share of a task's points, rounded to the ledger's one decimal place. */
+export function shareOfTaskPoints(points: number, percent: number): number {
+  if (!Number.isFinite(points) || !Number.isFinite(percent) || points <= 0 || percent <= 0) return 0;
+  return Math.round((points * percent) / 10) / 10;
+}
+
+/** A task pays the points set when it was created, clamped to its type's current cap. */
 export function clampTaskPoints(pointsSnapshot: number, maxPoints: number): number {
   if (!Number.isInteger(pointsSnapshot) || !Number.isInteger(maxPoints)) return 0;
   return Math.max(0, Math.min(pointsSnapshot, maxPoints));
@@ -240,9 +268,9 @@ export function breakdownFor(entries: LedgerEntry[], range: WeekRange, userId: s
   const sum = (reason: PointReason) =>
     own.filter((entry) => entry.reason === reason).reduce((total, entry) => total + entry.amount, 0);
   return {
-    tasks: sum("task_approved"),
+    tasks: sum("task_approved") + sum("goal_task_approved"),
     reviews: sum("review_submitted"),
-    ideas: sum("idea_accepted") + sum("idea_upvoted") + sum("task_proposal_accepted"),
+    ideas: sum("idea_accepted") + sum("idea_upvoted") + sum("idea_downvoted") + sum("task_proposal_accepted") + sum("idea_task_approved"),
     adjustments: sum("manual_adjustment") + sum("reversal"),
   };
 }

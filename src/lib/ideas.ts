@@ -13,6 +13,7 @@ export type IdeaRecord = Workstream & {
   } | null;
   acceptedBy: { id: string; name: string | null; email: string | null } | null;
   upvotes: Prisma.IdeaUpvoteGetPayload<{ include: typeof upvoteInclude }>[];
+  downvotes: Prisma.IdeaDownvoteGetPayload<{ include: typeof upvoteInclude }>[];
 };
 
 export const ideaInclude = {
@@ -21,6 +22,7 @@ export const ideaInclude = {
   },
   acceptedBy: { select: { id: true, name: true, email: true } },
   upvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },
+  downvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },
 } satisfies Prisma.WorkstreamInclude;
 
 export function toIdeaItem(workstream: IdeaRecord): z.infer<typeof ideaItemSchema> {
@@ -42,6 +44,7 @@ export function toIdeaItem(workstream: IdeaRecord): z.infer<typeof ideaItemSchem
     acceptedBy: workstream.acceptedBy ?? null,
     rejectionReason: workstream.rejectionReason,
     upvotes: workstream.upvotes.map(serializeUpvote),
+    downvotes: workstream.downvotes.map(serializeUpvote),
     createdAt: workstream.createdAt.toISOString(),
     updatedAt: workstream.updatedAt.toISOString(),
   };

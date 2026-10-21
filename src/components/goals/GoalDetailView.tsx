@@ -3,8 +3,9 @@
 import { useProject } from "@/components/projects/ProjectProvider";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRightIcon, CheckIcon, LayersIcon, LightbulbIcon, TargetIcon, ThumbsUpIcon, XIcon } from "lucide-react";
+import { ArrowRightIcon, CheckIcon, LayersIcon, LightbulbIcon, TargetIcon, ThumbsDownIcon, ThumbsUpIcon, XIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
+import { DeleteGoalButton } from "./DeleteGoalButton";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { goalTypeLabel, shortDate, summarizeTasks, UPVOTES_TO_PROMOTE, type Agent, type Idea } from "./goal-model";
+import { goalTypeLabel, shortDate, summarizeTasks, DOWNVOTES_TO_REMOVE, UPVOTES_TO_PROMOTE, type Agent, type Idea } from "./goal-model";
 import {
   BackLink,
   GoalPageLoading,
@@ -110,7 +111,12 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
   return (
     <>
       <BackLink href={href("/goals")} label="Goals" />
-      <PageHeader title={goal.title} description={goal.description || undefined} className="pt-2" />
+      <PageHeader
+        title={goal.title}
+        description={goal.description || undefined}
+        actions={<DeleteGoalButton goal={goal} />}
+        className="pt-2"
+      />
 
       <PageContent>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
@@ -182,7 +188,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
             {!isOwner && proposed.length > 0 && (
               <p className="m-0 text-[13px] text-muted-foreground">
                 Only {goal.ownerName} can approve or reject ideas. An idea with {UPVOTES_TO_PROMOTE} upvotes from agents
-                becomes a workstream on its own.
+                becomes a workstream on its own, and one with {DOWNVOTES_TO_REMOVE} downvotes is removed.
               </p>
             )}
             {decisionError && (
@@ -255,6 +261,7 @@ function IdeaCard({
   children?: React.ReactNode;
 }) {
   const rejected = idea.status === "rejected";
+  const removed = rejected && !idea.decidedBy && idea.downvotes.length >= DOWNVOTES_TO_REMOVE;
   const agent = agentFor(idea.agentId);
 
   return (
@@ -262,14 +269,14 @@ function IdeaCard({
       <ItemHeading style={rejected ? KINDS.rejected : KINDS.idea} title={idea.title} muted={rejected}>
         {idea.description && <Description>{idea.description}</Description>}
         <ByAgent agent={agent} at={idea.proposedAt} />
-        <Upvotes idea={idea} agentFor={agentFor} />
+        <Votes idea={idea} agentFor={agentFor} />
         {rejected && (
           <p className="m-0 mt-2 max-w-[68ch] self-start rounded-xl bg-destructive-muted px-3.5 py-2.5 text-[13px] text-foreground">
             <span className="font-semibold text-destructive">
-              Rejected{idea.decidedBy ? ` by ${idea.decidedBy}` : ""}
-              {idea.rejectionReason ? ": " : ""}
+              {removed ? "Removed by downvotes" : `Rejected${idea.decidedBy ? ` by ${idea.decidedBy}` : ""}`}
+              {!removed && idea.rejectionReason ? ": " : ""}
             </span>
-            {idea.rejectionReason}
+            {!removed && idea.rejectionReason}
           </p>
         )}
       </ItemHeading>
@@ -278,30 +285,56 @@ function IdeaCard({
   );
 }
 
-/** How many agents back the idea and why, so the goal owner and other agents can weigh it. */
-function Upvotes({ idea, agentFor }: { idea: Idea; agentFor: (agentId: string) => Agent | undefined }) {
-  const count = idea.upvotes.length;
-  if (count === 0 && idea.status !== "proposed") return null;
+/** How many agents back or oppose the idea and why, so the goal owner and other agents can weigh it. */
+function Votes({ idea, agentFor }: { idea: Idea; agentFor: (agentId: string) => Agent | undefined }) {
+  const proposed = idea.status === "proposed";
+  const ups = idea.upvotes.length;
+  const downs = idea.downvotes.length;
+  if (ups + downs === 0 && !proposed) return null;
+
+  const votes = [
+    ...idea.upvotes.map((vote) => ({ ...vote, up: true })),
+    ...idea.downvotes.map((vote) => ({ ...vote, up: false })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
 
   return (
     <div className="mt-1 flex flex-col gap-2">
-      <p className="m-0 flex items-center gap-1.5 text-[13px] text-muted-foreground tabular-nums">
-        <ThumbsUpIcon className="size-3.5" aria-hidden="true" />
-        <span className="font-semibold text-foreground">
-          {count} {count === 1 ? "upvote" : "upvotes"}
+      <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-foreground tabular-nums">
+        <span className="flex items-center gap-1.5">
+          <ThumbsUpIcon className="size-3.5" aria-hidden="true" />
+          <span className="font-semibold text-foreground">
+            {ups} {ups === 1 ? "upvote" : "upvotes"}
+          </span>
+          {proposed && <span>of {UPVOTES_TO_PROMOTE} to become a workstream</span>}
         </span>
-        {idea.status === "proposed" && <span>of {UPVOTES_TO_PROMOTE} to become a workstream</span>}
+        <span className="flex items-center gap-1.5">
+          <ThumbsDownIcon className="size-3.5" aria-hidden="true" />
+          <span className="font-semibold text-foreground">
+            {downs} {downs === 1 ? "downvote" : "downvotes"}
+          </span>
+          {proposed && <span>of {DOWNVOTES_TO_REMOVE} to remove it</span>}
+        </span>
       </p>
-      {count > 0 && (
+      {votes.length > 0 && (
         <ul className="m-0 flex max-w-[68ch] list-none flex-col gap-1.5 p-0">
-          {idea.upvotes.map((upvote) => {
-            const voter = agentFor(upvote.agentId);
+          {votes.map((vote) => {
+            const voter = agentFor(vote.agentId);
+            const Icon = vote.up ? ThumbsUpIcon : ThumbsDownIcon;
             return (
-              <li key={upvote.id} className="rounded-xl bg-muted px-3.5 py-2.5 text-[13px] leading-relaxed text-foreground">
-                <span className="font-semibold">{voter?.name ?? "An agent"}</span>
-                {voter && <span className="text-muted-foreground"> ({voter.ownerName})</span>}
-                <span className="text-muted-foreground">: </span>
-                {upvote.reason}
+              <li
+                key={vote.id}
+                className="flex items-start gap-2.5 rounded-xl bg-muted px-3.5 py-2.5 text-[13px] leading-relaxed text-foreground"
+              >
+                <Icon
+                  className={cn("mt-1 size-3.5 shrink-0", vote.up ? "text-success" : "text-destructive")}
+                  aria-label={vote.up ? "Upvote" : "Downvote"}
+                />
+                <span>
+                  <span className="font-semibold">{voter?.name ?? "An agent"}</span>
+                  {voter && <span className="text-muted-foreground"> ({voter.ownerName})</span>}
+                  <span className="text-muted-foreground">: </span>
+                  {vote.reason}
+                </span>
               </li>
             );
           })}

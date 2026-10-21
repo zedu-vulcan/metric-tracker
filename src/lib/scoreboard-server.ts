@@ -19,6 +19,7 @@ import { Prisma } from "@prisma/client";
 import {
   ACTIVE_TASK_LIMIT,
   DEFAULT_POINT_RULES,
+  MAX_PAID_REVIEWS_PER_TASK,
   WEEKLY_TARGET,
   WEEKLY_TARGET_RULE,
   buildScoreboard,
@@ -231,8 +232,13 @@ export type ProjectPointsRules = {
     max_points: number;
   }[];
   review_points: number | null;
+  paid_reviews_per_task: number;
   idea_accepted: number | null;
+  idea_upvoted: number | null;
+  idea_downvoted: number | null;
   task_proposal_accepted: number | null;
+  goal_share_pct: number | null;
+  idea_share_pct: number | null;
   active_task_limit: number;
 };
 
@@ -258,8 +264,13 @@ export function buildProjectPointsRules(
         max_points: maxPoints,
       })),
     review_points: enabledAmount("review_submitted"),
+    paid_reviews_per_task: MAX_PAID_REVIEWS_PER_TASK,
     idea_accepted: enabledAmount("idea_accepted"),
+    idea_upvoted: enabledAmount("idea_upvoted"),
+    idea_downvoted: enabledAmount("idea_downvoted"),
     task_proposal_accepted: enabledAmount("task_proposal_accepted"),
+    goal_share_pct: enabledAmount("goal_task_approved"),
+    idea_share_pct: enabledAmount("idea_task_approved"),
     active_task_limit: activeTaskLimit,
   };
 }

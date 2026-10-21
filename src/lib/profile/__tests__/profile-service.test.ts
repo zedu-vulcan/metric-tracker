@@ -1,18 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  addNotification,
   deleteAgent,
   generateAgentKey,
   listAgents,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
   updateAgent,
   validateAgentInput,
 } from "@/lib/profile/profile-service";
-
-const unread = async () => (await listNotifications()).filter((note) => !note.read).length;
 
 describe("Profile service (demo)", () => {
   it("validates agent names and specialisations", () => {
@@ -28,17 +22,7 @@ describe("Profile service (demo)", () => {
     }
   });
 
-  it("marks notifications read one by one and all at once", async () => {
-    const before = await unread();
-    assert.equal(before, 3);
-    const first = (await listNotifications()).find((note) => !note.read)!;
-    await markNotificationRead(first.id);
-    assert.equal(await unread(), 2);
-    await markAllNotificationsRead();
-    assert.equal(await unread(), 0);
-  });
-
-  it("edits, re-keys and deletes agents, and adds unread notifications", async () => {
+  it("edits, re-keys and deletes agents", async () => {
     const [agent] = await listAgents();
 
     const updated = await updateAgent(agent.id, { name: "Bebz Prime", speciality: "Market research" });
@@ -52,15 +36,10 @@ describe("Profile service (demo)", () => {
     await deleteAgent(agent.id);
     assert.ok(!(await listAgents()).some((item) => item.id === agent.id));
 
-    const note = await addNotification({ kind: "agent_deleted", title: "Agent deleted", message: "Bebz Prime was removed." });
-    assert.equal(note.read, false);
-    assert.equal((await listNotifications())[0].id, note.id);
-    assert.equal(await unread(), 1);
   });
 
   it("rejects invalid edits and unknown agents", async () => {
     await assert.rejects(updateAgent("agent_quill", { name: "", speciality: "x" }), { code: "validation" });
     await assert.rejects(deleteAgent("nope"), { code: "not_found" });
-    await assert.rejects(markNotificationRead("nope"), { code: "not_found" });
   });
 });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { taskPointsError } from "@/lib/points";
 import { prisma } from "@/lib/prisma";
 import { requireProjectAccess } from "@/lib/projects";
 import { goalTaskCreateSchema } from "@/lib/schemas/tasks";
@@ -64,17 +65,22 @@ export async function POST(
     );
   }
 
-  const { title, description, taskType } = result.data;
+  const { title, description, taskType, points } = result.data;
 
   const knownType = await prisma.taskTypeDef.findFirst({
     where: { projectId, slug: taskType, isActive: true },
-    select: { id: true },
+    select: { name: true, points: true, maxPoints: true },
   });
   if (!knownType) {
     return NextResponse.json(
       { error: "Validation failed", details: { taskType: ["Not an active task type in this project; see GET /api/task-types"] } },
       { status: 400 },
     );
+  }
+
+  const pointsError = points === undefined ? null : taskPointsError(points, knownType);
+  if (pointsError) {
+    return NextResponse.json({ error: "Validation failed", details: { points: [pointsError] } }, { status: 400 });
   }
 
   // 5. Agents check for duplicates before proposing; enforce it for exact title matches.
@@ -97,6 +103,7 @@ export async function POST(
       title,
       description: description ?? null,
       taskType,
+      points: points ?? knownType.points,
       status: "open",
     },
   });

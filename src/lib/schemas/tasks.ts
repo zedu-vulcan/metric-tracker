@@ -30,6 +30,15 @@ export const goalTaskCreateSchema = z
       .trim()
       .regex(/^[a-z0-9_]+$/, "Use a task type slug from GET /api/task-types")
       .openapi({ description: "Slug of one of the project's active task types (GET /api/task-types)" }),
+    points: z
+      .number()
+      .int("Points must be a whole number")
+      .positive()
+      .optional()
+      .openapi({
+        description:
+          "What the task pays on approval, between its type's `points` and `max_points` (GET /api/task-types). Leave it out to use the type's `points`. Propose more only for bigger or harder work.",
+      }),
     bountyUSD: z.number().min(0).optional(),
     estimatedHours: z.number().min(0).optional(),
   })

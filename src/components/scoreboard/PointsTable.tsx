@@ -1,220 +1,176 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDownIcon } from "lucide-react";
+import { Fragment, useState } from "react";
+import { ChevronDownIcon, TrophyIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 import type { ScoreboardBreakdown, ScoreboardRow } from "@/lib/schemas/scoreboard";
+import { cn } from "@/lib/utils";
 
-function formatPoints(points: number): string {
-  return points.toLocaleString("en-GB");
-}
+export const formatPoints = (value: number) => value.toLocaleString("en-GB", { maximumFractionDigits: 1 });
 
-function BreakdownLine({ breakdown }: { breakdown: ScoreboardBreakdown }) {
-  const items = [
-    { label: "Tasks", value: breakdown.tasks },
-    { label: "Reviews", value: breakdown.reviews },
-    { label: "Ideas", value: breakdown.ideas },
-    { label: "Adjustments", value: breakdown.adjustments },
-  ];
+const BREAKDOWN: { key: keyof ScoreboardBreakdown; label: string }[] = [
+  { key: "tasks", label: "Tasks" },
+  { key: "reviews", label: "Reviews" },
+  { key: "ideas", label: "Ideas" },
+  { key: "adjustments", label: "Adjustments" },
+];
+
+function Breakdown({ row }: { row: ScoreboardRow }) {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      {items.map((item) => (
-        <span key={item.label} className="inline-flex items-center gap-1.5">
-          {item.label}
-          <span className={cn("font-semibold tabular-nums", item.value < 0 ? "text-destructive" : "text-foreground")}>
-            {item.value > 0 ? "+" : ""}
-            {item.value}
-          </span>
-        </span>
-      ))}
+    <div className="flex flex-col gap-3 rounded-2xl bg-muted px-4 py-3">
+      <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+        {BREAKDOWN.map(({ key, label }) => {
+          const value = row.breakdown[key];
+          return (
+            <div key={key} className="flex flex-col gap-0.5">
+              <dt className="text-xs text-muted-foreground">{label}</dt>
+              <dd className={cn("m-0 text-sm font-bold tabular-nums", value < 0 ? "text-destructive" : "text-foreground")}>
+                {value > 0 ? "+" : value < 0 ? "−" : ""}
+                {formatPoints(Math.abs(value))}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+      {row.agents.length > 0 && (
+        <p className="m-0 text-xs text-muted-foreground">
+          Agents:{" "}
+          {row.agents
+            .map((agent) => `${agent.name} ${formatPoints(agent.points)}`)
+            .join(" · ")}
+        </p>
+      )}
     </div>
   );
 }
 
-function ProgressBar({ row, target }: { row: ScoreboardRow; target: number }) {
+function TargetBar({ row, target }: { row: ScoreboardRow; target: number }) {
+  const percent = Math.min(100, Math.round((row.points / Math.max(1, target)) * 100));
+  const reached = row.points >= target;
   return (
-    <div className="flex min-w-[140px] items-center gap-3">
+    <div className="flex items-center gap-3">
       <div
-        className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-chart-track"
         role="progressbar"
-        aria-label={`${row.name}: ${row.points} of ${target} points`}
+        aria-label={`${row.name}: ${formatPoints(row.points)} of ${target} points`}
         aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={row.progress_pct}
+        aria-valuemax={target}
+        aria-valuenow={row.points}
+        className="h-2 min-w-16 flex-1 overflow-hidden rounded-full bg-chart-track"
       >
-        <div className="h-full rounded-full bg-primary" style={{ width: `${row.progress_pct}%` }} />
+        <div className={cn("h-full rounded-full", reached ? "bg-success" : "bg-primary")} style={{ width: `${percent}%` }} />
       </div>
-      <span className="shrink-0 text-xs font-semibold text-foreground tabular-nums">
-        {formatPoints(row.points)}
-        <span className="text-muted-foreground">/{target}</span>
+      <span className={cn("w-10 shrink-0 text-right text-xs font-semibold tabular-nums", reached ? "text-success" : "text-muted-foreground")}>
+        {percent}%
       </span>
     </div>
   );
 }
 
-function AgentChips({ row }: { row: ScoreboardRow }) {
-  const shown = row.agents.slice(0, 2);
-  const extra = row.agents.length - shown.length;
-  return (
-    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-      {shown.map((agent) => (
-        <Badge key={agent.id} variant="secondary" className="max-w-[160px]">
-          <span className="truncate">{agent.name}</span>
-          <span className="text-muted-foreground tabular-nums">· {agent.points}</span>
-        </Badge>
-      ))}
-      {extra > 0 && <span className="text-xs text-muted-foreground">+{extra} more</span>}
-    </div>
-  );
-}
-
+/** Everyone ranked for the chosen period; open a row to see where its points came from. */
 export function PointsTable({
   rows,
   target,
   currentUserId,
 }: {
   rows: ScoreboardRow[];
-  target: number;
+  /** Null for all-time, where there's no target to measure against. */
+  target: number | null;
   currentUserId: string;
 }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const toggle = (id: string) => setExpandedId((current) => (current === id ? null : id));
+  const [open, setOpen] = useState<string | null>(null);
+  const toggle = (id: string) => setOpen((current) => (current === id ? null : id));
+
+  if (rows.length === 0) {
+    return (
+      <Empty className="border-0 py-10">
+        <EmptyHeader>
+          <EmptyMedia className="size-12 rounded-full bg-accent text-primary-deep [&_svg]:size-5">
+            <TrophyIcon aria-hidden="true" />
+          </EmptyMedia>
+          <EmptyTitle className="text-[15px] font-bold">No points in this period</EmptyTitle>
+          <EmptyDescription>Points show up here once work is approved or reviewed.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
 
   return (
-    <>
-      {/* Desktop / tablet table */}
-      <div className="hidden sm:block">
-        <Table variant="pill">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">#</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead className="w-[220px]">Progress</TableHead>
-              <TableHead className="w-24 text-right">Points</TableHead>
-              <TableHead className="w-24 text-right">Tasks</TableHead>
-              <TableHead className="w-10" aria-label="Details" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => {
-              const expanded = expandedId === row.user_id;
-              return (
-                <TableRowFragment
-                  key={row.user_id}
-                  row={row}
-                  target={target}
-                  currentUserId={currentUserId}
-                  expanded={expanded}
-                  onToggle={() => toggle(row.user_id)}
-                />
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Mobile cards */}
-      <ul className="m-0 flex list-none flex-col divide-y divide-border p-0 sm:hidden">
+    <Table variant="pill">
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-14">Rank</TableHead>
+          <TableHead>Person</TableHead>
+          {target !== null && <TableHead className="hidden w-[34%] md:table-cell">Toward {target}</TableHead>}
+          <TableHead className="text-right">Points</TableHead>
+          <TableHead className="w-12">
+            <span className="sr-only">Breakdown</span>
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row) => {
-          const expanded = expandedId === row.user_id;
-          const current = row.user_id === currentUserId;
+          const you = row.user_id === currentUserId;
+          const expanded = open === row.user_id;
           return (
-            <li key={row.user_id} className={cn("flex flex-col gap-2 py-3", current && "rounded-xl bg-accent px-2")}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="w-5 shrink-0 text-center text-xs font-semibold text-muted-foreground tabular-nums">
+            <Fragment key={row.user_id}>
+              <TableRow data-state={you ? "selected" : undefined}>
+                <TableCell>
+                  <span
+                    className={cn(
+                      "flex size-8 items-center justify-center rounded-full text-[13px] font-extrabold tabular-nums",
+                      row.rank === 1 && row.points > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                    )}
+                  >
                     {row.rank}
                   </span>
-                  <span className="truncate text-sm font-bold text-foreground">{row.name}</span>
-                  {current && <Badge variant="default">You</Badge>}
-                </div>
-                <span className="shrink-0 text-sm font-extrabold text-foreground tabular-nums">{formatPoints(row.points)}</span>
-              </div>
-              <div className="pl-7">
-                <ProgressBar row={row} target={target} />
-              </div>
-              <div className="flex items-center justify-between pl-7">
-                <AgentChips row={row} />
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`${expanded ? "Hide" : "Show"} breakdown for ${row.name}`}
-                  aria-expanded={expanded}
-                  onClick={() => toggle(row.user_id)}
-                >
-                  <ChevronDownIcon className={cn("transition-transform", expanded && "rotate-180")} aria-hidden="true" />
-                </Button>
-              </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex w-[150px] flex-col sm:w-[260px]">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-semibold text-foreground">{row.name}</span>
+                      {you && <Badge className="shrink-0">You</Badge>}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {row.agents.length === 0
+                        ? "No agents yet"
+                        : `${row.agents.length} ${row.agents.length === 1 ? "agent" : "agents"}`}
+                    </span>
+                  </div>
+                </TableCell>
+                {target !== null && (
+                  <TableCell className="hidden md:table-cell">
+                    <TargetBar row={row} target={target} />
+                  </TableCell>
+                )}
+                <TableCell className="text-right text-base font-extrabold tracking-[-0.02em] text-foreground tabular-nums">
+                  {formatPoints(row.points)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`${expanded ? "Hide" : "Show"} where ${row.name}'s points came from`}
+                    aria-expanded={expanded}
+                    onClick={() => toggle(row.user_id)}
+                  >
+                    <ChevronDownIcon className={cn("transition-transform", expanded && "rotate-180")} aria-hidden="true" />
+                  </Button>
+                </TableCell>
+              </TableRow>
               {expanded && (
-                <div className="rounded-xl border border-border bg-card p-3">
-                  <BreakdownLine breakdown={row.breakdown} />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {row.tasks_given_this_week} task{row.tasks_given_this_week === 1 ? "" : "s"} given this week
-                  </p>
-                </div>
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={target !== null ? 5 : 4} className="pt-0 pb-3">
+                    <Breakdown row={row} />
+                  </TableCell>
+                </TableRow>
               )}
-            </li>
+            </Fragment>
           );
         })}
-      </ul>
-    </>
-  );
-}
-
-function TableRowFragment({
-  row,
-  target,
-  currentUserId,
-  expanded,
-  onToggle,
-}: {
-  row: ScoreboardRow;
-  target: number;
-  currentUserId: string;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const current = row.user_id === currentUserId;
-  return (
-    <>
-      <TableRow data-state={current ? "selected" : undefined}>
-        <TableCell className="text-muted-foreground tabular-nums">{row.rank}</TableCell>
-        <TableCell className="max-w-0">
-          <div className="flex items-center gap-2">
-            <span className={cn("truncate font-semibold text-foreground", current && "text-primary-deep")}>{row.name}</span>
-            {current && <Badge variant="default">You</Badge>}
-          </div>
-          <AgentChips row={row} />
-        </TableCell>
-        <TableCell>
-          <ProgressBar row={row} target={target} />
-        </TableCell>
-        <TableCell className="text-right text-sm font-extrabold text-foreground tabular-nums">{formatPoints(row.points)}</TableCell>
-        <TableCell className="text-right text-muted-foreground tabular-nums">{row.tasks_given_this_week}</TableCell>
-        <TableCell className="text-right">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`${expanded ? "Hide" : "Show"} breakdown for ${row.name}`}
-            aria-expanded={expanded}
-            onClick={onToggle}
-          >
-            <ChevronDownIcon className={cn("transition-transform", expanded && "rotate-180")} aria-hidden="true" />
-          </Button>
-        </TableCell>
-      </TableRow>
-      {expanded && (
-        <TableRow data-state={current ? "selected" : undefined}>
-          <TableCell />
-          <TableCell colSpan={4} className="py-2">
-            <BreakdownLine breakdown={row.breakdown} />
-          </TableCell>
-          <TableCell />
-        </TableRow>
-      )}
-    </>
+      </TableBody>
+    </Table>
   );
 }

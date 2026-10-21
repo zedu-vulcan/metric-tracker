@@ -297,7 +297,7 @@ export function PressMediaDashboard() {
     <>
       <PageHeader
         title="Press & Media"
-        description="Where Zedu has been featured, and where you're working to be featured next."
+        description="Where you've been featured, and where you're working to be featured next."
         actions={
           <>
             <Button variant="outline" onClick={exportCsv} disabled={isLoading || items.length === 0}>
@@ -345,7 +345,7 @@ export function PressMediaDashboard() {
                 : { label: `+${newOutlets}`, direction: newOutlets > 0 ? "up" : "flat", favorable: true }
             }
             comparison="new in the last 30 days"
-            action={{ label: "Show where Zedu has been featured", onClick: () => show("featured") }}
+            action={{ label: "Show where you've been featured", onClick: () => show("featured") }}
           />
           <KpiCard
             title="Pieces of coverage"
@@ -479,7 +479,7 @@ export function PressMediaDashboard() {
               isEmpty={!isLoading && !loadError && visibleFeatured.length === 0}
               empty={
                 featured.length === 0
-                  ? { title: "No coverage yet", text: "When Zedu gets featured, log it here.", action: () => openForm(null, "Featured") }
+                  ? { title: "No coverage yet", text: "When you get featured, log it here.", action: () => openForm(null, "Featured") }
                   : { title: "No coverage matches", text: "Try a different search, or clear the filters.", clear: clearFilters }
               }
             >

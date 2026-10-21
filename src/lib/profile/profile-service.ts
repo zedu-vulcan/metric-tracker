@@ -1,5 +1,5 @@
 /**
- * Profile service. The Profile screen and the notification bell call ONLY these functions.
+ * Profile service for the agent dialogs. Inbox notifications are real: see `/api/notifications`.
  * Today they work on in-memory demo data (a page refresh resets it). When the backend exists,
  * replace each function body with the API call below. Keep the signatures and the UI stays untouched.
  *
@@ -22,41 +22,22 @@
  *                                     request:  none
  *                                     response 201: { agent: <updated agent>, key } where `key` is the full new key,
  *                                     returned ONCE. The old key stops working immediately. 404 when missing.
- * listNotifications()               → GET    /api/notifications
- *                                     response 200: [{ id, kind, title, message, createdAt, read }], newest first
- * markNotificationRead(id)          → PATCH  /api/notifications/:id
- *                                     request:  { read: true }
- *                                     response 200: the updated notification. 404 when missing.
- * markAllNotificationsRead()        → POST   /api/notifications/read-all
- *                                     request:  none
- *                                     response 204, no body.
- * addNotification(input)            → POST   /api/notifications
- *                                     request:  { kind, title, message }
- *                                     response 201: the created notification { id, kind, title, message, createdAt, read: false }
  *
  * Open backend questions:
- * - addNotification exists so the demo can log agent edits, deletions and re-keys. The backend will
- *   probably create those notifications itself inside the PATCH / DELETE / POST key handlers; if so,
- *   make addNotification a no-op and the UI still works, because it re-lists notifications afterwards.
  * - Validation limits below (name 2–40, specialisation 2–80 characters) are a proposal.
- * - Notifications are never pushed live; the UI re-lists after each action. Real-time updates need polling or SSE.
  */
 
 import {
   DEMO_AGENTS,
-  DEMO_NOTIFICATIONS,
   DEMO_PROFILE,
   type Agent,
-  type Notification,
-  type NotificationKind,
   type UserProfile,
 } from "./profile-demo-data";
 
-export type { Agent, Notification, NotificationKind, UserProfile };
+export type { Agent, UserProfile };
 
 export type AgentInput = { name: string; speciality: string };
 export type AgentInputErrors = Partial<Record<keyof AgentInput, string>>;
-export type NotificationInput = Pick<Notification, "kind" | "title" | "message">;
 
 export class ProfileServiceError extends Error {
   constructor(
@@ -87,7 +68,6 @@ export function validateAgentInput(input: AgentInput): AgentInputErrors {
 const store = {
   profile: { ...DEMO_PROFILE },
   agents: DEMO_AGENTS.map((agent) => ({ ...agent })),
-  notifications: DEMO_NOTIFICATIONS.map((note) => ({ ...note })),
 };
 
 function findAgent(id: string) {
@@ -134,32 +114,4 @@ export async function generateAgentKey(id: string): Promise<{ agent: Agent; key:
   const key = newDemoKey();
   agent.keyHint = `zedu_ak_…${key.slice(-4)}`;
   return { agent: { ...agent }, key };
-}
-
-// ── Notifications ──
-
-export async function listNotifications(): Promise<Notification[]> {
-  return store.notifications.map((note) => ({ ...note }));
-}
-
-export async function markNotificationRead(id: string): Promise<Notification> {
-  const note = store.notifications.find((item) => item.id === id);
-  if (!note) throw new ProfileServiceError("Not found", "not_found");
-  note.read = true;
-  return { ...note };
-}
-
-export async function markAllNotificationsRead(): Promise<void> {
-  for (const note of store.notifications) note.read = true;
-}
-
-export async function addNotification(input: NotificationInput): Promise<Notification> {
-  const note: Notification = {
-    ...input,
-    id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    createdAt: new Date().toISOString(),
-    read: false,
-  };
-  store.notifications.unshift(note);
-  return { ...note };
 }

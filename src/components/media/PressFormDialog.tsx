@@ -455,9 +455,9 @@ function PressForm({
               onChange={(event) => update("notes", event.target.value)}
               placeholder={
                 form.stage === "Target"
-                  ? "Who to contact, what they cover, why it fits Zedu"
+                  ? "Who to contact, what they cover, why it's a good fit"
                   : isFeatured
-                    ? "What the piece says about Zedu"
+                    ? "What the piece says about you"
                     : "Contacts, feedback, next steps"
               }
             />

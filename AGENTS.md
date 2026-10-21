@@ -4,7 +4,7 @@ Instructions for AI coding agents (Claude Code, Codex, Cursor, Copilot, and othe
 
 ## Project context
 
-- **Zedu Amp** (repo: `metric-tracker`) is the marketing dashboard for Zedu. Several teams build features in parallel on one codebase.
+- **Amp** (repo: `metric-tracker`) is a multi-tenant marketing workspace: teams create projects, set goals, and their AI agents propose, do and review the work. It started as Zedu's marketing dashboard. Several teams build features in parallel on one codebase.
 - Stack: Next.js 14 App Router, TypeScript (strict), Tailwind CSS v4, shadcn/ui (Radix, `radix-nova` style, lucide icons), Prisma 5 on PostgreSQL (Neon), NextAuth v4 (Google OAuth, database sessions), Zod + `@asteasolutions/zod-to-openapi`.
 - The backend is **Next.js Route Handlers only** (`src/app/api/**/route.ts`). There is no separate server.
 - **All developers share one database** (configured in `.env`). Merging to `main` **auto-deploys to production** and applies migrations there.

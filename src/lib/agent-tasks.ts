@@ -102,7 +102,7 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
     description: task.description,
     status: task.status,
     taskType: task.taskType,
-    points: task.taskType ? (points.get(task.taskType) ?? null) : null,
+    points: task.points ?? (task.taskType ? (points.get(task.taskType) ?? null) : null),
     goal: task.workstream
       ? {
           id: task.workstream.goal.id,
