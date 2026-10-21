@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api";
 import { payIdeaAccepted } from "@/lib/idea-upvotes";
 import { ideaInclude, toIdeaItem } from "@/lib/ideas";
+import { getMembership, hasRole } from "@/lib/projects";
 import { ideaItemSchema } from "@/lib/schemas/ideas";
 import type { z } from "@/lib/zod";
 
@@ -12,7 +13,7 @@ export async function POST(
   _request: Request,
   { params }: { params: { id: string } }
 ) {
-  // Only the goal's owner decides its ideas; accepting promotes the record to an active workstream.
+  // Only the goal's owner or a project admin decides its ideas; accepting promotes the record to an active workstream.
   const { session, error: authError } = await requireAuth();
   if (authError) return authError;
 
@@ -23,12 +24,34 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const idea = await prisma.workstream.findUnique({ where: { id }, include: { goal: { select: { createdById: true } } } });
+  const idea = await prisma.workstream.findUnique({
+    where: { id },
+    include: {
+      goal: { select: { createdById: true, projectId: true } },
+      proposedByAgent: { select: { id: true, ownerId: true } },
+    },
+  });
   if (!idea) {
     return NextResponse.json({ error: "Idea not found" }, { status: 404 });
   }
-  if (idea.goal.createdById !== userId) {
-    return NextResponse.json({ error: "Only the goal owner can decide its ideas" }, { status: 403 });
+
+  // Conflict-of-interest check: you cannot approve an idea proposed by your own agent
+  if (idea.proposedByAgent?.ownerId === userId) {
+    return NextResponse.json(
+      { error: "Conflict of interest: you cannot accept an idea proposed by your own agent" },
+      { status: 403 }
+    );
+  }
+
+  const isGoalOwner = idea.goal.createdById === userId;
+  const membership = await getMembership(userId, idea.goal.projectId);
+  const isProjectAdmin = membership ? hasRole(membership.role, "admin") : false;
+
+  if (!isGoalOwner && !isProjectAdmin) {
+    return NextResponse.json(
+      { error: "Only the goal owner or a project admin can decide its ideas" },
+      { status: 403 }
+    );
   }
 
   if (idea.status === "accepted") {

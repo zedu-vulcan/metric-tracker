@@ -61,7 +61,8 @@ type ApiAgentRef = {
   speciality: string;
   lastActiveAt: string | null;
   /** The goal detail nests the owner; the other routes flatten it to `ownerName`. */
-  owner?: { name: string | null };
+  owner?: { id?: string; name: string | null };
+  ownerId?: string | null;
   ownerName?: string | null;
 };
 
@@ -70,6 +71,7 @@ function toAgent(agent: ApiAgentRef, fallbackActiveAt: string): Agent {
     id: agent.id,
     name: agent.name,
     speciality: agent.speciality,
+    ownerId: agent.ownerId ?? agent.owner?.id ?? undefined,
     ownerName: agent.ownerName ?? agent.owner?.name ?? "A teammate",
     lastActiveAt: agent.lastActiveAt ?? fallbackActiveAt,
   };
