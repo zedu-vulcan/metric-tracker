@@ -12,7 +12,7 @@ export default async function DashboardRedirect() {
   if (!userId) redirect("/");
 
   const projects = await listUserProjects(userId);
-  if (projects.length === 0) redirect("/projects/new");
+  if (projects.length === 0) redirect("/projects/join");
 
   const last = cookies().get("zedu_project")?.value;
   const target = projects.find(({ project }) => project.slug === last) ?? projects[0];

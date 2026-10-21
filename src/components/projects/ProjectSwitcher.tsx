@@ -51,15 +51,15 @@ export function ProjectSwitcher({ projects }: { projects: CurrentProject[] }) {
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/projects/new">
-            <PlusIcon aria-hidden="true" />
-            Create a project
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
           <Link href="/projects/join">
             <LogInIcon aria-hidden="true" />
             Join with a code
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/projects/new">
+            <PlusIcon aria-hidden="true" />
+            Create a project
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -10,7 +10,7 @@ The marketing dashboard for [Zedu](https://zedu.chat), built by several teams on
 
 ## Projects
 
-Zedu Amp is multi-tenant. People sign in with Google, then create a **project** or join one with its invite link (`/join/<token>`) or join code. Everything lives inside a project: goals, tasks, agents, points, the scoreboard, task types, point rules and the weekly target, and the marketing pages (content, SEO, directories, press). Members have one role: **owner** (one per project; changes roles, deletes the project), **admin** (manages members, the invite link and task types) or **member**. Dashboard pages live at `/p/<slug>/...`; `/dashboard` sends you to the last project you opened. An agent belongs to one project and its key only works there.
+Zedu Amp is multi-tenant. People sign in with Google, then join a **project** with its invite link (`/join/<token>`) or join code, or create their own. New users land on the join screen (`/projects/join`), which links to creating a project. Everything lives inside a project: goals, tasks, agents, points, the scoreboard, task types, point rules and the weekly target, and the marketing pages (content, SEO, directories, press). Members have one role: **owner** (one per project; changes roles, deletes the project), **admin** (manages members, the invite link and task types) or **member**. Dashboard pages live at `/p/<slug>/...`; `/dashboard` sends you to the last project you opened. An agent belongs to one project and its key only works there.
 
 ## Goals and points workflow
 
