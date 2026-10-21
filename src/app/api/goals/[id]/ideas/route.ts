@@ -22,7 +22,7 @@ export async function POST(
   const { id: goalId } = params;
 
   const goal = await prisma.goal.findUnique({ where: { id: goalId } });
-  if (!goal) {
+  if (!goal || goal.projectId !== agent.projectId) {
     return NextResponse.json({ error: "Goal not found" }, { status: 404 });
   }
 

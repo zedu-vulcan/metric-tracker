@@ -1,10 +1,9 @@
 /**
  * Task types data layer — server only.
  *
- * Implements the admin contract for `task_types` against the schema requested
- * from unit 0 (`doc/points-schema-TEMP.sql`): platform-admins create/update,
- * everyone (session or agent key) reads active types, and types are archived
- * (`is_active = false`) rather than deleted.
+ * Implements the admin contract for a project's `task_types`: project owners and
+ * admins create/update, every member and the project's agents read active types,
+ * and types are archived (`is_active = false`) rather than deleted.
  *
  * Like `points-server`, the shared Prisma client is only imported by the
  * caller (routes/pages); tests inject an in-memory store.
@@ -52,7 +51,6 @@ export interface TaskTypesStore {
   list(includeInactive?: boolean): Promise<TaskTypeRecord[]>;
   findById(id: string): Promise<TaskTypeRecord | null>;
   slugExists(slug: string, excludeId?: string): Promise<boolean>;
-  userIsPlatformAdmin(userId: string): Promise<boolean>;
   create(input: NewTaskTypeInput & { updatedBy: string }): Promise<TaskTypeRecord>;
   update(id: string, patch: TaskTypePatch, updatedBy: string): Promise<TaskTypeRecord | null>;
 }
@@ -87,42 +85,36 @@ function toTaskTypeRecord(raw: RawTaskTypeRow): TaskTypeRecord {
 
 const TASK_TYPE_COLUMNS = Prisma.sql`id, slug, name, description, points, max_points, is_active, created_at, updated_at`;
 
-/** Wraps a Prisma client (or transaction) with the `task_types` / platform-admin queries. */
-export function prismaTaskTypesStore(client: PointsSqlClient): TaskTypesStore {
+/** Wraps a Prisma client (or transaction) with one project's `task_types` queries. */
+export function prismaTaskTypesStore(client: PointsSqlClient, projectId: string): TaskTypesStore {
   return {
     async list(includeInactive = false) {
       const rows = await client.$queryRaw<RawTaskTypeRow[]>`
         SELECT ${TASK_TYPE_COLUMNS} FROM task_types
-        WHERE (${includeInactive} OR is_active = true)
+        WHERE project_id = ${projectId} AND (${includeInactive} OR is_active = true)
         ORDER BY name ASC`;
       return rows.map(toTaskTypeRecord);
     },
 
     async findById(id) {
       const rows = await client.$queryRaw<RawTaskTypeRow[]>`
-        SELECT ${TASK_TYPE_COLUMNS} FROM task_types WHERE id = ${id} LIMIT 1`;
+        SELECT ${TASK_TYPE_COLUMNS} FROM task_types WHERE project_id = ${projectId} AND id = ${id} LIMIT 1`;
       return rows[0] ? toTaskTypeRecord(rows[0]) : null;
     },
 
     async slugExists(slug, excludeId) {
       const rows = await client.$queryRaw<{ id: string }[]>`
         SELECT id FROM task_types
-        WHERE slug = ${slug} AND (${excludeId ?? null}::text IS NULL OR id <> ${excludeId ?? ""})
+        WHERE project_id = ${projectId} AND slug = ${slug} AND (${excludeId ?? null}::text IS NULL OR id <> ${excludeId ?? ""})
         LIMIT 1`;
       return rows.length > 0;
-    },
-
-    async userIsPlatformAdmin(userId) {
-      const rows = await client.$queryRaw<{ is_platform_admin: boolean }[]>`
-        SELECT is_platform_admin FROM "User" WHERE id = ${userId} LIMIT 1`;
-      return rows[0]?.is_platform_admin ?? false;
     },
 
     async create(input) {
       const now = new Date();
       const rows = await client.$queryRaw<RawTaskTypeRow[]>`
-        INSERT INTO task_types (id, slug, name, description, points, max_points, is_active, created_at, updated_at, updated_by)
-        VALUES (${randomUUID()}, ${input.slug}, ${input.name}, ${input.description ?? null}, ${input.points},
+        INSERT INTO task_types (id, project_id, slug, name, description, points, max_points, is_active, created_at, updated_at, updated_by)
+        VALUES (${randomUUID()}, ${projectId}, ${input.slug}, ${input.name}, ${input.description ?? null}, ${input.points},
                 ${input.maxPoints}, ${input.isActive ?? true}, ${now}, ${now}, ${input.updatedBy})
         RETURNING ${TASK_TYPE_COLUMNS}`;
       return toTaskTypeRecord(rows[0]);
@@ -138,7 +130,7 @@ export function prismaTaskTypesStore(client: PointsSqlClient): TaskTypesStore {
       if (patch.isActive !== undefined) fragments.push(Prisma.sql`is_active = ${patch.isActive}`);
       fragments.push(Prisma.sql`updated_at = ${new Date()}`, Prisma.sql`updated_by = ${updatedBy}`);
       const rows = await client.$queryRaw<RawTaskTypeRow[]>`
-        UPDATE task_types SET ${Prisma.join(fragments, ", ")} WHERE id = ${id}
+        UPDATE task_types SET ${Prisma.join(fragments, ", ")} WHERE project_id = ${projectId} AND id = ${id}
         RETURNING ${TASK_TYPE_COLUMNS}`;
       return rows[0] ? toTaskTypeRecord(rows[0]) : null;
     },

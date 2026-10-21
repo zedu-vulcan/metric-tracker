@@ -86,6 +86,7 @@ type ApiIdea = {
   proposedByAgent?: ApiAgentRef | null;
   acceptedBy?: { name: string | null; email: string | null } | null;
   rejectionReason?: string | null;
+  upvotes?: { id: string; agent: ApiAgentRef; reason: string; createdAt: string }[];
   /** Only the goal detail includes these. */
   tasks?: { status: TaskStatus }[];
   createdAt: string;
@@ -107,6 +108,12 @@ function toIdea(idea: ApiIdea): Idea {
     // There's no decision timestamp yet; the record's last update is when it was decided.
     decidedAt: idea.status === "proposed" ? undefined : idea.updatedAt,
     rejectionReason: idea.rejectionReason ?? undefined,
+    upvotes: (idea.upvotes ?? []).map((upvote) => ({
+      id: upvote.id,
+      agentId: upvote.agent.id,
+      reason: upvote.reason,
+      at: upvote.createdAt,
+    })),
     taskStatuses: idea.tasks?.map((task) => task.status) ?? [],
   };
 }
@@ -171,6 +178,8 @@ type ApiComment = {
   body: string;
   attachment: string | null;
   score: number | null;
+  verdict: "approve" | "changes" | null;
+  parentId: string | null;
   authorAgentId: string | null;
   authorAgent: ApiAgentRef | null;
   authorUser: { name: string | null; email: string | null } | null;
@@ -196,6 +205,8 @@ function toComment(comment: ApiComment): ThreadComment {
       ? { kind: isLink ? "link" : "text", label: isLink ? "Link" : (ATTACHMENT_LABELS[comment.type] ?? "Attachment"), content: attachment }
       : undefined,
     score: comment.score ?? undefined,
+    verdict: comment.verdict ?? undefined,
+    parentId: comment.parentId ?? undefined,
   };
 }
 
@@ -238,7 +249,7 @@ type GoalsContextValue = {
   sendOffer: (taskId: string, agentId: string) => Promise<void>;
   withdrawOffer: (taskId: string) => Promise<void>;
   /** Posts a note from the signed-in person to the task's thread. */
-  postNote: (taskId: string, body: string) => Promise<void>;
+  postNote: (taskId: string, body: string, parentId?: string) => Promise<void>;
 };
 
 const GoalsContext = createContext<GoalsContextValue | undefined>(undefined);
@@ -300,7 +311,9 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
       requestJson<ApiGoalDetail>(`/api/goals/${goalId}`)
         .then((detail) => {
           const records = [...detail.acceptedWorkstreams, ...detail.pendingIdeas, ...(detail.rejectedIdeas ?? [])];
-          records.forEach((record) => rememberAgents([record.proposedByAgent], record.createdAt));
+          records.forEach((record) =>
+            rememberAgents([record.proposedByAgent, ...(record.upvotes ?? []).map((upvote) => upvote.agent)], record.createdAt)
+          );
           setIdeas((previous) => [...previous.filter((idea) => idea.goalId !== goalId), ...records.map(toIdea)]);
           setIdeaStatuses((previous) => ({ ...previous, [goalId]: "ready" }));
         })
@@ -381,8 +394,11 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
   );
 
   const postNote = useCallback(
-    async (taskId: string, body: string) => {
-      await requestJson(`/api/tasks/${taskId}/comments`, { method: "POST", body: JSON.stringify({ type: "note", body }) });
+    async (taskId: string, body: string, parentId?: string) => {
+      await requestJson(`/api/tasks/${taskId}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ type: "note", body, parentId }),
+      });
       loadThread(taskId);
       const workstreamId = tasks.find((task) => task.id === taskId)?.workstreamId;
       if (workstreamId) loadWorkstream(workstreamId);

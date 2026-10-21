@@ -27,6 +27,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/request-json";
 
 export type ContentStatus = "Idea" | "Draft" | "Scheduled" | "Published" | "Archived";
 export type ContentType = "Article" | "Social post" | "Video" | "Newsletter";
@@ -235,7 +236,7 @@ function ContentForm({
     setFormError("");
     setFieldErrors({});
     try {
-      const response = await fetch(isEditing ? `/api/content/${item.id}` : "/api/content", {
+      const response = await apiFetch(isEditing ? `/api/content/${item.id}` : "/api/content", {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

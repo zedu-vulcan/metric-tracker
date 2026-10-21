@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { serializeSavedCopy } from "@/lib/directories";
 import { savedCopyUpdateSchema } from "@/lib/schemas/directories";
 
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   let body: unknown;
@@ -22,7 +22,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: "Validation failed", details: result.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const existing = await prisma.savedCopy.findUnique({ where: { id: params.id }, select: { id: true } });
+  const existing = await prisma.savedCopy.findFirst({ where: { id: params.id, projectId }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const copy = await prisma.savedCopy.update({
@@ -35,11 +35,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json(serializeSavedCopy(copy));
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
-  const existing = await prisma.savedCopy.findUnique({ where: { id: params.id }, select: { id: true } });
+  const existing = await prisma.savedCopy.findFirst({ where: { id: params.id, projectId }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await prisma.savedCopy.delete({ where: { id: existing.id } });

@@ -1,8 +1,9 @@
 "use client";
 
+import { useProject } from "@/components/projects/ProjectProvider";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRightIcon, CheckIcon, LayersIcon, LightbulbIcon, TargetIcon, XIcon } from "lucide-react";
+import { ArrowRightIcon, CheckIcon, LayersIcon, LightbulbIcon, TargetIcon, ThumbsUpIcon, XIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { goalTypeLabel, shortDate, summarizeTasks, type Agent, type Idea } from "./goal-model";
+import { goalTypeLabel, shortDate, summarizeTasks, UPVOTES_TO_PROMOTE, type Agent, type Idea } from "./goal-model";
 import {
   BackLink,
   GoalPageLoading,
@@ -45,6 +46,7 @@ const KINDS = {
 export function GoalDetailView({ goalId }: { goalId: string }) {
   const { goals, goalsLoading, ideas, ideasStatus, loadIdeas, currentUser, agentFor, approveIdea, rejectIdea } =
     useGoals();
+  const { href } = useProject();
   const [rejecting, setRejecting] = useState<Idea | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
         title="Goal not found"
         description="It may have been deleted, or the link is wrong."
         icon={TargetIcon}
-        backHref="/dashboard/goals"
+        backHref={href("/goals")}
         backLabel="Back to goals"
       />
     );
@@ -107,7 +109,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
 
   return (
     <>
-      <BackLink href="/dashboard/goals" label="Goals" />
+      <BackLink href={href("/goals")} label="Goals" />
       <PageHeader title={goal.title} description={goal.description || undefined} className="pt-2" />
 
       <PageContent>
@@ -148,7 +150,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
                   return (
                     <li key={workstream.id}>
                       <Link
-                        href={`/dashboard/goals/${goal.id}/workstreams/${workstream.id}`}
+                        href={href(`/goals/${goal.id}/workstreams/${workstream.id}`)}
                         className={cn(ITEM_CARD, ITEM_LINK, "flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-10")}
                       >
                         <ItemHeading style={KINDS.workstream} title={workstream.title} interactive>
@@ -156,7 +158,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
                           <p className="m-0 text-[13px] text-muted-foreground tabular-nums">
                             <span className="font-semibold text-foreground">{work.openTasks} open</span> ·{" "}
                             {work.activeTasks} in progress · from {agentFor(workstream.agentId)?.name ?? "an agent"}&rsquo;s
-                            idea
+                            idea{!workstream.decidedBy && workstream.upvotes.length >= UPVOTES_TO_PROMOTE && ", promoted by upvotes"}
                           </p>
                         </ItemHeading>
                         <div className="flex items-center gap-5 lg:w-[340px] lg:shrink-0">
@@ -178,7 +180,10 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
 
           <TabsContent value="ideas" className="flex flex-col gap-4">
             {!isOwner && proposed.length > 0 && (
-              <p className="m-0 text-[13px] text-muted-foreground">Only {goal.ownerName} can approve or reject ideas.</p>
+              <p className="m-0 text-[13px] text-muted-foreground">
+                Only {goal.ownerName} can approve or reject ideas. An idea with {UPVOTES_TO_PROMOTE} upvotes from agents
+                becomes a workstream on its own.
+              </p>
             )}
             {decisionError && (
               <Alert variant="destructive">
@@ -194,7 +199,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
             ) : (
               <CardStack>
                 {proposed.map((idea) => (
-                  <IdeaCard key={idea.id} idea={idea} agent={agentFor(idea.agentId)}>
+                  <IdeaCard key={idea.id} idea={idea} agentFor={agentFor}>
                     {isOwner ? (
                       <div className="flex shrink-0 gap-2">
                         <Button variant="outline" onClick={() => setRejecting(idea)} disabled={approving === idea.id}>
@@ -223,7 +228,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
             <RejectedToggle count={rejected.length}>
               <CardStack>
                 {rejected.map((idea) => (
-                  <IdeaCard key={idea.id} idea={idea} agent={agentFor(idea.agentId)} />
+                  <IdeaCard key={idea.id} idea={idea} agentFor={agentFor} />
                 ))}
               </CardStack>
             </RejectedToggle>
@@ -240,14 +245,24 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
   );
 }
 
-function IdeaCard({ idea, agent, children }: { idea: Idea; agent?: Agent; children?: React.ReactNode }) {
+function IdeaCard({
+  idea,
+  agentFor,
+  children,
+}: {
+  idea: Idea;
+  agentFor: (agentId: string) => Agent | undefined;
+  children?: React.ReactNode;
+}) {
   const rejected = idea.status === "rejected";
+  const agent = agentFor(idea.agentId);
 
   return (
     <li className={cn(ITEM_CARD, "flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-8")}>
       <ItemHeading style={rejected ? KINDS.rejected : KINDS.idea} title={idea.title} muted={rejected}>
         {idea.description && <Description>{idea.description}</Description>}
         <ByAgent agent={agent} at={idea.proposedAt} />
+        <Upvotes idea={idea} agentFor={agentFor} />
         {rejected && (
           <p className="m-0 mt-2 max-w-[68ch] self-start rounded-xl bg-destructive-muted px-3.5 py-2.5 text-[13px] text-foreground">
             <span className="font-semibold text-destructive">
@@ -260,5 +275,38 @@ function IdeaCard({ idea, agent, children }: { idea: Idea; agent?: Agent; childr
       </ItemHeading>
       {children}
     </li>
+  );
+}
+
+/** How many agents back the idea and why, so the goal owner and other agents can weigh it. */
+function Upvotes({ idea, agentFor }: { idea: Idea; agentFor: (agentId: string) => Agent | undefined }) {
+  const count = idea.upvotes.length;
+  if (count === 0 && idea.status !== "proposed") return null;
+
+  return (
+    <div className="mt-1 flex flex-col gap-2">
+      <p className="m-0 flex items-center gap-1.5 text-[13px] text-muted-foreground tabular-nums">
+        <ThumbsUpIcon className="size-3.5" aria-hidden="true" />
+        <span className="font-semibold text-foreground">
+          {count} {count === 1 ? "upvote" : "upvotes"}
+        </span>
+        {idea.status === "proposed" && <span>of {UPVOTES_TO_PROMOTE} to become a workstream</span>}
+      </p>
+      {count > 0 && (
+        <ul className="m-0 flex max-w-[68ch] list-none flex-col gap-1.5 p-0">
+          {idea.upvotes.map((upvote) => {
+            const voter = agentFor(upvote.agentId);
+            return (
+              <li key={upvote.id} className="rounded-xl bg-muted px-3.5 py-2.5 text-[13px] leading-relaxed text-foreground">
+                <span className="font-semibold">{voter?.name ?? "An agent"}</span>
+                {voter && <span className="text-muted-foreground"> ({voter.ownerName})</span>}
+                <span className="text-muted-foreground">: </span>
+                {upvote.reason}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }

@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { TaskTypeConfig } from "@/lib/points";
 import type { TaskTypeItem } from "@/lib/schemas/task-types";
 import { TaskTypeFormDialog } from "./TaskTypeFormDialog";
+import { apiFetch } from "@/lib/request-json";
 
 type SaveOutcome = { ok: true } | { ok: false; error: string };
 
@@ -50,7 +51,7 @@ export function TaskTypesView() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const response = await fetch("/api/task-types?include_archived=true");
+      const response = await apiFetch("/api/task-types?include_archived=true");
       if (!response.ok) throw new Error(`Failed to load task types (${response.status})`);
       setItems((await response.json()) as TaskTypeItem[]);
     } catch (cause) {
@@ -65,7 +66,7 @@ export function TaskTypesView() {
   const saveType = useCallback(
     async (type: TaskTypeConfig): Promise<SaveOutcome> => {
       const existing = items?.some((item) => item.id === type.id) ?? false;
-      const response = await fetch(existing ? `/api/task-types/${type.id}` : "/api/task-types", {
+      const response = await apiFetch(existing ? `/api/task-types/${type.id}` : "/api/task-types", {
         method: existing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -88,7 +89,7 @@ export function TaskTypesView() {
 
   const toggleActive = useCallback(
     async (item: TaskTypeItem) => {
-      const response = await fetch(`/api/task-types/${item.id}`, {
+      const response = await apiFetch(`/api/task-types/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !item.isActive }),

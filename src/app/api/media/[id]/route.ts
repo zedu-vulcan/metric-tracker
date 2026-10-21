@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
 import {
   articleTypeToDb,
   dateOrNull,
@@ -10,12 +9,13 @@ import {
   submissionStatusToDb,
 } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { mediaInputSchema } from "@/lib/schemas/media";
 
 export const dynamic = "force-dynamic";
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   let body: unknown;
@@ -31,8 +31,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 
   const [existingSubmission, existingCoverage] = await Promise.all([
-    prisma.pressSubmission.findUnique({ where: { id: params.id } }),
-    prisma.pressCoverage.findUnique({ where: { id: params.id } }),
+    prisma.pressSubmission.findFirst({ where: { id: params.id, projectId } }),
+    prisma.pressCoverage.findFirst({ where: { id: params.id, projectId } }),
   ]);
   if (!existingSubmission && !existingCoverage) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -53,7 +53,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
   const articleType = articleTypeToDb(payload.articleType);
   const articleTypeOther = articleType === "Other" ? payload.articleTypeOther || null : null;
-  const outletId = await resolveOutletId(prisma, payload.outlet);
+  const outletId = await resolveOutletId(prisma, projectId, payload.outlet);
 
   if (isCoverage) {
     const updated = await prisma.pressCoverage.update({
@@ -94,13 +94,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   return NextResponse.json(normalizeSubmission(updated));
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   const [submission, coverage] = await Promise.all([
-    prisma.pressSubmission.findUnique({ where: { id: params.id }, select: { id: true } }),
-    prisma.pressCoverage.findUnique({ where: { id: params.id }, select: { id: true } }),
+    prisma.pressSubmission.findFirst({ where: { id: params.id, projectId }, select: { id: true } }),
+    prisma.pressCoverage.findFirst({ where: { id: params.id, projectId }, select: { id: true } }),
   ]);
   if (!submission && !coverage) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -1,9 +1,11 @@
 "use client";
 
+import { useProject, type CurrentProject } from "@/components/projects/ProjectProvider";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { LogOutIcon, UserRoundIcon } from "lucide-react";
 import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
+import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
 import { NewGoalButton } from "@/components/goals/NewGoalButton";
 import { PointsTotal } from "@/components/goals/PointsTotal";
 import { NotificationBell } from "@/components/profile/NotificationBell";
@@ -21,14 +23,21 @@ export function TopBar({
   email,
   image,
   initials,
+  projects,
 }: {
+  projects: CurrentProject[];
   name: string;
   email?: string;
   image?: string;
   initials: string;
 }) {
+  const { href } = useProject();
+
   return (
     <div className="flex h-16 shrink-0 items-center justify-end gap-2 border-b sm:gap-3 border-border px-4 sm:px-6">
+      <div className="mr-auto flex min-w-0">
+        <ProjectSwitcher projects={projects} />
+      </div>
       <PointsTotal />
       <NewGoalButton />
       <AgentSwitcher />
@@ -51,7 +60,7 @@ export function TopBar({
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile">
+            <Link href={href("/profile")}>
               <UserRoundIcon aria-hidden="true" />
               Profile
             </Link>

@@ -15,6 +15,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import type { OverviewSummary } from "@/lib/schemas/overview";
+import { apiFetch } from "@/lib/request-json";
 
 const SECTIONS = [
   { key: "highlights", label: "Going well" },
@@ -32,7 +33,7 @@ export function AiSummaryButton() {
     setIsGenerating(true);
     setError("");
     try {
-      const response = await fetch("/api/overview/summary", { method: "POST" });
+      const response = await apiFetch("/api/overview/summary", { method: "POST" });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
         setError(body?.error ?? "Couldn't generate a summary. Try again.");

@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { workstreamQuerySchema } from "@/lib/schemas/workstreams";
-import { authenticateAgentRequest, serializeWorkstreamItem } from "@/lib/workstreams";
+import { serializeWorkstreamItem } from "@/lib/workstreams";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const { error } = await requireAuth();
-  if (error) {
-    const agent = await authenticateAgentRequest(request);
-    if (!agent) return error;
-  }
+  const { projectId, error } = await requireProjectAccess(request);
+  if (error) return error;
 
   const { searchParams } = new URL(request.url);
   const rawQuery: Record<string, string> = {};
@@ -31,6 +28,7 @@ export async function GET(request: Request) {
   }
 
   const where: Prisma.WorkstreamWhereInput = {
+    goal: { projectId },
     status: parsedQuery.data.status,
     ...(parsedQuery.data.goalId ? { goalId: parsedQuery.data.goalId } : {}),
   };

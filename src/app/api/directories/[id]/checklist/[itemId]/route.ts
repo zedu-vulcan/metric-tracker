@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
 import { displayName, serializeChecklistItem } from "@/lib/directories";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { checklistItemUpdateSchema } from "@/lib/schemas/directories";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ type Params = { params: { id: string; itemId: string } };
 
 /** Ticks, unticks or renames a checklist item. Logs when the checklist becomes complete. */
 export async function PATCH(request: Request, { params }: Params) {
-  const { error } = await requireAuth();
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   let body: unknown;
@@ -26,7 +26,7 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const existing = await prisma.directoryChecklistItem.findFirst({
-    where: { id: params.itemId, directoryId: params.id },
+    where: { id: params.itemId, directoryId: params.id, directory: { projectId } },
     include: { directory: { select: { id: true, name: true, website: true, status: true } } },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -44,6 +44,7 @@ export async function PATCH(request: Request, { params }: Params) {
       if (remaining === 0) {
         await tx.directoryActivity.create({
           data: {
+            projectId,
             directoryId: existing.directory.id,
             directoryName: displayName(existing.directory),
             message: `${displayName(existing.directory)} is ready to submit: checklist complete`,
@@ -58,12 +59,12 @@ export async function PATCH(request: Request, { params }: Params) {
   return NextResponse.json(serializeChecklistItem(item));
 }
 
-export async function DELETE(_request: Request, { params }: Params) {
-  const { error } = await requireAuth();
+export async function DELETE(request: Request, { params }: Params) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   const existing = await prisma.directoryChecklistItem.findFirst({
-    where: { id: params.itemId, directoryId: params.id },
+    where: { id: params.itemId, directoryId: params.id, directory: { projectId } },
     select: { id: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthContext, requireUser } from "@/lib/api";
+import { serializeUpvote, upvoteInclude } from "@/lib/idea-upvotes";
+import { callerInProject } from "@/lib/projects";
 import { prisma } from "@/lib/prisma";
 import { goalUpdateSchema } from "@/lib/schemas/goals";
 
@@ -10,8 +12,8 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const { error } = await getAuthContext(request);
-  if (error) return error;
+  const auth = await getAuthContext(request);
+  if (auth.error) return auth.error;
 
   const { id } = params;
 
@@ -27,6 +29,7 @@ export async function GET(
             select: { id: true, name: true, speciality: true, lastActiveAt: true, owner: { select: { name: true } } },
           },
           acceptedBy: { select: { id: true, name: true, email: true } },
+          upvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },
           tasks: {
             select: {
               id: true,
@@ -42,13 +45,15 @@ export async function GET(
     },
   });
 
-  if (!goal) {
+  const caller = auth.type === "agent" ? { agent: auth.agent } : { userId: auth.user.id };
+  if (!goal || !(await callerInProject(goal.projectId, caller))) {
     return NextResponse.json({ error: "Goal not found" }, { status: 404 });
   }
 
-  const acceptedWorkstreams = goal.workstreams.filter((ws) => ws.status === "accepted");
-  const pendingIdeas = goal.workstreams.filter((ws) => ws.status === "proposed");
-  const rejectedIdeas = goal.workstreams.filter((ws) => ws.status === "rejected");
+  const workstreams = goal.workstreams.map((ws) => ({ ...ws, upvotes: ws.upvotes.map(serializeUpvote) }));
+  const acceptedWorkstreams = workstreams.filter((ws) => ws.status === "accepted");
+  const pendingIdeas = workstreams.filter((ws) => ws.status === "proposed");
+  const rejectedIdeas = workstreams.filter((ws) => ws.status === "rejected");
 
   return NextResponse.json({
     id: goal.id,
@@ -71,7 +76,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   // Only humans modify top-level goals; requireUser blocks agent keys with 403.
-  const { error } = await requireUser(request);
+  const { user, error } = await requireUser(request);
   if (error) return error;
 
   const { id } = params;
@@ -80,7 +85,7 @@ export async function PATCH(
     where: { id },
   });
 
-  if (!existing) {
+  if (!existing || !user || !(await callerInProject(existing.projectId, { userId: user.id }))) {
     return NextResponse.json({ error: "Goal not found" }, { status: 404 });
   }
 

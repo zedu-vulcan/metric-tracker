@@ -1,23 +1,23 @@
 import { NextResponse } from "next/server";
 import type { Prisma, TaskType } from "@prisma/client";
-import { requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { taskCreateSchema, taskTypeValues } from "@/lib/schemas/tasks";
 import { serializeTask } from "@/lib/tasks";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const { session, error } = await requireAuth();
+  const { projectId, user, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
-  const userId = (session.user as { id?: string }).id;
+  const userId = user?.id;
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const type = searchParams.get("type");
   const assignedToMe = searchParams.get("assignedToMe");
 
-  const where: Prisma.TaskWhereInput = {};
+  const where: Prisma.TaskWhereInput = { projectId };
 
   if (status === "open") {
     where.done = false;
@@ -49,10 +49,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { session, error } = await requireAuth();
+  const { projectId, user, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
-  const userId = (session.user as { id?: string }).id;
+  const userId = user?.id;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -81,6 +81,7 @@ export async function POST(request: Request) {
 
   const task = await prisma.task.create({
     data: {
+      projectId,
       title: data.title,
       description: data.description ?? null,
       type: data.type,

@@ -1,5 +1,6 @@
 "use client";
 
+import { useProject } from "@/components/projects/ProjectProvider";
 import Link from "next/link";
 import { BellIcon, CheckCheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { useNotifications } from "./useNotifications";
 const PREVIEW_LIMIT = 8;
 
 export function NotificationBell() {
+  const { href } = useProject();
   const { notifications, unreadCount, loading, markRead, markAllRead } = useNotifications();
   const shown = notifications.slice(0, PREVIEW_LIMIT);
 
@@ -87,7 +89,7 @@ export function NotificationBell() {
         <DropdownMenuSeparator className="m-0" />
         <div className="p-1.5">
           <DropdownMenuItem asChild className="justify-center rounded-xl py-2 text-sm font-semibold text-primary-deep">
-            <Link href="/dashboard/profile?tab=inbox">View all in your Inbox</Link>
+            <Link href={href("/profile?tab=inbox")}>View all in your Inbox</Link>
           </DropdownMenuItem>
         </div>
       </DropdownMenuContent>

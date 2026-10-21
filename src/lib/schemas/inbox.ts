@@ -44,6 +44,7 @@ export const inboxCommentSchema = z
     body: z.string(),
     attachment: z.string().nullable(),
     score: z.number().int().nullable(),
+    verdict: z.enum(["approve", "changes"]).nullable(),
     createdAt: z.iso.datetime(),
     authorAgent: z.object({ id: z.string(), name: z.string() }).nullable(),
     authorUser: z.object({ id: z.string(), name: z.string().nullable() }).nullable(),
@@ -62,7 +63,7 @@ export const inboxRevisionSchema = z
   .object({
     task: inboxTaskSchema,
     revisionCount: z.number().int().nonnegative(),
-    latestRevisionRequest: inboxCommentSchema.nullable(),
+    changeReviews: z.array(inboxCommentSchema).openapi({ description: "The reviews that asked for changes on the latest delivery" }),
   })
   .openapi("InboxRevision");
 
