@@ -1,28 +1,32 @@
 import {
-  ClipboardCheckIcon,
   CircleCheckIcon,
   CoinsIcon,
   GavelIcon,
-  KeyRoundIcon,
+  HandIcon,
+  LifeBuoyIcon,
   LightbulbIcon,
-  PencilIcon,
+  ListPlusIcon,
+  MessageSquareIcon,
   RotateCcwIcon,
-  Trash2Icon,
+  SendIcon,
+  XCircleIcon,
   type LucideIcon,
 } from "lucide-react";
-import type { Notification, NotificationKind } from "@/lib/profile/profile-service";
+import type { Notification, NotificationKind } from "@/lib/schemas/notifications";
 import { cn } from "@/lib/utils";
 
 const KIND_STYLE: Record<NotificationKind, { icon: LucideIcon; tone: string }> = {
-  idea_accepted: { icon: LightbulbIcon, tone: "bg-success-muted text-success" },
-  task_accepted: { icon: CircleCheckIcon, tone: "bg-success-muted text-success" },
-  bid_received: { icon: GavelIcon, tone: "bg-info-muted text-info" },
-  review_completed: { icon: ClipboardCheckIcon, tone: "bg-info-muted text-info" },
-  points_released: { icon: CoinsIcon, tone: "bg-success-muted text-success" },
-  revision_requested: { icon: RotateCcwIcon, tone: "bg-warning-muted text-warning" },
-  agent_edited: { icon: PencilIcon, tone: "bg-accent text-primary-deep" },
-  agent_deleted: { icon: Trash2Icon, tone: "bg-destructive-muted text-destructive" },
-  agent_rekeyed: { icon: KeyRoundIcon, tone: "bg-warning-muted text-warning" },
+  idea_proposed: { icon: LightbulbIcon, tone: "bg-warning-muted text-warning" },
+  task_proposed: { icon: ListPlusIcon, tone: "bg-warning-muted text-warning" },
+  bids_waiting: { icon: GavelIcon, tone: "bg-warning-muted text-warning" },
+  escalation: { icon: LifeBuoyIcon, tone: "bg-destructive-muted text-destructive" },
+  offer_received: { icon: SendIcon, tone: "bg-info-muted text-info" },
+  idea_accepted: { icon: HandIcon, tone: "bg-success-muted text-success" },
+  idea_rejected: { icon: XCircleIcon, tone: "bg-secondary text-muted-foreground" },
+  task_approved: { icon: CircleCheckIcon, tone: "bg-success-muted text-success" },
+  changes_requested: { icon: RotateCcwIcon, tone: "bg-warning-muted text-warning" },
+  comment: { icon: MessageSquareIcon, tone: "bg-accent text-primary-deep" },
+  points_earned: { icon: CoinsIcon, tone: "bg-success-muted text-success" },
 };
 
 export function NotificationIcon({ kind, className }: { kind: NotificationKind; className?: string }) {

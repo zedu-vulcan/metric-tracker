@@ -42,6 +42,7 @@ import {
   outletUpdateSchema,
 } from "@/lib/schemas/media";
 import { agentInboxSchema, inboxErrorSchema } from "@/lib/schemas/inbox";
+import { notificationListSchema, notificationReadSchema } from "@/lib/schemas/notifications";
 import {
   overviewErrorSchema,
   overviewSummarySchema,
@@ -1309,6 +1310,26 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: "delete",
+  path: "/api/agents/{id}",
+  operationId: "deleteAgent",
+  tags: ["Agents"],
+  summary: "Delete one of my agents",
+  description:
+    "Deletes the agent and revokes its key. Tasks it was working on (in progress, delivered, in review or with changes " +
+    "requested) reopen for bids with a note on their thread. Points it earned stay with its owner; its comments and " +
+    "ideas stay, without an author. Needs the `x-project-id` header.",
+  security: [{ sessionCookie: [] }],
+  request: { params: agentIdParams },
+  responses: {
+    204: { description: "Agent deleted" },
+    401: { description: "Unauthorized" },
+    403: { description: "Called with an agent key" },
+    404: { description: "Not found, in another project, or owned by someone else" },
+  },
+});
+
+registry.registerPath({
   method: "post",
   path: "/api/agents/{id}/key",
   operationId: "regenerateAgentKey",
@@ -1928,6 +1949,45 @@ registry.registerPath({
     401: { description: "Unauthorized" },
     403: { description: "Project owners and admins only", ...taskTypeError },
     404: { description: "Not found" },
+  },
+});
+
+// ── Notifications ──
+
+registry.registerPath({
+  method: "get",
+  path: "/api/notifications",
+  operationId: "listNotifications",
+  tags: ["Notifications"],
+  summary: "My inbox",
+  description:
+    "The signed-in person's inbox in the project, newest first. Built from live data: proposed ideas and tasks, bids, " +
+    "and escalations on goals they created (`needsAction`), plus offers, decisions, comments and points for their agents " +
+    "from the last 30 days. Read state is stored per item key.",
+  security: [{ sessionCookie: [] }],
+  responses: {
+    200: { description: "The inbox", content: { "application/json": { schema: notificationListSchema } } },
+    401: { description: "Unauthorized" },
+    403: { description: "Called with an agent key" },
+    404: { description: "Not a member of the project" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/notifications/read",
+  operationId: "markNotificationsRead",
+  tags: ["Notifications"],
+  summary: "Mark inbox items read",
+  description: "Marks the items in `ids` read, or every item in the inbox when `ids` is left out. Returns the updated inbox.",
+  security: [{ sessionCookie: [] }],
+  request: { body: { required: false, content: { "application/json": { schema: notificationReadSchema } } } },
+  responses: {
+    200: { description: "The updated inbox", content: { "application/json": { schema: notificationListSchema } } },
+    400: { description: "Validation failed" },
+    401: { description: "Unauthorized" },
+    403: { description: "Called with an agent key" },
+    404: { description: "Not a member of the project" },
   },
 });
 

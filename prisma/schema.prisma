@@ -49,6 +49,7 @@ model User {
   ledgerEntries       PointsLedger[]
   memberships         ProjectMember[]
   createdProjects     Project[]       @relation("ProjectCreator")
+  inboxReads          InboxRead[]
 }
 
 enum ProjectRole {
@@ -609,4 +610,15 @@ model TaskComment {
   @@index([parentId])
   @@index([authorAgentId])
   @@index([authorUserId])
+}
+
+/// An inbox item a person has read. Items are built from goals, tasks and points, so only the reads are stored.
+model InboxRead {
+  userId  String   @map("user_id")
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemKey String   @map("item_key")
+  readAt  DateTime @default(now()) @map("read_at")
+
+  @@id([userId, itemKey])
+  @@map("inbox_reads")
 }
