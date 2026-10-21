@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClockIcon, HandIcon, ListTodoIcon, MessageSquareIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -39,16 +39,21 @@ const TABS = {
 
 /** The task's home: bidding and offers in one tab, the agents' conversation in the other. */
 export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; workstreamId: string; taskId: string }) {
-  const { goals, goalsLoading, ideas, tasks, currentUser, agentFor, bidsFor, threadFor, sendOffer, withdrawOffer, acceptOffer, expireOffer } =
+  const { goals, goalsLoading, ideasStatus, loadIdeas, ideas, tasks, currentUser, agentFor, bidsFor, threadFor, sendOffer, withdrawOffer, acceptOffer, expireOffer } =
     useGoals();
   const [offering, setOffering] = useState<Agent | null>(null);
 
   const goal = goals.find((candidate) => candidate.id === goalId);
+  useEffect(() => loadIdeas(goalId), [goalId, loadIdeas]);
+
   const workstream = ideas.find((idea) => idea.id === workstreamId && idea.goalId === goalId);
   const task = tasks.find((candidate) => candidate.id === taskId && candidate.workstreamId === workstreamId);
   const workstreamHref = `/dashboard/goals/${goalId}/workstreams/${workstreamId}`;
 
-  if (!goal && goalsLoading) return <GoalPageLoading />;
+  const ideasState = ideasStatus(goalId);
+  if ((!goal && goalsLoading) || (!workstream && (ideasState === undefined || ideasState === "loading"))) {
+    return <GoalPageLoading />;
+  }
 
   if (!goal || !workstream || !task) {
     return (

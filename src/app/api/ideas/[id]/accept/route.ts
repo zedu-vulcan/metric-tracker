@@ -11,15 +11,23 @@ export async function POST(
   _request: Request,
   { params }: { params: { id: string } }
 ) {
-  // Only humans decide ideas; accepting promotes the record to an active workstream.
+  // Only the goal's owner decides its ideas; accepting promotes the record to an active workstream.
   const { session, error: authError } = await requireAuth();
   if (authError) return authError;
 
   const { id } = params;
 
-  const idea = await prisma.workstream.findUnique({ where: { id } });
+  const userId = (session.user as { id?: string }).id;
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const idea = await prisma.workstream.findUnique({ where: { id }, include: { goal: { select: { createdById: true } } } });
   if (!idea) {
     return NextResponse.json({ error: "Idea not found" }, { status: 404 });
+  }
+  if (idea.goal.createdById !== userId) {
+    return NextResponse.json({ error: "Only the goal owner can decide its ideas" }, { status: 403 });
   }
 
   if (idea.status === "accepted") {
@@ -29,7 +37,6 @@ export async function POST(
     return NextResponse.json({ error: "Idea was rejected and cannot be accepted" }, { status: 400 });
   }
 
-  const userId = (session.user as { id?: string }).id;
   // The WHERE clause re-tests the status, so a concurrent accept/reject cannot be overwritten.
   const result = await prisma.workstream.updateMany({
     where: { id, status: "proposed" },

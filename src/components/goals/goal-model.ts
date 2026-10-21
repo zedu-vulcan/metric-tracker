@@ -25,7 +25,11 @@ export type Goal = {
   ownerId: string;
   ownerName: string;
   createdAt: string;
+  /** From the goals list, so cards don't need every goal's ideas loaded. */
+  counts: GoalCounts;
 };
+
+export type GoalCounts = { pendingIdeas: number; workstreams: number; totalTasks: number; approvedTasks: number };
 
 export type Agent = {
   id: string;
@@ -240,102 +244,6 @@ export const DEMO_AGENTS: Agent[] = [
   },
 ];
 
-export function demoIdeas(currentUser: DemoUser): Idea[] {
-  return [
-    {
-      id: "idea_onpage",
-      goalId: "goal_seo",
-      agentId: "agent_scout",
-      title: "On-page SEO",
-      description: "Fix titles, meta descriptions, H1s and image alt text on every marketing page.",
-      proposedAt: "2026-10-14T12:10:00.000Z",
-      status: "accepted",
-      decidedBy: currentUser.name,
-      decidedAt: "2026-10-14T15:00:00.000Z",
-    },
-    {
-      id: "idea_technical",
-      goalId: "goal_seo",
-      agentId: "agent_scout",
-      title: "Technical SEO",
-      description: "Sitemap, robots.txt, canonical tags and page speed fixes.",
-      proposedAt: "2026-10-15T09:20:00.000Z",
-      status: "accepted",
-      decidedBy: currentUser.name,
-      decidedAt: "2026-10-15T10:05:00.000Z",
-    },
-    {
-      id: "idea_schema",
-      goalId: "goal_seo",
-      agentId: "agent_scout",
-      title: "Structured data for every page",
-      description: "Add schema.org markup (Organization, Article, FAQ) so search results show rich snippets.",
-      proposedAt: "2026-10-20T07:40:00.000Z",
-      status: "proposed",
-    },
-    {
-      id: "idea_backlinks",
-      goalId: "goal_seo",
-      agentId: "agent_quill",
-      title: "Backlinks from bootcamp blogs",
-      description: "Write guest posts for coding bootcamp blogs that link back to Zedu's guides.",
-      proposedAt: "2026-10-20T08:55:00.000Z",
-      status: "proposed",
-    },
-    {
-      id: "idea_pricing_h1",
-      goalId: "goal_seo",
-      agentId: "agent_hunter",
-      title: "Fix the H1 tag on the pricing page",
-      description: "The pricing page has two H1 tags.",
-      proposedAt: "2026-10-16T13:30:00.000Z",
-      status: "rejected",
-      decidedBy: currentUser.name,
-      decidedAt: "2026-10-16T16:00:00.000Z",
-      rejectionReason: "This is a task, not a workstream. Propose it under On-page SEO.",
-    },
-    {
-      id: "idea_industry",
-      goalId: "goal_content",
-      agentId: "agent_quill",
-      title: "Write content about our industry",
-      description: "A weekly series on how remote work and travel are changing business.",
-      proposedAt: "2026-10-15T14:00:00.000Z",
-      status: "accepted",
-      decidedBy: "Tunde Bello",
-      decidedAt: "2026-10-15T17:30:00.000Z",
-    },
-    {
-      id: "idea_guides",
-      goalId: "goal_content",
-      agentId: "agent_quill",
-      title: "How-to guides for new users",
-      description: "Step-by-step guides that answer the questions new users ask support most.",
-      proposedAt: "2026-10-19T10:15:00.000Z",
-      status: "proposed",
-    },
-    {
-      id: "idea_bootcamps",
-      goalId: "goal_leads",
-      agentId: "agent_hunter",
-      title: "Nigerian coding bootcamps",
-      description: "List bootcamps in Lagos, Abuja and online, with programme leads and contact emails.",
-      proposedAt: "2026-10-17T11:00:00.000Z",
-      status: "accepted",
-      decidedBy: "Ada Okafor",
-      decidedAt: "2026-10-17T12:20:00.000Z",
-    },
-    {
-      id: "idea_outlets",
-      goalId: "goal_press",
-      agentId: "agent_wire",
-      title: "Launch story for TechCabal and Techpoint",
-      description: "Pitch the Zedu launch as a founder story with usage numbers.",
-      proposedAt: "2026-10-19T16:30:00.000Z",
-      status: "proposed",
-    },
-  ];
-}
 
 type DemoTaskInput = Pick<Task, "id" | "workstreamId" | "title" | "description" | "taskType" | "status"> &
   Partial<Task> & { day: number };

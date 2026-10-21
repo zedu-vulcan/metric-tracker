@@ -60,9 +60,12 @@ describe("Ideas Validation, Serialization & OpenAPI", () => {
         id: "agent-1",
         name: "Outreach Bot",
         speciality: "outreach",
+        lastActiveAt: null,
+        owner: { name: "Jane Manager" },
       },
       acceptedById: null,
       acceptedBy: null,
+      rejectionReason: null,
       createdAt: now,
       updatedAt: now,
     };

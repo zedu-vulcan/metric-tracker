@@ -81,6 +81,7 @@ import {
   ideaCreateSchema,
   ideaErrorSchema,
   ideaItemSchema,
+  ideaRejectSchema,
 } from "@/lib/schemas/ideas";
 import {
   bidderFairnessSchema,
@@ -1512,7 +1513,7 @@ registry.registerPath({
   tags: ["Ideas"],
   summary: "Accept an idea, turning it into an active workstream",
   description:
-    "Humans only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it.",
+    "The goal's owner only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it.",
   security: [{ sessionCookie: [] }],
   request: { params: ideaIdParams },
   responses: {
@@ -1525,6 +1526,7 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
+    403: { description: "Only the goal owner can decide its ideas", ...ideaError },
     404: { description: "Idea not found", ...ideaError },
     409: {
       description: "Idea was rejected and cannot be accepted (or changed concurrently)",
@@ -1540,9 +1542,12 @@ registry.registerPath({
   tags: ["Ideas"],
   summary: "Reject an idea",
   description:
-    "Humans only. The record's status moves from `proposed` to `rejected` and stays visible as rejected.",
+    "The goal's owner only. The record's status moves from `proposed` to `rejected` and stays visible as rejected, with the optional reason.",
   security: [{ sessionCookie: [] }],
-  request: { params: ideaIdParams },
+  request: {
+    params: ideaIdParams,
+    body: { required: false, content: { "application/json": { schema: ideaRejectSchema } } },
+  },
   responses: {
     200: {
       description: "Idea rejected",
@@ -1553,6 +1558,7 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
+    403: { description: "Only the goal owner can decide its ideas", ...ideaError },
     404: { description: "Idea not found", ...ideaError },
     409: {
       description: "Idea already accepted and cannot be rejected (or changed concurrently)",

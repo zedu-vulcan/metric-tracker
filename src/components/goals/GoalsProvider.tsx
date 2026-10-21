@@ -6,12 +6,12 @@ import {
   DEMO_AGENTS,
   MAX_REVISIONS,
   OFFER_HOURS,
-  demoIdeas,
   demoTasks,
   type Agent,
   type Bid,
   type DemoUser,
   type Goal,
+  type GoalCounts,
   type GoalType,
   type Idea,
   type Task,
@@ -36,8 +36,13 @@ type ApiGoal = {
   status: "active" | "completed" | "archived";
   createdById: string;
   createdBy?: { id: string; name: string | null; email: string | null };
+  /** Only the list returns these. */
+  ideaCounts?: { proposed: number; accepted: number; rejected: number };
+  taskCounts?: { total: number; approved: number };
   createdAt: string;
 };
+
+const NO_COUNTS: GoalCounts = { pendingIdeas: 0, workstreams: 0, totalTasks: 0, approvedTasks: 0 };
 
 function toGoal(goal: ApiGoal): Goal {
   return {
@@ -48,8 +53,71 @@ function toGoal(goal: ApiGoal): Goal {
     ownerId: goal.createdById,
     ownerName: goal.createdBy?.name ?? goal.createdBy?.email ?? "A teammate",
     createdAt: goal.createdAt,
+    counts: goal.ideaCounts
+      ? {
+          pendingIdeas: goal.ideaCounts.proposed,
+          workstreams: goal.ideaCounts.accepted,
+          totalTasks: goal.taskCounts?.total ?? 0,
+          approvedTasks: goal.taskCounts?.approved ?? 0,
+        }
+      : NO_COUNTS,
   };
 }
+
+type ApiAgentRef = {
+  id: string;
+  name: string;
+  speciality: string;
+  lastActiveAt: string | null;
+};
+
+/** An idea (a workstream record) as `/api/goals/{id}` and the idea routes return it. */
+type ApiIdea = {
+  id: string;
+  goalId: string;
+  title: string;
+  description: string | null;
+  status: Idea["status"];
+  proposedByAgentId: string | null;
+  /** The goal detail nests the owner; the idea routes flatten it to `ownerName`. */
+  proposedByAgent?: (ApiAgentRef & { owner?: { name: string | null }; ownerName?: string | null }) | null;
+  acceptedBy?: { name: string | null; email: string | null } | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ApiGoalDetail = { acceptedWorkstreams: ApiIdea[]; pendingIdeas: ApiIdea[]; rejectedIdeas?: ApiIdea[] };
+
+function toIdea(idea: ApiIdea): Idea {
+  return {
+    id: idea.id,
+    goalId: idea.goalId,
+    agentId: idea.proposedByAgentId ?? "",
+    title: idea.title,
+    description: idea.description ?? "",
+    proposedAt: idea.createdAt,
+    status: idea.status,
+    decidedBy: idea.acceptedBy ? (idea.acceptedBy.name ?? idea.acceptedBy.email ?? undefined) : undefined,
+    // There's no decision timestamp yet; the record's last update is when it was decided.
+    decidedAt: idea.status === "proposed" ? undefined : idea.updatedAt,
+    rejectionReason: idea.rejectionReason ?? undefined,
+  };
+}
+
+function toAgent(idea: ApiIdea): Agent | undefined {
+  const agent = idea.proposedByAgent;
+  if (!agent) return undefined;
+  return {
+    id: agent.id,
+    name: agent.name,
+    speciality: agent.speciality,
+    ownerName: agent.ownerName ?? agent.owner?.name ?? "A teammate",
+    lastActiveAt: agent.lastActiveAt ?? idea.createdAt,
+  };
+}
+
+export type IdeasStatus = "loading" | "ready" | "error";
 
 type GoalsContextValue = {
   currentUser: DemoUser;
@@ -58,13 +126,17 @@ type GoalsContextValue = {
   goalsLoading: boolean;
   goalsError: boolean;
   reloadGoals: () => void;
+  /** Ideas of the goals loaded with `loadIdeas`. Accepted ideas are workstreams. */
   ideas: Idea[];
+  ideasStatus: (goalId: string) => IdeasStatus | undefined;
+  /** Loads (or refreshes) one goal's ideas and workstreams. */
+  loadIdeas: (goalId: string) => void;
   tasks: Task[];
   bidsFor: (taskId: string) => Bid[];
   agentFor: (agentId: string) => Agent | undefined;
   createGoal: (input: NewGoal) => Promise<Goal>;
-  approveIdea: (ideaId: string) => void;
-  rejectIdea: (ideaId: string, reason: string) => void;
+  approveIdea: (ideaId: string) => Promise<void>;
+  rejectIdea: (ideaId: string, reason: string) => Promise<void>;
   sendOffer: (taskId: string, agentId: string) => void;
   withdrawOffer: (taskId: string) => void;
   /** Demo stand-ins for what an agent does through the API. */
@@ -81,13 +153,16 @@ const EMPTY_THREAD: ThreadEntry[] = [];
 
 /**
  * Store for the Goals section, mounted by the dashboard layout so the top bar can create goals.
- * Goals come from `/api/goals`; ideas, tasks and threads are still demo data.
+ * Goals and ideas come from the API; tasks and threads are still demo data.
  */
 export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser; children: React.ReactNode }) {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [goalsLoading, setGoalsLoading] = useState(true);
   const [goalsError, setGoalsError] = useState(false);
-  const [ideas, setIdeas] = useState(() => demoIdeas(currentUser));
+  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [ideaStatuses, setIdeaStatuses] = useState<Record<string, IdeasStatus>>({});
+  /** Agents seen on ideas, so cards can show who proposed what. */
+  const [apiAgents, setApiAgents] = useState<Record<string, Agent>>({});
   const [baseTasks, setBaseTasks] = useState(demoTasks);
   const [threads, setThreads] = useState<Record<string, ThreadEntry[]>>(() =>
     Object.fromEntries(baseTasks.map((task) => [task.id, demoThread(task)]))
@@ -137,16 +212,48 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
     return goal;
   }, []);
 
+  const rememberAgents = useCallback((records: ApiIdea[]) => {
+    const seen = records.flatMap((record) => toAgent(record) ?? []);
+    if (seen.length > 0) setApiAgents((previous) => ({ ...previous, ...Object.fromEntries(seen.map((agent) => [agent.id, agent])) }));
+  }, []);
+
+  const loadIdeas = useCallback(
+    (goalId: string) => {
+      setIdeaStatuses((previous) => (previous[goalId] === "ready" ? previous : { ...previous, [goalId]: "loading" }));
+      requestJson<ApiGoalDetail>(`/api/goals/${goalId}`)
+        .then((detail) => {
+          const records = [...detail.acceptedWorkstreams, ...detail.pendingIdeas, ...(detail.rejectedIdeas ?? [])];
+          rememberAgents(records);
+          setIdeas((previous) => [...previous.filter((idea) => idea.goalId !== goalId), ...records.map(toIdea)]);
+          setIdeaStatuses((previous) => ({ ...previous, [goalId]: "ready" }));
+        })
+        .catch(() =>
+          // Keep what's on screen if a refresh fails; only a first load turns into an error.
+          setIdeaStatuses((previous) => (previous[goalId] === "ready" ? previous : { ...previous, [goalId]: "error" }))
+        );
+    },
+    [rememberAgents]
+  );
+
+  // Ideas arrive from agents at any time, so refresh the goals already open when the tab regains focus.
+  useEffect(() => {
+    const refresh = () =>
+      Object.entries(ideaStatuses).forEach(([goalId, status]) => status === "ready" && loadIdeas(goalId));
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [ideaStatuses, loadIdeas]);
+
   const decide = useCallback(
-    (ideaId: string, change: Pick<Idea, "status"> & Partial<Idea>) =>
-      setIdeas((previous) =>
-        previous.map((idea) =>
-          idea.id === ideaId
-            ? { ...idea, ...change, decidedBy: currentUser.name, decidedAt: new Date().toISOString() }
-            : idea
-        )
-      ),
-    [currentUser]
+    async (ideaId: string, action: "accept" | "reject", reason?: string) => {
+      const record = await requestJson<ApiIdea>(`/api/ideas/${ideaId}/${action}`, {
+        method: "POST",
+        body: action === "reject" ? JSON.stringify({ reason: reason || null }) : undefined,
+      });
+      rememberAgents([record]);
+      setIdeas((previous) => previous.map((idea) => (idea.id === ideaId ? toIdea(record) : idea)));
+      reloadGoals();
+    },
+    [rememberAgents, reloadGoals]
   );
 
   const append = useCallback((taskId: string, entries: ThreadEntry[]) => {
@@ -259,6 +366,8 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
       goalsError,
       reloadGoals,
       ideas,
+      ideasStatus: (goalId) => ideaStatuses[goalId],
+      loadIdeas,
       tasks,
       bidsFor: (taskId) =>
         (threads[taskId] ?? EMPTY_THREAD).flatMap((entry) =>
@@ -266,10 +375,10 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
             ? [{ id: entry.id, taskId, agentId: entry.author.agentId, message: entry.body, createdAt: entry.at }]
             : []
         ),
-      agentFor: (agentId) => DEMO_AGENTS.find((agent) => agent.id === agentId),
+      agentFor: (agentId) => apiAgents[agentId] ?? DEMO_AGENTS.find((agent) => agent.id === agentId),
       createGoal,
-      approveIdea: (ideaId) => decide(ideaId, { status: "accepted" }),
-      rejectIdea: (ideaId, reason) => decide(ideaId, { status: "rejected", rejectionReason: reason || undefined }),
+      approveIdea: (ideaId) => decide(ideaId, "accept"),
+      rejectIdea: (ideaId, reason) => decide(ideaId, "reject", reason),
       sendOffer,
       withdrawOffer: (taskId) => endOffer(taskId, "withdrawn"),
       acceptOffer: (taskId) => endOffer(taskId, "accepted"),
@@ -278,7 +387,7 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
       approveTask,
       requestChanges,
     }),
-    [currentUser, goals, goalsLoading, goalsError, reloadGoals, ideas, tasks, threads, createGoal, decide, sendOffer, endOffer, approveTask, requestChanges]
+    [currentUser, goals, goalsLoading, goalsError, reloadGoals, ideas, ideaStatuses, loadIdeas, apiAgents, tasks, threads, createGoal, decide, sendOffer, endOffer, approveTask, requestChanges]
   );
 
   return <GoalsContext.Provider value={value}>{children}</GoalsContext.Provider>;

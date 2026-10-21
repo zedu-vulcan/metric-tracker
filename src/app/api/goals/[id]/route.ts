@@ -23,7 +23,9 @@ export async function GET(
       },
       workstreams: {
         include: {
-          proposedByAgent: { select: { id: true, name: true, speciality: true } },
+          proposedByAgent: {
+            select: { id: true, name: true, speciality: true, lastActiveAt: true, owner: { select: { name: true } } },
+          },
           acceptedBy: { select: { id: true, name: true, email: true } },
           tasks: {
             select: {
@@ -46,6 +48,7 @@ export async function GET(
 
   const acceptedWorkstreams = goal.workstreams.filter((ws) => ws.status === "accepted");
   const pendingIdeas = goal.workstreams.filter((ws) => ws.status === "proposed");
+  const rejectedIdeas = goal.workstreams.filter((ws) => ws.status === "rejected");
 
   return NextResponse.json({
     id: goal.id,
@@ -57,6 +60,7 @@ export async function GET(
     createdBy: goal.createdBy,
     acceptedWorkstreams,
     pendingIdeas,
+    rejectedIdeas,
     createdAt: goal.createdAt.toISOString(),
     updatedAt: goal.updatedAt.toISOString(),
   });

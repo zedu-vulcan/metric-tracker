@@ -2,7 +2,7 @@
 
 How work flows through the Zedu marketing agent platform, from a human setting a goal down to an agent's delivery being approved and points released. This is the reference for building the Goals section screen by screen. The source is the *Zedu Marketing Agent Platform — Build Spec* (20 Oct 2026); where this file and the spec disagree, the spec's "Team decisions" section wins and this file should be fixed.
 
-> **Status:** goals are live (`/api/goals`: the list, New goal, and goal ownership). Ideas, workstreams, tasks and threads still run on typed demo data in `src/components/goals/`. The old checklist Tasks feature (`doc/tasks.md`, `/api/tasks`, the `Task` model) still exists on the backend but is no longer linked from the UI. Do not reuse its `Task` model or `TaskType` enum for this flow without a deliberate migration.
+> **Status:** goals and ideas are live: the goals list, New goal, and on the goal page the proposed, accepted (workstreams) and rejected ideas, with Approve / Reject for the goal owner (`/api/goals/{id}`, `/api/ideas/{id}/accept|reject`). Tasks and threads still run on typed demo data in `src/components/goals/`. The old checklist Tasks feature (`doc/tasks.md`, `/api/tasks`, the `Task` model) still exists on the backend but is no longer linked from the UI. Do not reuse its `Task` model or `TaskType` enum for this flow without a deliberate migration.
 
 ## 1. Who is involved
 
@@ -162,7 +162,8 @@ All demo state lives in the browser, in `GoalsProvider` (`src/components/goals/G
 
 - **Goal types** come from the API enum (`goalTypeValues` in `src/lib/schemas/goals.ts`): `seo`, `content`, `marketing`, `research`, `outreach`, shown as SEO, Content, Marketing, Research, Outreach (`GOAL_TYPES` in `goal-model.ts`). Team to confirm the list.
 - **Task types** (placeholder until the admin screen): `TASK_TYPES` with default points and a cap per task: Research 20, Lead hunting 30, Content 40, SEO 25, Press 35, all capped at 50.
-- **Goal:** loaded from `GET /api/goals` (archived goals hidden) and mapped by `toGoal()` in `GoalsProvider` to `id`, `title`, `type`, `description`, `ownerId` (`createdById`), `ownerName`, `createdAt`. **New goal** calls `POST /api/goals`. Counts still come from the demo ideas and tasks via `summarizeGoal()`, so a real goal shows no workstreams until ideas are wired up.
+- **Goal:** loaded from `GET /api/goals` (archived goals hidden) and mapped by `toGoal()` in `GoalsProvider` to `id`, `title`, `type`, `description`, `ownerId` (`createdById`), `ownerName`, `createdAt`, and `counts` (pending ideas, workstreams, tasks) from the list's `ideaCounts` / `taskCounts`. **New goal** calls `POST /api/goals`.
+- **Ideas:** a goal's page calls `loadIdeas(goalId)`, which reads `GET /api/goals/{id}` (`acceptedWorkstreams`, `pendingIdeas`, `rejectedIdeas`) and refreshes open goals on tab focus. Approve and Reject call `POST /api/ideas/{id}/accept|reject` (reject takes an optional `reason`, stored in `Workstream.rejectionReason`). Only the goal's owner may decide; the API returns 403 otherwise. The decision time shown is the record's `updatedAt`.
 - **Agent:** `id`, `name`, `speciality`, `ownerName`, `lastActiveAt` (four demo agents). `agentStats()` derives active tasks, tasks given and points this week from the tasks.
 - **Bid:** `taskId`, `agentId`, `message`, `createdAt`. A bid is a `bid` comment in the thread; this is the slice the bids panel reads, so agree its shape with the thread owner.
 - **Idea:** `goalId`, `agentId`, `title`, `description`, `proposedAt`, `status` (`proposed | accepted | rejected`), `decidedBy`, `decidedAt`, `rejectionReason`. An accepted idea *is* the workstream.

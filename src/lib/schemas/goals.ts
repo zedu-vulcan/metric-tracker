@@ -54,6 +54,18 @@ export const goalItemSchema = z
         tasks: z.number().int().nonnegative(),
       })
       .optional(),
+    ideaCounts: z
+      .object({
+        proposed: z.number().int().nonnegative(),
+        accepted: z.number().int().nonnegative(),
+        rejected: z.number().int().nonnegative(),
+      })
+      .optional()
+      .openapi({ description: "Ideas by status. Accepted ideas are the goal's workstreams. Returned by the list only." }),
+    taskCounts: z
+      .object({ total: z.number().int().nonnegative(), approved: z.number().int().nonnegative() })
+      .optional()
+      .openapi({ description: "Tasks in accepted workstreams. Returned by the list only." }),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
@@ -70,7 +82,13 @@ export const goalWorkstreamSchema = z
     autoAcceptTasks: z.boolean(),
     proposedByAgentId: z.string().nullable(),
     proposedByAgent: z
-      .object({ id: z.string(), name: z.string(), speciality: z.string() })
+      .object({
+        id: z.string(),
+        name: z.string(),
+        speciality: z.string(),
+        lastActiveAt: z.iso.datetime().nullable(),
+        owner: z.object({ name: z.string().nullable() }),
+      })
       .nullable()
       .optional(),
     acceptedById: z.string().nullable(),
@@ -78,6 +96,7 @@ export const goalWorkstreamSchema = z
       .object({ id: z.string(), name: z.string().nullable(), email: z.string().nullable() })
       .nullable()
       .optional(),
+    rejectionReason: z.string().nullable(),
     tasks: z
       .array(
         z.object({
@@ -112,6 +131,7 @@ export const goalDetailSchema = z
       .optional(),
     acceptedWorkstreams: z.array(goalWorkstreamSchema),
     pendingIdeas: z.array(goalWorkstreamSchema),
+    rejectedIdeas: z.array(goalWorkstreamSchema),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })

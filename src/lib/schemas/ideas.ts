@@ -20,6 +20,8 @@ export const proposedByAgentSchema = z
     id: z.string(),
     name: z.string(),
     speciality: z.string(),
+    ownerName: z.string().nullable(),
+    lastActiveAt: z.iso.datetime().nullable(),
   })
   .openapi("IdeaProposedByAgent");
 
@@ -42,11 +44,18 @@ export const ideaItemSchema = z
     proposedByAgentId: z.string().nullable(),
     proposedByAgent: proposedByAgentSchema.nullable(),
     acceptedById: z.string().nullable(),
-    acceptedBy: acceptedBySchema.nullable(),
+    acceptedBy: acceptedBySchema.nullable().openapi({ description: "Who decided the idea: accepted or rejected it." }),
+    rejectionReason: z.string().nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
   .openapi("IdeaItem");
+
+export const ideaRejectSchema = z
+  .object({
+    reason: z.string().trim().max(1000).nullable().optional(),
+  })
+  .openapi("IdeaReject");
 
 export const ideaErrorSchema = z
   .object({

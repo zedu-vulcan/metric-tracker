@@ -18,13 +18,13 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GOAL_TYPES, goalTypeLabel, summarizeGoal, type Goal, type GoalSummary } from "./goal-model";
+import { GOAL_TYPES, goalTypeLabel, type Goal, type GoalCounts } from "./goal-model";
 import { GoalFormDialog } from "./GoalFormDialog";
 import { OwnerAvatar, TaskProgress } from "./GoalParts";
 import { useGoals } from "./GoalsProvider";
 
 export function GoalsView() {
-  const { goals, goalsLoading, goalsError, reloadGoals, ideas, tasks, currentUser, createGoal } = useGoals();
+  const { goals, goalsLoading, goalsError, reloadGoals, currentUser, createGoal } = useGoals();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
@@ -40,13 +40,13 @@ export function GoalsView() {
           (!query || goal.title.toLowerCase().includes(query) || goal.description.toLowerCase().includes(query))
       )
       .map((goal) => {
-        const summary = summarizeGoal(goal.id, ideas, tasks);
+        const summary = goal.counts;
         const ownedByYou = goal.ownerId === currentUser.id;
         const rank = ownedByYou && summary.pendingIdeas > 0 ? 0 : ownedByYou ? 1 : 2;
         return { goal, summary, ownedByYou, rank };
       })
       .sort((a, b) => a.rank - b.rank);
-  }, [goals, ideas, tasks, currentUser.id, search, typeFilter]);
+  }, [goals, currentUser.id, search, typeFilter]);
 
   const filtering = search !== "" || typeFilter !== "all";
 
@@ -165,7 +165,7 @@ function GoalCard({
   ownerImage,
 }: {
   goal: Goal;
-  summary: GoalSummary;
+  summary: GoalCounts;
   ownedByYou: boolean;
   ownerImage?: string;
 }) {

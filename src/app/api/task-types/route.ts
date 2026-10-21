@@ -7,7 +7,7 @@ import {
   createTaskType,
   prismaTaskTypesStore,
   serializeTaskType,
-  type TaskTypeMutationResult,
+  taskTypeMutationResponse,
 } from "@/lib/task-types-server";
 
 export const dynamic = "force-dynamic";
@@ -71,20 +71,4 @@ export async function POST(request: Request) {
 
   const result = await createTaskType(store, parsed.data, { isAdmin: true, userId });
   return taskTypeMutationResponse(result, true);
-}
-
-export function taskTypeMutationResponse(result: TaskTypeMutationResult, created = false) {
-  if (result.status === "ok") {
-    return NextResponse.json(serializeTaskType(result.type), { status: created ? 201 : 200 });
-  }
-  if (result.status === "forbidden") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-  if (result.status === "not_found") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-  return NextResponse.json(
-    { error: "Validation failed", details: { _errors: result.errors } },
-    { status: 400 }
-  );
 }

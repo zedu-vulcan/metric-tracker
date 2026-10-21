@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,7 +12,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+
 type Rejectable = { id: string; title: string };
 
 export function RejectDialog({
@@ -21,7 +24,7 @@ export function RejectDialog({
 }: {
   item: Rejectable | null;
   onOpenChange: (open: boolean) => void;
-  onReject: (reason: string) => void;
+  onReject: (reason: string) => Promise<void>;
 }) {
   return (
     <Dialog open={item !== null} onOpenChange={onOpenChange}>
@@ -41,18 +44,27 @@ function RejectForm({
 }: {
   item: Rejectable;
   onCancel: () => void;
-  onReject: (reason: string) => void;
+  onReject: (reason: string) => Promise<void>;
 }) {
   const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const onSubmit = (event: FormEvent) => {
+  const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    onReject(reason.trim());
-    onCancel();
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onReject(reason.trim());
+      onCancel();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Couldn't reject the idea. Try again.");
+      setSaving(false);
+    }
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-5">
+    <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-5">
       <DialogHeader className="gap-1">
         <DialogTitle className="text-xl font-extrabold tracking-[-0.03em]">Reject idea</DialogTitle>
         <DialogDescription>
@@ -61,6 +73,11 @@ function RejectForm({
       </DialogHeader>
 
       <FieldGroup>
+        {saveError && (
+          <Alert variant="destructive">
+            <AlertDescription>{saveError}</AlertDescription>
+          </Alert>
+        )}
         <Field>
           <FieldLabel htmlFor="reject-reason">Reason</FieldLabel>
           <Textarea
@@ -80,7 +97,8 @@ function RejectForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" variant="destructive">
+        <Button type="submit" variant="destructive" disabled={saving}>
+          {saving && <Spinner data-icon="inline-start" />}
           Reject idea
         </Button>
       </DialogFooter>

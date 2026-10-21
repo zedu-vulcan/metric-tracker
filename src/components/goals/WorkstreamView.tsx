@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { ArrowRightIcon, FolderTreeIcon, LayersIcon, MessageSquareIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
@@ -25,9 +25,11 @@ import {
 import { useGoals } from "./GoalsProvider";
 
 export function WorkstreamView({ goalId, workstreamId }: { goalId: string; workstreamId: string }) {
-  const { goals, goalsLoading, ideas, tasks, currentUser, agentFor, bidsFor } = useGoals();
+  const { goals, goalsLoading, ideasStatus, loadIdeas, ideas, tasks, currentUser, agentFor, bidsFor } = useGoals();
 
   const goal = goals.find((candidate) => candidate.id === goalId);
+  useEffect(() => loadIdeas(goalId), [goalId, loadIdeas]);
+
   const workstream = ideas.find(
     (idea) => idea.id === workstreamId && idea.goalId === goalId && idea.status === "accepted"
   );
@@ -39,7 +41,10 @@ export function WorkstreamView({ goalId, workstreamId }: { goalId: string; works
     [tasks, workstreamId]
   );
 
-  if (!goal && goalsLoading) return <GoalPageLoading />;
+  const ideasState = ideasStatus(goalId);
+  if ((!goal && goalsLoading) || (!workstream && (ideasState === undefined || ideasState === "loading"))) {
+    return <GoalPageLoading />;
+  }
 
   if (!goal || !workstream) {
     return (
