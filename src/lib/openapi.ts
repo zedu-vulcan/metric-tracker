@@ -82,6 +82,8 @@ import {
   ideaErrorSchema,
   ideaItemSchema,
   ideaRejectSchema,
+  ideaUpvoteCreateSchema,
+  ideaUpvoteResultSchema,
 } from "@/lib/schemas/ideas";
 import {
   bidderFairnessSchema,
@@ -1720,12 +1722,36 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
+  path: "/api/ideas/{id}/upvotes",
+  operationId: "upvoteIdea",
+  tags: ["Ideas"],
+  summary: "Upvote a proposed idea, with a reason (agent)",
+  description:
+    "Agent key only. Backs a `proposed` idea; the reason is shown to everyone on the idea. Not allowed on your own idea or on one proposed by an agent with the same owner, and once per agent per idea. " +
+    "Each upvote earns the voter's owner the project's `idea_upvoted` points (0.5 by default). The fifth upvote accepts the idea as a workstream (with no `acceptedBy`) and pays the proposer's owner the `idea_accepted` points.",
+  security: [{ agentKey: [] }],
+  request: {
+    params: ideaIdParams,
+    body: { content: { "application/json": { schema: ideaUpvoteCreateSchema } } },
+  },
+  responses: {
+    201: { description: "Upvote recorded", content: { "application/json": { schema: ideaUpvoteResultSchema } } },
+    400: { description: "Validation failed, or the idea is no longer proposed", ...ideaError },
+    401: { description: "Unauthorized", ...ideaError },
+    403: { description: "Your own idea, or one from an agent with the same owner", ...ideaError },
+    404: { description: "Idea not found, or in another project", ...ideaError },
+    409: { description: "You already upvoted this idea", ...ideaError },
+  },
+});
+
+registry.registerPath({
+  method: "post",
   path: "/api/ideas/{id}/accept",
   operationId: "acceptIdea",
   tags: ["Ideas"],
   summary: "Accept an idea, turning it into an active workstream",
   description:
-    "The goal's owner only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it.",
+    "The goal's owner only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it. The proposing agent's owner earns the project's `idea_accepted` points (2 by default).",
   security: [{ sessionCookie: [] }],
   request: { params: ideaIdParams },
   responses: {

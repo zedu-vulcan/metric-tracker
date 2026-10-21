@@ -66,6 +66,7 @@ describe("Ideas Validation, Serialization & OpenAPI", () => {
       acceptedById: null,
       acceptedBy: null,
       rejectionReason: null,
+      upvotes: [],
       createdAt: now,
       updatedAt: now,
     };

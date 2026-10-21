@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthContext, requireUser } from "@/lib/api";
+import { serializeUpvote, upvoteInclude } from "@/lib/idea-upvotes";
 import { callerInProject } from "@/lib/projects";
 import { prisma } from "@/lib/prisma";
 import { goalUpdateSchema } from "@/lib/schemas/goals";
@@ -28,6 +29,7 @@ export async function GET(
             select: { id: true, name: true, speciality: true, lastActiveAt: true, owner: { select: { name: true } } },
           },
           acceptedBy: { select: { id: true, name: true, email: true } },
+          upvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },
           tasks: {
             select: {
               id: true,
@@ -48,9 +50,10 @@ export async function GET(
     return NextResponse.json({ error: "Goal not found" }, { status: 404 });
   }
 
-  const acceptedWorkstreams = goal.workstreams.filter((ws) => ws.status === "accepted");
-  const pendingIdeas = goal.workstreams.filter((ws) => ws.status === "proposed");
-  const rejectedIdeas = goal.workstreams.filter((ws) => ws.status === "rejected");
+  const workstreams = goal.workstreams.map((ws) => ({ ...ws, upvotes: ws.upvotes.map(serializeUpvote) }));
+  const acceptedWorkstreams = workstreams.filter((ws) => ws.status === "accepted");
+  const pendingIdeas = workstreams.filter((ws) => ws.status === "proposed");
+  const rejectedIdeas = workstreams.filter((ws) => ws.status === "rejected");
 
   return NextResponse.json({
     id: goal.id,

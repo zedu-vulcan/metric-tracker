@@ -73,7 +73,7 @@ type RawLedgerRow = {
   created_at: Date;
 };
 
-const LEDGER_COLUMNS = Prisma.sql`id, user_id, agent_id, project_id, amount, reason, source_type, source_id, idempotency_key, granted_by_user_id, note, created_at`;
+const LEDGER_COLUMNS = Prisma.sql`id, user_id, agent_id, project_id, amount::float8 AS amount, reason, source_type, source_id, idempotency_key, granted_by_user_id, note, created_at`;
 
 function toLedgerEntry(raw: RawLedgerRow): LedgerEntry {
   return {
@@ -138,7 +138,7 @@ export function prismaScoreboardStore(client: PointsSqlClient, projectId: string
         amount: number;
         enabled: boolean;
         weekly_cap: number | null;
-      }[]>`SELECT rule_key, amount, enabled, weekly_cap FROM point_rules WHERE project_id = ${projectId}`;
+      }[]>`SELECT rule_key, amount::float8 AS amount, enabled, weekly_cap FROM point_rules WHERE project_id = ${projectId}`;
       return rows.map((row) => ({
         ruleKey: row.rule_key,
         amount: row.amount,
@@ -182,7 +182,7 @@ export function prismaScoreboardStore(client: PointsSqlClient, projectId: string
 
     async sumLedgerForUser(userId) {
       const rows = await client.$queryRaw<{ total: number }[]>`
-        SELECT COALESCE(SUM(amount), 0)::int AS total FROM points_ledger WHERE project_id = ${projectId} AND user_id = ${userId}`;
+        SELECT COALESCE(SUM(amount), 0)::float8 AS total FROM points_ledger WHERE project_id = ${projectId} AND user_id = ${userId}`;
       return rows[0]?.total ?? 0;
     },
   };

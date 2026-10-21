@@ -26,6 +26,7 @@ export const POINT_REASONS = [
   "task_approved",
   "review_submitted",
   "idea_accepted",
+  "idea_upvoted",
   "task_proposal_accepted",
   "manual_adjustment",
   "reversal",
@@ -37,6 +38,7 @@ export const REASON_LABELS: Record<PointReason, string> = {
   task_approved: "Task approved",
   review_submitted: "Review submitted",
   idea_accepted: "Idea accepted",
+  idea_upvoted: "Idea upvoted",
   task_proposal_accepted: "Task proposal accepted",
   manual_adjustment: "Manual adjustment",
   reversal: "Reversal",
@@ -107,7 +109,8 @@ export type PointRule = {
 /** Award rules every new project starts with. Each review pays 5 (decision 20 Oct 2026). */
 export const DEFAULT_POINT_RULES: PointRule[] = [
   { ruleKey: "review_submitted", amount: 5, enabled: true, weeklyCap: null },
-  { ruleKey: "idea_accepted", amount: 5, enabled: false, weeklyCap: null },
+  { ruleKey: "idea_accepted", amount: 2, enabled: true, weeklyCap: null },
+  { ruleKey: "idea_upvoted", amount: 0.5, enabled: true, weeklyCap: null },
   { ruleKey: "task_proposal_accepted", amount: 5, enabled: false, weeklyCap: null },
 ];
 
@@ -239,7 +242,7 @@ export function breakdownFor(entries: LedgerEntry[], range: WeekRange, userId: s
   return {
     tasks: sum("task_approved"),
     reviews: sum("review_submitted"),
-    ideas: sum("idea_accepted") + sum("task_proposal_accepted"),
+    ideas: sum("idea_accepted") + sum("idea_upvoted") + sum("task_proposal_accepted"),
     adjustments: sum("manual_adjustment") + sum("reversal"),
   };
 }

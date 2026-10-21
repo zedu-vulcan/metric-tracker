@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api";
+import { payIdeaAccepted } from "@/lib/idea-upvotes";
 import { ideaInclude, toIdeaItem } from "@/lib/ideas";
 import { ideaItemSchema } from "@/lib/schemas/ideas";
 import type { z } from "@/lib/zod";
@@ -38,9 +39,14 @@ export async function POST(
   }
 
   // The WHERE clause re-tests the status, so a concurrent accept/reject cannot be overwritten.
-  const result = await prisma.workstream.updateMany({
-    where: { id, status: "proposed" },
-    data: { status: "accepted", acceptedById: userId },
+  // Accepting pays the proposer's owner in the same transaction.
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.workstream.updateMany({
+      where: { id, status: "proposed" },
+      data: { status: "accepted", acceptedById: userId },
+    });
+    if (updated.count === 1) await payIdeaAccepted(tx, id);
+    return updated;
   });
 
   if (result.count === 0) {

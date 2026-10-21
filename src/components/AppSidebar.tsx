@@ -2,15 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { ChevronLeftIcon } from "lucide-react";
-import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
-import { useProject, type CurrentProject } from "@/components/projects/ProjectProvider";
+import { useProject } from "@/components/projects/ProjectProvider";
 import { DashboardSidebarNav } from "@/components/SidebarNav";
 import { BrandMark, Wordmark } from "@/components/Wordmark";
 import { cn } from "@/lib/utils";
 
 const COLLAPSED_KEY = "zedu-amp:sidebar-collapsed";
 
-export function AppSidebar({ projects }: { projects: CurrentProject[] }) {
+export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { href } = useProject();
 
@@ -60,7 +59,6 @@ export function AppSidebar({ projects }: { projects: CurrentProject[] }) {
         </button>
       </div>
 
-      <ProjectSwitcher projects={projects} collapsed={collapsed} />
       <DashboardSidebarNav collapsed={collapsed} />
     </aside>
   );

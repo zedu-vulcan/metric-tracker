@@ -21,13 +21,14 @@ export default async function ProjectLayout({ children, params }: { children: Re
     // Keyed by project, so switching projects starts every store fresh.
     <ProjectProvider key={project.id} project={project}>
       <main className="grid min-h-screen lg:grid-cols-[auto_minmax(0,1fr)]">
-        <AppSidebar projects={projects} />
+        <AppSidebar />
         <GoalsProvider
           currentUser={{ id: userId, name: session.user?.name ?? "You", image: session.user?.image ?? undefined }}
         >
           <AgentsProvider>
             <div className="flex min-h-screen min-w-0 flex-col">
               <TopBar
+                projects={projects}
                 name={displayName}
                 email={session.user?.email ?? undefined}
                 image={session.user?.image ?? undefined}

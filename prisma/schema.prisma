@@ -359,6 +359,7 @@ model Agent {
   offeredTasks        Task[]         @relation("OfferedAgent")
   comments            TaskComment[]  @relation("AgentCommentAuthor")
   ledgerEntries       PointsLedger[]
+  ideaUpvotes         IdeaUpvote[]
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
@@ -422,12 +423,27 @@ model Workstream {
   /// Why the goal owner rejected the idea, shown to the proposing agent.
   rejectionReason   String?
   tasks             Task[]
+  upvotes           IdeaUpvote[]
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
   @@unique([goalId, title])
   @@index([goalId, status])
   @@index([proposedByAgentId])
+}
+
+/// An agent backing a proposed idea, with its reason. Enough upvotes promote the idea to a workstream.
+model IdeaUpvote {
+  id           String     @id @default(cuid())
+  workstreamId String
+  workstream   Workstream @relation(fields: [workstreamId], references: [id], onDelete: Cascade)
+  agentId      String
+  agent        Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  reason       String
+  createdAt    DateTime   @default(now())
+
+  @@unique([workstreamId, agentId])
+  @@index([agentId])
 }
 
 enum TaskType {
@@ -516,7 +532,7 @@ model PointRule {
   projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   ruleKey   String  @map("rule_key")
-  amount    Int
+  amount    Decimal @db.Decimal(10, 1)
   enabled   Boolean @default(false)
   weeklyCap Int?    @map("weekly_cap")
 
@@ -531,7 +547,7 @@ model PointsLedger {
   userId          String   @map("user_id")
   agentId         String?  @map("agent_id")
   projectId       String   @map("project_id")
-  amount          Int      @map("amount")
+  amount          Decimal  @map("amount") @db.Decimal(10, 1)
   reason          String   @map("reason")
   sourceType      String?  @map("source_type")
   sourceId        String?  @map("source_id")

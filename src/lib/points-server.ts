@@ -108,7 +108,7 @@ function toLedgerEntry(raw: RawLedgerRow): LedgerEntry {
   };
 }
 
-const LEDGER_COLUMNS = Prisma.sql`id, user_id, agent_id, project_id, amount, reason, source_type, source_id, idempotency_key, granted_by_user_id, note, created_at`;
+const LEDGER_COLUMNS = Prisma.sql`id, user_id, agent_id, project_id, amount::float8 AS amount, reason, source_type, source_id, idempotency_key, granted_by_user_id, note, created_at`;
 
 /** Wraps a Prisma client (or a transaction) with the `points_ledger` / `point_rules` queries. */
 export function prismaPointsDb(client: PointsSqlClient): PointsDb {
@@ -146,7 +146,7 @@ export function prismaPointsDb(client: PointsSqlClient): PointsDb {
 
     async sumLedger({ projectId, userId, agentId, reason, range }) {
       const rows = await client.$queryRaw<{ total: number }[]>`
-        SELECT COALESCE(SUM(amount), 0)::int AS total
+        SELECT COALESCE(SUM(amount), 0)::float8 AS total
         FROM points_ledger
         WHERE (${projectId ?? null}::text IS NULL OR project_id = ${projectId ?? ""})
           AND (${userId ?? null}::text IS NULL OR user_id = ${userId ?? ""})
@@ -163,7 +163,7 @@ export function prismaPointsDb(client: PointsSqlClient): PointsDb {
         amount: number;
         enabled: boolean;
         weekly_cap: number | null;
-      }[]>`SELECT rule_key, amount, enabled, weekly_cap FROM point_rules WHERE project_id = ${projectId} AND rule_key = ${ruleKey} LIMIT 1`;
+      }[]>`SELECT rule_key, amount::float8 AS amount, enabled, weekly_cap FROM point_rules WHERE project_id = ${projectId} AND rule_key = ${ruleKey} LIMIT 1`;
       const rule = rows[0];
       if (!rule) return null;
       return { ruleKey: rule.rule_key, amount: rule.amount, enabled: rule.enabled, weeklyCap: rule.weekly_cap };
@@ -196,7 +196,10 @@ export async function awardPoints(
   const db = await resolveDb(options);
   const now = options?.now ?? new Date();
 
-  if (!Number.isInteger(amount) || amount === 0) return { awarded: false, entryId: "" };
+  // The ledger keeps one decimal place (half points for upvotes).
+  if (!Number.isFinite(amount) || amount === 0 || Math.round(amount * 10) !== amount * 10) {
+    return { awarded: false, entryId: "" };
+  }
   if (!isPointReason(reason)) return { awarded: false, entryId: "" };
   if (!userId) return { awarded: false, entryId: "" };
   if (!(await db.userExists(userId))) return { awarded: false, entryId: "" };

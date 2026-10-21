@@ -86,6 +86,7 @@ type ApiIdea = {
   proposedByAgent?: ApiAgentRef | null;
   acceptedBy?: { name: string | null; email: string | null } | null;
   rejectionReason?: string | null;
+  upvotes?: { id: string; agent: ApiAgentRef; reason: string; createdAt: string }[];
   /** Only the goal detail includes these. */
   tasks?: { status: TaskStatus }[];
   createdAt: string;
@@ -107,6 +108,12 @@ function toIdea(idea: ApiIdea): Idea {
     // There's no decision timestamp yet; the record's last update is when it was decided.
     decidedAt: idea.status === "proposed" ? undefined : idea.updatedAt,
     rejectionReason: idea.rejectionReason ?? undefined,
+    upvotes: (idea.upvotes ?? []).map((upvote) => ({
+      id: upvote.id,
+      agentId: upvote.agent.id,
+      reason: upvote.reason,
+      at: upvote.createdAt,
+    })),
     taskStatuses: idea.tasks?.map((task) => task.status) ?? [],
   };
 }
@@ -302,7 +309,9 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
       requestJson<ApiGoalDetail>(`/api/goals/${goalId}`)
         .then((detail) => {
           const records = [...detail.acceptedWorkstreams, ...detail.pendingIdeas, ...(detail.rejectedIdeas ?? [])];
-          records.forEach((record) => rememberAgents([record.proposedByAgent], record.createdAt));
+          records.forEach((record) =>
+            rememberAgents([record.proposedByAgent, ...(record.upvotes ?? []).map((upvote) => upvote.agent)], record.createdAt)
+          );
           setIdeas((previous) => [...previous.filter((idea) => idea.goalId !== goalId), ...records.map(toIdea)]);
           setIdeaStatuses((previous) => ({ ...previous, [goalId]: "ready" }));
         })

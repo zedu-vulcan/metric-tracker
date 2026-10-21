@@ -42,6 +42,11 @@ export type Agent = {
 export type IdeaStatus = "proposed" | "accepted" | "rejected";
 
 /** An idea an agent proposed under a goal. Once accepted it is a workstream, and tasks are created inside it. */
+export type IdeaUpvote = { id: string; agentId: string; reason: string; at: string };
+
+/** Upvotes from other owners' agents that make an idea a workstream (matches the API). */
+export const UPVOTES_TO_PROMOTE = 5;
+
 export type Idea = {
   id: string;
   goalId: string;
@@ -53,6 +58,8 @@ export type Idea = {
   decidedBy?: string;
   decidedAt?: string;
   rejectionReason?: string;
+  /** Agents backing the idea, oldest first. Enough of them promote it to a workstream. */
+  upvotes: IdeaUpvote[];
   /** Statuses of the workstream's tasks, from the goal detail, for progress summaries. */
   taskStatuses: TaskStatus[];
 };

@@ -93,6 +93,8 @@ interface Fixtures {
   agentC: Actor; // reviewer
   agentD: Actor; // reviewer
   agentE: Actor; // reviewer, and the worker in the revision-limit case
+  agentF: Actor; // the fifth owner's agent, for idea upvotes
+  agentA2: Actor; // shares agentA's owner
   outsider: Actor; // an agent in another project
 }
 
@@ -313,13 +315,13 @@ before(
 
     const mkUser = (label: string) =>
       prisma.user.create({ data: { email: `lifecycle-${label}-${RUN_ID}@test.local`, name: `E2E ${label}` } });
-    const [owner, ownerB, ownerC, ownerD, ownerE, stranger] = await Promise.all(
-      ["owner", "owner-b", "owner-c", "owner-d", "owner-e", "stranger"].map(mkUser),
+    const [owner, ownerB, ownerC, ownerD, ownerE, ownerF, stranger] = await Promise.all(
+      ["owner", "owner-b", "owner-c", "owner-d", "owner-e", "owner-f", "stranger"].map(mkUser),
     );
 
     const project = await createProject(owner.id, `E2E ${RUN_ID}`);
     const elsewhere = await createProject(stranger.id, `E2E elsewhere ${RUN_ID}`);
-    for (const member of [ownerB, ownerC, ownerD, ownerE]) await joinProject(member.id, project.id);
+    for (const member of [ownerB, ownerC, ownerD, ownerE, ownerF]) await joinProject(member.id, project.id);
 
     const sessionToken = randomBytes(32).toString("hex");
     await prisma.session.create({
@@ -342,6 +344,8 @@ before(
       agentC: await mkAgent("c", ownerC.id),
       agentD: await mkAgent("d", ownerD.id),
       agentE: await mkAgent("e", ownerE.id),
+      agentF: await mkAgent("f", ownerF.id),
+      agentA2: await mkAgent("a2", owner.id),
       outsider: await mkAgent("x", stranger.id, elsewhere.id),
     };
 
@@ -434,6 +438,45 @@ describe("full lifecycle: goal → idea → workstream → task → bid → deli
 
     const accepted = await call("POST", `/api/ideas/${ctx.workstreamId}/accept`);
     assert.equal(accepted.status, 200, errorText(accepted));
+
+    const pay = await ledger(`idea:${ctx.workstreamId}`);
+    assert.equal(pay?.userId, ctx.fx!.agentA.ownerId, "an accepted idea pays its proposer's owner");
+    assert.equal(Number(pay?.amount), 2);
+  });
+
+  it("five upvotes from other owners' agents promote an idea, paying half a point each", async () => {
+    const proposed = await call("POST", `/api/goals/${ctx.goalId}/ideas`, {
+      agent: ctx.fx!.agentA,
+      body: { title: `E2E Upvoted idea ${RUN_ID}` },
+    });
+    assert.equal(proposed.status, 201, errorText(proposed));
+    const ideaId = asObject(proposed).id as string;
+    const upvote = (agent: Actor, reason = "This targets the pages that fail the most checks.") =>
+      call("POST", `/api/ideas/${ideaId}/upvotes`, { agent, body: { reason } });
+
+    assert.equal((await upvote(ctx.fx!.agentA)).status, 403, "not your own idea");
+    assert.equal((await upvote(ctx.fx!.agentA2)).status, 403, "not an idea from your owner's agent");
+    assert.equal((await upvote(ctx.fx!.outsider)).status, 404, "not an idea in another project");
+    assert.equal((await upvote(ctx.fx!.agentB, "short")).status, 400, "a reason is required");
+
+    const voters = [ctx.fx!.agentB, ctx.fx!.agentC, ctx.fx!.agentD, ctx.fx!.agentE, ctx.fx!.agentF];
+    for (const [index, voter] of voters.entries()) {
+      const res = await upvote(voter);
+      assert.equal(res.status, 201, errorText(res));
+      const body = asObject(res);
+      assert.equal(body.promoted, index === voters.length - 1);
+      const pay = await ledger(`upvote:${(body.upvote as Json).id}`);
+      assert.equal(pay?.userId, voter.ownerId);
+      assert.equal(Number(pay?.amount), 0.5);
+      if (index === 0) assert.equal((await upvote(voter)).status, 409, "once per idea");
+    }
+
+    const goal = asObject(await call("GET", `/api/goals/${ctx.goalId}`));
+    const promoted = (goal.acceptedWorkstreams as Json[]).find((w) => w.id === ideaId);
+    assert.ok(promoted, "the idea is now a workstream");
+    assert.equal((promoted.upvotes as Json[]).length, 5);
+    assert.equal(Number((await ledger(`idea:${ideaId}`))?.amount), 2, "the proposer is paid on promotion");
+    assert.equal((await upvote(ctx.fx!.agentB)).status, 400, "accepted ideas take no upvotes");
   });
 
   it("step 3 — an agent creates a task with one of the project's task types", async () => {
@@ -482,7 +525,7 @@ describe("full lifecycle: goal → idea → workstream → task → bid → deli
 
     const pay = await ledger(`review:${first.id}`);
     assert.equal(pay?.userId, ctx.fx!.agentC.ownerId, "each review pays its reviewer's owner");
-    assert.equal(pay?.amount, 5);
+    assert.equal(Number(pay?.amount), 5);
 
     const inbox = await call("GET", "/api/me/inbox", { agent: ctx.fx!.agentB });
     assert.equal(inbox.status, 200, errorText(inbox));
@@ -503,13 +546,13 @@ describe("full lifecycle: goal → idea → workstream → task → bid → deli
     const payout = await ledger(`task:${ctx.taskId}`);
     assert.equal(payout?.userId, ctx.fx!.agentB.ownerId);
     assert.equal(payout?.agentId, ctx.fx!.agentB.id);
-    assert.equal(payout?.amount, 40, "the content task type's points");
+    assert.equal(Number(payout?.amount), 40, "the content task type's points");
     assert.equal(payout?.projectId, ctx.fx!.projectId);
 
     const scoreboard = await call("GET", "/api/scoreboard");
     assert.equal(scoreboard.status, 200, errorText(scoreboard));
     const row = (asObject(scoreboard).rows as Json[]).find((r) => r.user_id === ctx.fx!.agentB.ownerId);
-    assert.equal(row?.points, 40);
+    assert.equal(row?.points, 40.5, "the task payout plus half a point for an upvote");
   });
 });
 
