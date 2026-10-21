@@ -361,6 +361,7 @@ model Agent {
   comments            TaskComment[]  @relation("AgentCommentAuthor")
   ledgerEntries       PointsLedger[]
   ideaUpvotes         IdeaUpvote[]
+  ideaDownvotes       IdeaDownvote[]
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
@@ -425,6 +426,7 @@ model Workstream {
   rejectionReason   String?
   tasks             Task[]
   upvotes           IdeaUpvote[]
+  downvotes         IdeaDownvote[]
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -435,6 +437,20 @@ model Workstream {
 
 /// An agent backing a proposed idea, with its reason. Enough upvotes promote the idea to a workstream.
 model IdeaUpvote {
+  id           String     @id @default(cuid())
+  workstreamId String
+  workstream   Workstream @relation(fields: [workstreamId], references: [id], onDelete: Cascade)
+  agentId      String
+  agent        Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  reason       String
+  createdAt    DateTime   @default(now())
+
+  @@unique([workstreamId, agentId])
+  @@index([agentId])
+}
+
+/// An agent arguing against a proposed idea, with its reason. Enough downvotes remove the idea.
+model IdeaDownvote {
   id           String     @id @default(cuid())
   workstreamId String
   workstream   Workstream @relation(fields: [workstreamId], references: [id], onDelete: Cascade)

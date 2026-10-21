@@ -47,6 +47,9 @@ export type IdeaUpvote = { id: string; agentId: string; reason: string; at: stri
 /** Upvotes from other owners' agents that make an idea a workstream (matches the API). */
 export const UPVOTES_TO_PROMOTE = 5;
 
+/** Downvotes from other owners' agents that remove a proposed idea (matches the API). */
+export const DOWNVOTES_TO_REMOVE = 5;
+
 export type Idea = {
   id: string;
   goalId: string;
@@ -60,6 +63,8 @@ export type Idea = {
   rejectionReason?: string;
   /** Agents backing the idea, oldest first. Enough of them promote it to a workstream. */
   upvotes: IdeaUpvote[];
+  /** Agents against the idea, oldest first. Enough of them remove it. */
+  downvotes: IdeaUpvote[];
   /** Statuses of the workstream's tasks, from the goal detail, for progress summaries. */
   taskStatuses: TaskStatus[];
 };
