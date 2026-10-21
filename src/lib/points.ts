@@ -24,6 +24,8 @@ export const ACTIVE_TASK_LIMIT = 2;
 
 export const POINT_REASONS = [
   "task_approved",
+  "goal_task_approved",
+  "idea_task_approved",
   "review_submitted",
   "idea_accepted",
   "idea_upvoted",
@@ -36,6 +38,8 @@ export type PointReason = (typeof POINT_REASONS)[number];
 
 export const REASON_LABELS: Record<PointReason, string> = {
   task_approved: "Task approved",
+  goal_task_approved: "Task on your goal approved",
+  idea_task_approved: "Task from your idea approved",
   review_submitted: "Review submitted",
   idea_accepted: "Idea accepted",
   idea_upvoted: "Idea upvoted",
@@ -112,6 +116,9 @@ export const DEFAULT_POINT_RULES: PointRule[] = [
   { ruleKey: "idea_accepted", amount: 2, enabled: true, weeklyCap: null },
   { ruleKey: "idea_upvoted", amount: 0.5, enabled: true, weeklyCap: null },
   { ruleKey: "task_proposal_accepted", amount: 5, enabled: false, weeklyCap: null },
+  // These two are percentages of the approved task's points, not fixed amounts.
+  { ruleKey: "goal_task_approved", amount: 5, enabled: true, weeklyCap: null },
+  { ruleKey: "idea_task_approved", amount: 8, enabled: true, weeklyCap: null },
 ];
 
 /** Stored as a `point_rules` row so each project can set its own; `amount` is the target. */
@@ -156,6 +163,15 @@ export function validateTaskType(input: { points: number; maxPoints: number }): 
     errors.push("Max points must be at least the default points.");
   }
   return errors;
+}
+
+/** Only the first reviews on a task pay their reviewers, so review pay can't outgrow the task. */
+export const MAX_PAID_REVIEWS_PER_TASK = 4;
+
+/** A percentage share of a task's points, rounded to the ledger's one decimal place. */
+export function shareOfTaskPoints(points: number, percent: number): number {
+  if (!Number.isFinite(points) || !Number.isFinite(percent) || points <= 0 || percent <= 0) return 0;
+  return Math.round((points * percent) / 10) / 10;
 }
 
 /** A task pays its snapshot, clamped to the type's cap. Snapshot is fixed at "open" time. */
@@ -240,9 +256,9 @@ export function breakdownFor(entries: LedgerEntry[], range: WeekRange, userId: s
   const sum = (reason: PointReason) =>
     own.filter((entry) => entry.reason === reason).reduce((total, entry) => total + entry.amount, 0);
   return {
-    tasks: sum("task_approved"),
+    tasks: sum("task_approved") + sum("goal_task_approved"),
     reviews: sum("review_submitted"),
-    ideas: sum("idea_accepted") + sum("idea_upvoted") + sum("task_proposal_accepted"),
+    ideas: sum("idea_accepted") + sum("idea_upvoted") + sum("task_proposal_accepted") + sum("idea_task_approved"),
     adjustments: sum("manual_adjustment") + sum("reversal"),
   };
 }

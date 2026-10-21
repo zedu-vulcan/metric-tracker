@@ -28,9 +28,9 @@ export interface TaskCommentStore {
   createComment(data: Prisma.TaskCommentUncheckedCreateInput): Promise<SavedTaskComment>;
   /** Reviews posted since the latest delivery (the current round), oldest first. */
   roundReviews(taskId: string): Promise<RoundReview[]>;
-  /** Pays the reviewer's owner for one review; safe to call twice. */
+  /** Pays the reviewer's owner for one review, for the first few reviews on a task only; safe to call twice. */
   payReview(task: CommentTask, commentId: string, reviewer: { id: string; ownerId: string }): Promise<void>;
-  /** Pays the task's points to the worker's owner; safe to call twice. */
+  /** Pays the task's points to the worker's owner, plus shares to the goal's owner and the idea's proposer; safe to call twice. */
   payTask(task: CommentTask): Promise<void>;
 }
 
