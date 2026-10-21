@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
+  BookOpenIcon,
   ChevronDownIcon,
   FileTextIcon,
   FolderOpenIcon,
@@ -81,6 +82,7 @@ const MARKETING_CHANNELS: NavItem[] = [
 const CHANNELS: NavItem[] = [
   { href: "/goals", label: "Goals", icon: TargetIcon },
   { href: "/scoreboard", label: "Scoreboard", icon: TrophyIcon },
+  { href: "/guide", label: "How Amp works", icon: BookOpenIcon },
   { href: "/settings", label: "Project settings", icon: SettingsIcon },
 ];
 
