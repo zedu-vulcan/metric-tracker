@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,8 +14,9 @@ import {
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { GOAL_TYPES } from "./goal-model";
+import { GOAL_TYPES, type GoalType } from "./goal-model";
 import type { NewGoal } from "./GoalsProvider";
 
 export function GoalFormDialog({
@@ -24,7 +26,7 @@ export function GoalFormDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (goal: NewGoal) => void;
+  onCreate: (goal: NewGoal) => Promise<void>;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -35,25 +37,34 @@ export function GoalFormDialog({
   );
 }
 
-function GoalForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (goal: NewGoal) => void }) {
+function GoalForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (goal: NewGoal) => Promise<void> }) {
   const [title, setTitle] = useState("");
-  const [type, setType] = useState("");
+  const [type, setType] = useState<GoalType | "">("");
   const [description, setDescription] = useState("");
   const [titleError, setTitleError] = useState("");
   const [typeError, setTypeError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const onSubmit = (event: FormEvent) => {
+  const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const missingTitle = !title.trim();
     setTitleError(missingTitle ? "Give the goal a title." : "");
     setTypeError(type ? "" : "Choose a goal type.");
     if (missingTitle || !type) return;
-    onCreate({ title: title.trim(), type, description: description.trim() });
-    onCancel();
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onCreate({ title: title.trim(), type, description: description.trim() });
+      onCancel();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Couldn't create the goal. Try again.");
+      setSaving(false);
+    }
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+    <form onSubmit={(event) => void onSubmit(event)} className="flex min-h-0 flex-1 flex-col">
       <DialogHeader className="shrink-0 gap-1 px-6 pt-6 pb-4">
         <DialogTitle className="text-xl font-extrabold tracking-[-0.03em]">New goal</DialogTitle>
         <DialogDescription>
@@ -63,6 +74,11 @@ function GoalForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (goa
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pt-1 pb-6">
         <FieldGroup className="gap-4">
+          {saveError && (
+            <Alert variant="destructive">
+              <AlertDescription>{saveError}</AlertDescription>
+            </Alert>
+          )}
           <Field data-invalid={Boolean(titleError)}>
             <FieldLabel htmlFor="goal-title">Goal title</FieldLabel>
             <Input
@@ -88,7 +104,7 @@ function GoalForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (goa
               className="w-full"
               value={type}
               onChange={(event) => {
-                setType(event.target.value);
+                setType(event.target.value as GoalType);
                 setTypeError("");
               }}
               aria-invalid={Boolean(typeError)}
@@ -97,8 +113,8 @@ function GoalForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (goa
                 Choose a type
               </NativeSelectOption>
               {GOAL_TYPES.map((option) => (
-                <NativeSelectOption key={option} value={option}>
-                  {option}
+                <NativeSelectOption key={option.value} value={option.value}>
+                  {option.label}
                 </NativeSelectOption>
               ))}
             </NativeSelect>
@@ -123,7 +139,10 @@ function GoalForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (goa
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit">Create goal</Button>
+        <Button type="submit" disabled={saving}>
+          {saving && <Spinner data-icon="inline-start" />}
+          Create goal
+        </Button>
       </DialogFooter>
     </form>
   );

@@ -25,7 +25,7 @@ export function NewGoalButton() {
       <GoalFormDialog
         open={open}
         onOpenChange={setOpen}
-        onCreate={(input) => router.push(`/dashboard/goals/${createGoal(input).id}`)}
+        onCreate={async (input) => router.push(`/dashboard/goals/${(await createGoal(input)).id}`)}
       />
     </>
   );

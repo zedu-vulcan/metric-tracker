@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { shortDate, summarizeGoal, summarizeTasks, type Agent, type Idea } from "./goal-model";
+import { goalTypeLabel, shortDate, summarizeGoal, summarizeTasks, type Agent, type Idea } from "./goal-model";
 import {
   BackLink,
+  GoalPageLoading,
   ByAgent,
   CardStack,
   ColorTab,
@@ -39,7 +40,7 @@ const KINDS = {
 } satisfies Record<string, ItemStyle>;
 
 export function GoalDetailView({ goalId }: { goalId: string }) {
-  const { goals, ideas, tasks, currentUser, agentFor, approveIdea, rejectIdea } = useGoals();
+  const { goals, goalsLoading, ideas, tasks, currentUser, agentFor, approveIdea, rejectIdea } = useGoals();
   const [rejecting, setRejecting] = useState<Idea | null>(null);
 
   const goal = goals.find((candidate) => candidate.id === goalId);
@@ -51,11 +52,13 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
     [ideas, goalId]
   );
 
+  if (!goal && goalsLoading) return <GoalPageLoading />;
+
   if (!goal) {
     return (
       <NotFoundState
         title="Goal not found"
-        description="It may have been created in another session. Demo goals reset on refresh."
+        description="It may have been deleted, or the link is wrong."
         icon={TargetIcon}
         backHref="/dashboard/goals"
         backLabel="Back to goals"
@@ -79,7 +82,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
           <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
             <OwnerAvatar name={goal.ownerName} image={isOwner ? currentUser.image : undefined} />
             <span className="font-semibold text-foreground">{isOwner ? "Your goal" : `${goal.ownerName}'s goal`}</span>·
-            <span>{goal.type}</span>·<span>created {shortDate.format(new Date(goal.createdAt))}</span>
+            <span>{goalTypeLabel(goal.type)}</span>·<span>created {shortDate.format(new Date(goal.createdAt))}</span>
           </p>
           <div className="w-full lg:max-w-md">
             <TaskProgress label={goal.title} done={summary.approvedTasks} total={summary.totalTasks} />

@@ -1,12 +1,26 @@
-/** Placeholder list. Goal types will be managed by a platform admin, so the UI treats a type as plain data. */
-export const GOAL_TYPES = ["SEO", "Content", "Research", "Lead hunting", "Press"];
+import type { goalTypeValues } from "@/lib/schemas/goals";
+
+export type GoalType = (typeof goalTypeValues)[number];
+
+/** The goal types the API accepts, with their display labels. */
+export const GOAL_TYPES: { value: GoalType; label: string }[] = [
+  { value: "seo", label: "SEO" },
+  { value: "content", label: "Content" },
+  { value: "marketing", label: "Marketing" },
+  { value: "research", label: "Research" },
+  { value: "outreach", label: "Outreach" },
+];
+
+export function goalTypeLabel(type: string) {
+  return GOAL_TYPES.find((option) => option.value === type)?.label ?? type;
+}
 
 export type DemoUser = { id: string; name: string; image?: string };
 
 export type Goal = {
   id: string;
   title: string;
-  type: string;
+  type: GoalType;
   description: string;
   ownerId: string;
   ownerName: string;
@@ -225,48 +239,6 @@ export const DEMO_AGENTS: Agent[] = [
     lastActiveAt: "2026-10-18T16:45:00.000Z",
   },
 ];
-
-/** The first goal belongs to whoever is signed in, so the demo shows both the owner's and a viewer's view. */
-export function demoGoals(currentUser: DemoUser): Goal[] {
-  return [
-    {
-      id: "goal_seo",
-      title: "Make Zedu SEO compliant",
-      type: "SEO",
-      description: "Fix on-page issues across the marketing site so every page passes the SEO checker.",
-      ownerId: currentUser.id,
-      ownerName: currentUser.name,
-      createdAt: "2026-10-14T09:00:00.000Z",
-    },
-    {
-      id: "goal_content",
-      title: "Get really good at content production",
-      type: "Content",
-      description: "Publish a steady stream of articles about how travel and work are changing.",
-      ownerId: "user_tunde",
-      ownerName: "Tunde Bello",
-      createdAt: "2026-10-15T11:30:00.000Z",
-    },
-    {
-      id: "goal_leads",
-      title: "Build a bootcamp contacts list",
-      type: "Lead hunting",
-      description: "Find coding bootcamps and their programme leads so we can pitch Zedu to them.",
-      ownerId: "user_ada",
-      ownerName: "Ada Okafor",
-      createdAt: "2026-10-17T08:15:00.000Z",
-    },
-    {
-      id: "goal_press",
-      title: "Land Zedu in three tech publications",
-      type: "Press",
-      description: "Pitch launch stories to African tech outlets and track who responds.",
-      ownerId: "user_chioma",
-      ownerName: "Chioma Eze",
-      createdAt: "2026-10-19T14:45:00.000Z",
-    },
-  ];
-}
 
 export function demoIdeas(currentUser: DemoUser): Idea[] {
   return [

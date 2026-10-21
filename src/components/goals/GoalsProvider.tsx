@@ -1,17 +1,18 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { requestJson } from "@/lib/request-json";
 import {
   DEMO_AGENTS,
   MAX_REVISIONS,
   OFFER_HOURS,
-  demoGoals,
   demoIdeas,
   demoTasks,
   type Agent,
   type Bid,
   type DemoUser,
   type Goal,
+  type GoalType,
   type Idea,
   type Task,
 } from "./goal-model";
@@ -24,16 +25,44 @@ import {
   type ThreadEntry,
 } from "./thread-model";
 
-export type NewGoal = { title: string; type: string; description: string };
+export type NewGoal = { title: string; type: GoalType; description: string };
+
+/** A goal as `/api/goals` returns it. */
+type ApiGoal = {
+  id: string;
+  title: string;
+  description: string | null;
+  type: GoalType;
+  status: "active" | "completed" | "archived";
+  createdById: string;
+  createdBy?: { id: string; name: string | null; email: string | null };
+  createdAt: string;
+};
+
+function toGoal(goal: ApiGoal): Goal {
+  return {
+    id: goal.id,
+    title: goal.title,
+    type: goal.type,
+    description: goal.description ?? "",
+    ownerId: goal.createdById,
+    ownerName: goal.createdBy?.name ?? goal.createdBy?.email ?? "A teammate",
+    createdAt: goal.createdAt,
+  };
+}
 
 type GoalsContextValue = {
   currentUser: DemoUser;
   goals: Goal[];
+  /** True until the first `/api/goals` response arrives. */
+  goalsLoading: boolean;
+  goalsError: boolean;
+  reloadGoals: () => void;
   ideas: Idea[];
   tasks: Task[];
   bidsFor: (taskId: string) => Bid[];
   agentFor: (agentId: string) => Agent | undefined;
-  createGoal: (input: NewGoal) => Goal;
+  createGoal: (input: NewGoal) => Promise<Goal>;
   approveIdea: (ideaId: string) => void;
   rejectIdea: (ideaId: string, reason: string) => void;
   sendOffer: (taskId: string, agentId: string) => void;
@@ -50,9 +79,14 @@ const GoalsContext = createContext<GoalsContextValue | undefined>(undefined);
 
 const EMPTY_THREAD: ThreadEntry[] = [];
 
-/** Demo-only store for the Goals section, mounted by the dashboard layout so the top bar can create goals. */
+/**
+ * Store for the Goals section, mounted by the dashboard layout so the top bar can create goals.
+ * Goals come from `/api/goals`; ideas, tasks and threads are still demo data.
+ */
 export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser; children: React.ReactNode }) {
-  const [goals, setGoals] = useState(() => demoGoals(currentUser));
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goalsLoading, setGoalsLoading] = useState(true);
+  const [goalsError, setGoalsError] = useState(false);
   const [ideas, setIdeas] = useState(() => demoIdeas(currentUser));
   const [baseTasks, setBaseTasks] = useState(demoTasks);
   const [threads, setThreads] = useState<Record<string, ThreadEntry[]>>(() =>
@@ -75,20 +109,33 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
     [baseTasks, threads]
   );
 
-  const createGoal = useCallback(
-    (input: NewGoal) => {
-      const goal: Goal = {
-        ...input,
-        id: `goal_${Date.now()}`,
-        ownerId: currentUser.id,
-        ownerName: currentUser.name,
-        createdAt: new Date().toISOString(),
-      };
-      setGoals((previous) => [goal, ...previous]);
-      return goal;
-    },
-    [currentUser]
-  );
+  const reloadGoals = useCallback(() => {
+    requestJson<ApiGoal[]>("/api/goals")
+      .then((next) => {
+        setGoals(next.filter((goal) => goal.status !== "archived").map(toGoal));
+        setGoalsError(false);
+      })
+      .catch(() => setGoalsError(true))
+      .finally(() => setGoalsLoading(false));
+  }, []);
+
+  // Refetching on focus picks up goals teammates created in the meantime.
+  useEffect(() => {
+    reloadGoals();
+    window.addEventListener("focus", reloadGoals);
+    return () => window.removeEventListener("focus", reloadGoals);
+  }, [reloadGoals]);
+
+  const createGoal = useCallback(async (input: NewGoal) => {
+    const goal = toGoal(
+      await requestJson<ApiGoal>("/api/goals", {
+        method: "POST",
+        body: JSON.stringify({ title: input.title, type: input.type, description: input.description || null }),
+      })
+    );
+    setGoals((previous) => [goal, ...previous.filter((candidate) => candidate.id !== goal.id)]);
+    return goal;
+  }, []);
 
   const decide = useCallback(
     (ideaId: string, change: Pick<Idea, "status"> & Partial<Idea>) =>
@@ -208,6 +255,9 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
     () => ({
       currentUser,
       goals,
+      goalsLoading,
+      goalsError,
+      reloadGoals,
       ideas,
       tasks,
       bidsFor: (taskId) =>
@@ -228,7 +278,7 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
       approveTask,
       requestChanges,
     }),
-    [currentUser, goals, ideas, tasks, threads, createGoal, decide, sendOffer, endOffer, approveTask, requestChanges]
+    [currentUser, goals, goalsLoading, goalsError, reloadGoals, ideas, tasks, threads, createGoal, decide, sendOffer, endOffer, approveTask, requestChanges]
   );
 
   return <GoalsContext.Provider value={value}>{children}</GoalsContext.Provider>;

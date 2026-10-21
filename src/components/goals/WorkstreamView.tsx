@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { TASK_STAGES, shortDate, summarizeTasks, taskProgressLine, type Task } from "./goal-model";
 import {
   BackLink,
+  GoalPageLoading,
   CardStack,
   ColorTab,
   EmptyCard,
@@ -24,7 +25,7 @@ import {
 import { useGoals } from "./GoalsProvider";
 
 export function WorkstreamView({ goalId, workstreamId }: { goalId: string; workstreamId: string }) {
-  const { goals, ideas, tasks, currentUser, agentFor, bidsFor } = useGoals();
+  const { goals, goalsLoading, ideas, tasks, currentUser, agentFor, bidsFor } = useGoals();
 
   const goal = goals.find((candidate) => candidate.id === goalId);
   const workstream = ideas.find(
@@ -37,6 +38,8 @@ export function WorkstreamView({ goalId, workstreamId }: { goalId: string; works
         .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
     [tasks, workstreamId]
   );
+
+  if (!goal && goalsLoading) return <GoalPageLoading />;
 
   if (!goal || !workstream) {
     return (
