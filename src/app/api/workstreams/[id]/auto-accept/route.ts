@@ -1,20 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { workstreamAutoAcceptSchema } from "@/lib/schemas/workstreams";
-import { authenticateAgentRequest, serializeAutoAcceptResponse } from "@/lib/workstreams";
+import { serializeAutoAcceptResponse } from "@/lib/workstreams";
 
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
-  if (error) {
-    const agent = await authenticateAgentRequest(request);
-    if (agent) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    return error;
-  }
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
+  if (error) return error;
 
   let body: unknown = {};
   const rawText = await request.text();
@@ -37,8 +31,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     );
   }
 
-  const existing = await prisma.workstream.findUnique({
-    where: { id: params.id },
+  const existing = await prisma.workstream.findFirst({
+    where: { id: params.id, goal: { projectId } },
   });
 
   if (!existing) {

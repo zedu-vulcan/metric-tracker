@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { taskTypeUpdateSchema } from "@/lib/schemas/task-types";
 import { prismaTaskTypesStore, taskTypeMutationResponse, updateTaskType } from "@/lib/task-types-server";
 
 export const dynamic = "force-dynamic";
 
-/** Update or archive a task type — platform admins only, enforced server-side. */
+/** Update or archive a task type: project owners and admins only. */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const { session, error } = await requireAuth();
+  const { projectId, user, error } = await requireProjectAccess(request, { allowAgents: false, minimumRole: "admin" });
   if (error) return error;
 
-  const userId = (session.user as { id?: string }).id;
+  const userId = user?.id;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -34,11 +34,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     );
   }
 
-  const store = prismaTaskTypesStore(prisma);
-  if (!(await store.userIsPlatformAdmin(userId))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+  const store = prismaTaskTypesStore(prisma, projectId);
   const result = await updateTaskType(store, params.id, parsed.data, { isAdmin: true, userId });
   return taskTypeMutationResponse(result);
 }

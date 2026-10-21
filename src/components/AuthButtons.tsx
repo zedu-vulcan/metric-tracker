@@ -5,7 +5,8 @@ import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
-export function SignInButton() {
+/** Google sign-in; `callbackUrl` is where to land afterwards, e.g. an invite link. */
+export function SignInButton({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   return (
@@ -15,7 +16,7 @@ export function SignInButton() {
       disabled={isRedirecting}
       onClick={() => {
         setIsRedirecting(true);
-        void signIn("google", { callbackUrl: "/dashboard" });
+        void signIn("google", { callbackUrl });
       }}
     >
       {isRedirecting && <Spinner data-icon="inline-start" />}

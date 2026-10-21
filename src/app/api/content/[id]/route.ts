@@ -1,23 +1,23 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { requireAuth } from "@/lib/api";
 import { dateFromInput, serializeContent } from "@/lib/content";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { z } from "@/lib/zod";
 import { contentUpdateSchema } from "@/lib/schemas/content";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const { session, error } = await requireAuth();
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
-  const item = await prisma.contentItem.findUnique({ where: { id: params.id } });
+  const item = await prisma.contentItem.findFirst({ where: { id: params.id, projectId } });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(serializeContent(item as typeof item & { views: number }));
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const { session, error } = await requireAuth();
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
   let body: unknown;
   try {
@@ -34,7 +34,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     );
   }
 
-  const existing = await prisma.contentItem.findUnique({ where: { id: params.id }, select: { id: true } });
+  const existing = await prisma.contentItem.findFirst({ where: { id: params.id, projectId }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const data = result.data;
@@ -63,10 +63,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json(serializeContent(updated as typeof updated & { views: number }));
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const { session, error } = await requireAuth();
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
-  const existing = await prisma.contentItem.findUnique({ where: { id: params.id }, select: { id: true } });
+  const existing = await prisma.contentItem.findFirst({ where: { id: params.id, projectId }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await prisma.contentItem.delete({ where: { id: existing.id } });

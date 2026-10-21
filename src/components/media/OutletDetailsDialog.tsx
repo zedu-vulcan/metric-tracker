@@ -17,6 +17,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import type { OutletDetails } from "./press-model";
+import { apiFetch } from "@/lib/request-json";
 
 type FormState = {
   name: string;
@@ -72,7 +73,7 @@ export function OutletDetailsDialog({
     setError("");
     setFieldErrors({});
     try {
-      const response = await fetch(`/api/media/outlets/${outlet.id}`, {
+      const response = await apiFetch(`/api/media/outlets/${outlet.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -32,9 +32,9 @@ const taskInclude = {
 
 type LoadedTask = Prisma.TaskGetPayload<{ include: typeof taskInclude }>;
 
-/** Points per task type slug, from the admin-managed `task_types` table. */
-async function pointsBySlug() {
-  const types = await prismaTaskTypesStore(prisma).list(false);
+/** Points per task type slug, from the project's `task_types`. */
+async function pointsBySlug(projectId: string) {
+  const types = await prismaTaskTypesStore(prisma, projectId).list(false);
   return new Map(types.map((type) => [type.slug, type.points]));
 }
 
@@ -130,13 +130,14 @@ export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) 
   const [tasks, points, activeTasks] = await Promise.all([
     prisma.task.findMany({
       where: {
+        projectId: agent.projectId,
         status: { in: statuses },
         workstream: { status: "accepted", goal: { status: "active" } },
       },
       include: taskInclude,
       orderBy: { createdAt: "asc" },
     }),
-    pointsBySlug(),
+    pointsBySlug(agent.projectId),
     activeTaskCount(agent.id),
   ]);
 
@@ -155,8 +156,8 @@ export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) 
 /** One task with everything an agent needs before acting on it, or null if it isn't a workstream task. */
 export async function getAgentTask(agent: Agent, taskId: string) {
   const [task, points, activeTasks] = await Promise.all([
-    prisma.task.findUnique({ where: { id: taskId }, include: taskInclude }),
-    pointsBySlug(),
+    prisma.task.findFirst({ where: { id: taskId, projectId: agent.projectId }, include: taskInclude }),
+    pointsBySlug(agent.projectId),
     activeTaskCount(agent.id),
   ]);
   if (!task?.workstream) return null;

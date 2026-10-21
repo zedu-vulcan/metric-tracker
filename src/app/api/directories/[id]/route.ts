@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
 import {
   dateFromInput,
   displayName,
@@ -11,21 +10,22 @@ import {
   withChecklist,
 } from "@/lib/directories";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { directoryUpdateSchema } from "@/lib/schemas/directories";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
-  const directory = await prisma.directory.findUnique({ where: { id: params.id }, include: withChecklist });
+  const directory = await prisma.directory.findFirst({ where: { id: params.id, projectId }, include: withChecklist });
   if (!directory) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(serializeDirectory(directory));
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   let body: unknown;
@@ -40,7 +40,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: "Validation failed", details: result.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const existing = await prisma.directory.findUnique({ where: { id: params.id } });
+  const existing = await prisma.directory.findFirst({ where: { id: params.id, projectId } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if ((result.data.name ?? existing.name) === "" && (result.data.website ?? existing.website) === "") {
@@ -77,6 +77,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (statusChanged) {
       await tx.directoryActivity.create({
         data: {
+          projectId,
           directoryId: updated.id,
           directoryName: name,
           message: statusMessage(name, nextStatus),
@@ -86,6 +87,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     } else if (listingAdded) {
       await tx.directoryActivity.create({
         data: {
+          projectId,
           directoryId: updated.id,
           directoryName: name,
           message: `${name} listing link added`,
@@ -99,12 +101,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json(serializeDirectory(directory));
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
-  const existing = await prisma.directory.findUnique({
-    where: { id: params.id },
+  const existing = await prisma.directory.findFirst({
+    where: { id: params.id, projectId },
     select: { id: true, name: true, website: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -112,7 +114,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const name = displayName(existing);
   await prisma.$transaction([
     prisma.directory.delete({ where: { id: existing.id } }),
-    prisma.directoryActivity.create({ data: { directoryName: name, message: `${name} removed from the list` } }),
+    prisma.directoryActivity.create({ data: { projectId, directoryName: name, message: `${name} removed from the list` } }),
   ]);
 
   return new NextResponse(null, { status: 204 });

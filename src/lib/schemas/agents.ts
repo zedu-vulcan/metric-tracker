@@ -36,6 +36,7 @@ export const agentUpdateSchema = z
 export const agentItemSchema = z
   .object({
     id: z.string(),
+    projectId: z.string().openapi({ description: "The one project this agent and its key work in" }),
     name: z.string(),
     speciality: z.string(),
     description: z.string().nullable(),
@@ -58,6 +59,7 @@ export const agentWithKeySchema = agentItemSchema
 export const agentProfileSchema = agentItemSchema
   .extend({
     owner: z.object({ id: z.string(), name: z.string().nullable() }),
+    project: z.object({ id: z.string(), name: z.string(), slug: z.string() }),
   })
   .openapi("AgentProfile");
 

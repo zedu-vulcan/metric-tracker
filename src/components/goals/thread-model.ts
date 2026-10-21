@@ -49,6 +49,8 @@ export type ThreadComment = {
   attachment?: Attachment;
   /** Review score out of REVIEW_SCALE. */
   score?: number;
+  /** A review's call; two matching verdicts on a delivery decide the task. */
+  verdict?: "approve" | "changes";
 };
 
 /** Review scores are 1 to 10. */

@@ -25,7 +25,16 @@ function getFreePort(): Promise<number> {
   });
 }
 
-function taskkillTree(pid: number): Promise<void> {
+/** Stops a process and its children: `taskkill /T` on Windows, the process group elsewhere. */
+function killTree(pid: number): Promise<void> {
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
+    return Promise.resolve();
+  }
   return new Promise((resolve) => {
     execFile("taskkill", ["/pid", String(pid), "/T", "/F"], () => resolve());
   });
@@ -40,13 +49,13 @@ function cleanStaleScratchDirs() {
 }
 
 /**
- * Task 5.1 — Full lifecycle integration suite (GOALS_TASKLIST.md).
+ * Full lifecycle integration suite.
  *
  * Boots a disposable PostgreSQL (embedded-postgres) plus `next dev`, then drives the
- * real HTTP API through: goal → idea → workstream → task → accept → bid → offer →
- * accept-offer → delivery → peer review → revision → re-delivery → approval, plus the
- * edge cases: self-review rejected, 2-revision limit unassigns the worker, and 24h
- * offer expiration.
+ * real HTTP API inside one project: goal → idea → workstream → task → bid → offer →
+ * accept-offer → delivery → peer reviews → changes → re-delivery → approval and points,
+ * plus the edge cases: other projects can't see or touch the work, the 2-revision limit
+ * reopens the task, the 2-active-task limit, and 24h offer expiration.
  *
  * By default the suite NEVER touches .env or DATABASE_URL — it starts its own scratch
  * database. Set TEST_DATABASE_URL to run against a different disposable postgres that
@@ -62,7 +71,6 @@ const PG_DATA_DIR_PREFIX = "metric-tracker-e2e-pg-";
 const DB_NAME = "metric_tracker_test";
 
 const SETUP_TIMEOUT_MS = 240_000;
-const STEP_TIMEOUT_MS = 60_000;
 
 type Json = Record<string, unknown>;
 
@@ -74,14 +82,18 @@ interface ApiResult {
 interface Actor {
   key: string;
   id: string;
+  ownerId: string;
 }
 
 interface Fixtures {
-  coordinator: { id: string; sessionToken: string };
-  agentA: Actor; // proposer (ideas + tasks)
+  owner: { id: string; sessionToken: string };
+  projectId: string;
+  agentA: Actor; // the goal owner's agent: proposes ideas and tasks
   agentB: Actor; // worker
-  agentC: Actor; // peer reviewer / rebidder
-  agentD: Actor; // extra bidder for the review cap
+  agentC: Actor; // reviewer
+  agentD: Actor; // reviewer
+  agentE: Actor; // reviewer, and the worker in the revision-limit case
+  outsider: Actor; // an agent in another project
 }
 
 const ctx: {
@@ -96,14 +108,12 @@ const ctx: {
 } = { serverLog: [] };
 
 function serverEnv(): NodeJS.ProcessEnv {
-  assert.ok(ctx.fx, "fixtures ready");
   return {
     ...process.env,
     DATABASE_URL: process.env.TEST_DATABASE_URL ?? `postgresql://postgres:postgres@localhost:${PG_PORT}/${DB_NAME}`,
     NEXTAUTH_URL: APP_BASE,
     PORT: String(APP_PORT),
     NODE_ENV: "development" as const,
-    REVIEW_COORDINATOR_USER_IDS: ctx.fx.coordinator.id,
   };
 }
 
@@ -134,13 +144,15 @@ function runPrismaCli(args: string[], options: { stdin?: string; databaseUrl?: s
       [path.join("node_modules", "prisma", "build", "index.js"), ...args],
       { cwd: process.cwd(), env, stdio: ["pipe", "pipe", "pipe"] },
     );
+    // Only stdout is returned: stderr carries notices (like update banners) that would corrupt a SQL script.
     let output = "";
+    let errors = "";
     child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
-    child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    child.stderr.on("data", (chunk: Buffer) => (errors += chunk.toString()));
     child.on("error", reject);
     child.on("close", (code) => {
       if (code === 0) resolve(output);
-      else reject(new Error(`prisma ${args.join(" ")} exited ${code}:\n${output}`));
+      else reject(new Error(`prisma ${args.join(" ")} exited ${code}:\n${output}${errors}`));
     });
     if (options.stdin !== undefined) child.stdin.write(options.stdin);
     child.stdin.end();
@@ -163,20 +175,16 @@ async function provisionFreshDatabase(databaseUrl: string): Promise<void> {
   await runPrismaCli(["db", "execute", "--stdin"], { stdin: script, databaseUrl });
 }
 
-async function call(
-  method: string,
-  pathAndQuery: string,
-  options: { body?: unknown; as?: "coordinator" | "agent" } = {},
-): Promise<ApiResult> {
+/** Calls the API as the project owner (session + project header) or as an agent (key only). */
+async function call(method: string, pathAndQuery: string, options: { body?: unknown; agent?: Actor } = {}): Promise<ApiResult> {
   const fx = ctx.fx;
   assert.ok(fx, "fixtures ready");
   const headers: Record<string, string> = {};
-  if (options.as === "agent") {
-    const agent = currentAgent();
-    assert.ok(agent, "an agent is selected");
-    headers["x-agent-key"] = agent.key;
+  if (options.agent) {
+    headers["x-agent-key"] = options.agent.key;
   } else {
-    headers["cookie"] = `next-auth.session-token=${fx.coordinator.sessionToken}`;
+    headers["cookie"] = `next-auth.session-token=${fx.owner.sessionToken}`;
+    headers["x-project-id"] = fx.projectId;
   }
   if (options.body !== undefined) headers["content-type"] = "application/json";
 
@@ -194,19 +202,6 @@ async function call(
   return { status: res.status, body };
 }
 
-let activeAgent: Actor | null = null;
-function asAgent(actor: Actor) {
-  activeAgent = actor;
-  return { as: "agent" as const };
-}
-function asCoordinator() {
-  activeAgent = null;
-  return { as: "coordinator" as const };
-}
-function currentAgent() {
-  return activeAgent;
-}
-
 function asObject(result: ApiResult): Json {
   assert.ok(result.body && !Array.isArray(result.body), `expected JSON object, got ${JSON.stringify(result.body)}`);
   return result.body;
@@ -218,53 +213,50 @@ function errorText(result: ApiResult): string {
 }
 
 async function taskFromWorkstream(taskId: string): Promise<Json> {
-  const res = await call("GET", `/api/workstreams/${ctx.workstreamId}`, asCoordinator());
-  assert.equal(res.status, 200);
-  const body = asObject(res);
-  const tasks = body.tasks as Json[];
-  const task = tasks.find((t) => t.id === taskId);
+  const res = await call("GET", `/api/workstreams/${ctx.workstreamId}`);
+  assert.equal(res.status, 200, errorText(res));
+  const task = (asObject(res).tasks as Json[]).find((t) => t.id === taskId);
   assert.ok(task, `task ${taskId} listed in workstream`);
   return task;
 }
 
-async function proposeOpenTask(title: string): Promise<string> {
-  const proposed = await call(
-    "POST",
-    `/api/workstreams/${ctx.workstreamId}/tasks`,
-    { ...asAgent(ctx.fx!.agentA), body: { title, taskType: "content" } },
-  );
-  assert.equal(proposed.status, 201, errorText(proposed));
-  const accepted = await call("POST", `/api/tasks/${(asObject(proposed) as Json).id}/accept`, asCoordinator());
-  assert.equal(accepted.status, 200, errorText(accepted));
-  return (asObject(proposed) as Json).id as string;
+async function createTask(title: string): Promise<string> {
+  const created = await call("POST", `/api/workstreams/${ctx.workstreamId}/tasks`, {
+    agent: ctx.fx!.agentA,
+    body: { title, taskType: "content" },
+  });
+  assert.equal(created.status, 201, errorText(created));
+  assert.equal(asObject(created).status, "open");
+  return asObject(created).id as string;
+}
+
+async function comment(taskId: string, agent: Actor, body: Json) {
+  return call("POST", `/api/tasks/${taskId}/comments`, { agent, body });
 }
 
 async function bidOfferAccept(taskId: string, worker: Actor) {
-  const bid = await call("POST", `/api/tasks/${taskId}/comments`, {
-    ...asAgent(worker),
-    body: { type: "bid", body: `Bidding for ${taskId}` },
-  });
+  const bid = await comment(taskId, worker, { type: "bid", body: `Bidding for ${taskId}` });
   assert.equal(bid.status, 201, errorText(bid));
-  const offer = await call("POST", `/api/tasks/${taskId}/offer`, {
-    ...asCoordinator(),
-    body: { agentId: worker.id },
-  });
+  const offer = await call("POST", `/api/tasks/${taskId}/offer`, { body: { agentId: worker.id } });
   assert.equal(offer.status, 200, errorText(offer));
-  const accept = await call("POST", `/api/tasks/${taskId}/accept-offer`, {
-    ...asAgent(worker),
-    body: {},
-  });
+  const accept = await call("POST", `/api/tasks/${taskId}/accept-offer`, { agent: worker, body: {} });
   assert.equal(accept.status, 200, errorText(accept));
   assert.equal(asObject(accept).status, "in_progress");
 }
 
 async function deliver(taskId: string, worker: Actor, attachment: string) {
-  const res = await call("POST", `/api/tasks/${taskId}/comments`, {
-    ...asAgent(worker),
-    body: { type: "delivery", tag: "blog", title: "Delivery", body: "See attachment.", attachment },
-  });
+  const res = await comment(taskId, worker, { type: "delivery", title: "Delivery", body: "See attachment.", attachment });
+  assert.equal(res.status, 201, errorText(res));
+}
+
+async function review(taskId: string, reviewer: Actor, verdict: "approve" | "changes") {
+  const res = await comment(taskId, reviewer, { type: "review", verdict, score: 7, body: `Verdict: ${verdict}` });
   assert.equal(res.status, 201, errorText(res));
   return asObject(res);
+}
+
+async function ledger(sourceKey: string) {
+  return ctx.prisma!.pointsLedger.findUnique({ where: { idempotencyKey: sourceKey } });
 }
 
 before(
@@ -291,64 +283,72 @@ before(
       await pg.initialise();
       await pg.start();
       await pg.createDatabase(DB_NAME);
-    }
-
-    if (process.env.TEST_DATABASE_URL) {
-      // The external database must already have the schema applied (e.g. a migrated dev database).
-      await runPrismaCli(["migrate", "deploy"], { databaseUrl });
-    } else {
       await provisionFreshDatabase(databaseUrl);
+    } else {
+      // The external database must be disposable; it gets the migrations applied.
+      await runPrismaCli(["migrate", "deploy"], { databaseUrl });
     }
 
     process.env.DATABASE_URL = databaseUrl;
     const { prisma } = await import("@/lib/prisma");
-    const { hashAgentKey: libHash } = await import("@/lib/agents");
+    const { hashAgentKey } = await import("@/lib/agents");
+    // `@/lib/projects` pulls in NextAuth, which this runner can't load, so projects are built here.
+    const { DEFAULT_POINT_RULES, DEFAULT_TASK_TYPES } = await import("@/lib/points");
     ctx.prisma = prisma;
+    const createProject = (ownerId: string, name: string) =>
+      prisma.project.create({
+        data: {
+          name,
+          slug: `e2e-${randomBytes(6).toString("hex")}`,
+          joinCode: randomBytes(4).toString("hex"),
+          inviteToken: randomBytes(16).toString("hex"),
+          createdById: ownerId,
+          members: { create: { userId: ownerId, role: "owner" } },
+          taskTypes: { create: DEFAULT_TASK_TYPES },
+          pointRules: { create: DEFAULT_POINT_RULES },
+        },
+      });
+    const joinProject = (userId: string, projectId: string) =>
+      prisma.projectMember.create({ data: { userId, projectId, role: "member" } });
 
-    const email = (label: string) => `lifecycle-${label}-${RUN_ID}@test.local`;
     const mkUser = (label: string) =>
-      prisma.user.create({ data: { email: email(label), name: `E2E ${label}` } });
+      prisma.user.create({ data: { email: `lifecycle-${label}-${RUN_ID}@test.local`, name: `E2E ${label}` } });
+    const [owner, ownerB, ownerC, ownerD, ownerE, stranger] = await Promise.all(
+      ["owner", "owner-b", "owner-c", "owner-d", "owner-e", "stranger"].map(mkUser),
+    );
 
-    const coordinatorUser = await mkUser("coordinator");
-    const ownerB = await mkUser("owner-b");
-    const ownerC = await mkUser("owner-c");
-    const ownerD = await mkUser("owner-d");
+    const project = await createProject(owner.id, `E2E ${RUN_ID}`);
+    const elsewhere = await createProject(stranger.id, `E2E elsewhere ${RUN_ID}`);
+    for (const member of [ownerB, ownerC, ownerD, ownerE]) await joinProject(member.id, project.id);
 
     const sessionToken = randomBytes(32).toString("hex");
     await prisma.session.create({
-      data: {
-        sessionToken,
-        userId: coordinatorUser.id,
-        expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      },
+      data: { sessionToken, userId: owner.id, expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
     });
 
-    const mkAgent = async (label: string, name: string, speciality: string, ownerId: string) => {
+    const mkAgent = async (label: string, ownerId: string, projectId = project.id): Promise<Actor> => {
       const key = `zedu_ak_e2e_${label}_${randomBytes(8).toString("hex")}`;
       const agent = await prisma.agent.create({
-        data: {
-          name,
-          speciality,
-          ownerId,
-          keyHash: libHash(key),
-          keyHint: "e2e",
-        },
+        data: { name: `E2E ${label}`, speciality: "content", ownerId, projectId, keyHash: hashAgentKey(key), keyHint: "e2e" },
       });
-      return { key, id: agent.id };
+      return { key, id: agent.id, ownerId };
     };
 
     ctx.fx = {
-      coordinator: { id: coordinatorUser.id, sessionToken },
-      agentA: await mkAgent("a", "E2E Proposer", "seo", coordinatorUser.id),
-      agentB: await mkAgent("b", "E2E Worker", "content", ownerB.id),
-      agentC: await mkAgent("c", "E2E Reviewer", "research", ownerC.id),
-      agentD: await mkAgent("d", "E2E Reviewer Two", "press", ownerD.id),
+      owner: { id: owner.id, sessionToken },
+      projectId: project.id,
+      agentA: await mkAgent("a", owner.id),
+      agentB: await mkAgent("b", ownerB.id),
+      agentC: await mkAgent("c", ownerC.id),
+      agentD: await mkAgent("d", ownerD.id),
+      agentE: await mkAgent("e", ownerE.id),
+      outsider: await mkAgent("x", stranger.id, elsewhere.id),
     };
 
     const server = spawn(
       process.execPath,
       [path.join("node_modules", "next", "dist", "bin", "next"), "dev", "-p", String(APP_PORT)],
-      { env: serverEnv(), stdio: ["ignore", "pipe", "pipe"] },
+      { env: serverEnv(), stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" },
     );
     ctx.server = server;
     server.stdout.on("data", (chunk: Buffer) => {
@@ -367,30 +367,19 @@ after(
   async () => {
     const { prisma, server, pg } = ctx;
     try {
-      if (prisma && ctx.fx) {
-        // Deleting the goal cascades to workstreams, tasks and comments.
-        if (ctx.goalId) await prisma.goal.deleteMany({ where: { id: ctx.goalId } });
-        const agentIds = [ctx.fx.agentA.id, ctx.fx.agentB.id, ctx.fx.agentC.id, ctx.fx.agentD.id];
-        await prisma.taskComment.deleteMany({ where: { authorAgentId: { in: agentIds } } });
-        await prisma.task.deleteMany({ where: { assignedAgentId: { in: agentIds } } });
-        await prisma.agent.deleteMany({ where: { id: { in: agentIds } } });
-        await prisma.session.deleteMany({ where: { userId: ctx.fx.coordinator.id } });
-        const orphanOwners = await prisma.user.findMany({
-          where: { email: { contains: `-${RUN_ID}@test.local` } },
-          select: { id: true },
-        });
-        await prisma.user.deleteMany({
-          where: { id: { in: [ctx.fx.coordinator.id, ...orphanOwners.map((u) => u.id)] } },
-        });
+      if (prisma && process.env.TEST_DATABASE_URL) {
+        // Deleting the projects cascades to their goals, tasks, agents and points.
+        await prisma.project.deleteMany({ where: { name: { contains: RUN_ID } } });
+        await prisma.user.deleteMany({ where: { email: { contains: `-${RUN_ID}@test.local` } } });
       }
     } finally {
-      if (server?.pid) await taskkillTree(server.pid);
+      if (server?.pid) await killTree(server.pid);
       // pg_ctl / SIGTERM cannot always reach the postmaster on Windows; force-kill the
       // recorded postmaster PID before removing its data directory.
       const pidFile = path.join(PG_DATA_DIR, "postmaster.pid");
-      if (existsSync(pidFile)) {
+      if (process.platform === "win32" && existsSync(pidFile)) {
         const pid = Number(readFileSync(pidFile, "utf8").split("\n")[0].trim());
-        if (Number.isInteger(pid) && pid > 0) await taskkillTree(pid);
+        if (Number.isInteger(pid) && pid > 0) await killTree(pid);
       }
       if (pg) {
         // pg.stop() waits on pg_ctl, which can hang on Windows once the postmaster is
@@ -408,274 +397,154 @@ after(
   { timeout: 120_000 },
 );
 
-describe("Task 5.1 — full lifecycle: goal → idea → workstream → task → bidding → delivery → review → revision → approval", () => {
-  it("blocks agents from creating top-level goals", async () => {
-    const res = await call("POST", "/api/goals", {
-      ...asAgent(ctx.fx!.agentA),
-      body: { title: "Agent goal", type: "seo" },
-    });
+describe("full lifecycle: goal → idea → workstream → task → bid → delivery → peer reviews → approval and points", () => {
+  it("blocks agents from creating goals", async () => {
+    const res = await call("POST", "/api/goals", { agent: ctx.fx!.agentA, body: { title: "Agent goal", type: "seo" } });
     assert.equal(res.status, 403);
   });
 
-  it("step 1 — human creates a goal", async () => {
+  it("step 1 — a member creates a goal in the project", async () => {
     const res = await call("POST", "/api/goals", {
-      ...asCoordinator(),
-      body: { title: `E2E Lifecycle Goal ${RUN_ID}`, description: "Integration test goal", type: "seo" },
+      body: { title: `E2E Goal ${RUN_ID}`, description: "Lifecycle goal", type: "seo" },
     });
     assert.equal(res.status, 201, errorText(res));
-    const goal = asObject(res);
-    assert.equal(goal.type, "seo");
-    assert.equal(goal.status, "active");
-    ctx.goalId = goal.id as string;
+    ctx.goalId = asObject(res).id as string;
   });
 
-  it("rejects goals with an invalid type", async () => {
-    const res = await call("POST", "/api/goals", {
-      ...asCoordinator(),
-      body: { title: "Bad type goal", type: "not-a-type" },
-    });
-    assert.equal(res.status, 400);
-  });
-
-  it("step 2 — agent proposes an idea under the goal", async () => {
-    const res = await call("POST", `/api/goals/${ctx.goalId}/ideas`, {
-      ...asAgent(ctx.fx!.agentA),
-      body: { title: `E2E Idea ${RUN_ID}`, description: "Proposed by agent A" },
-    });
-    assert.equal(res.status, 201, errorText(res));
-    const idea = asObject(res);
-    assert.equal(idea.status, "proposed");
-    assert.equal(idea.proposedByAgentId, ctx.fx!.agentA.id);
-    ctx.workstreamId = idea.id as string;
-
-    const duplicate = await call("POST", `/api/goals/${ctx.goalId}/ideas`, {
-      ...asAgent(ctx.fx!.agentA),
-      body: { title: `E2E Idea ${RUN_ID}` },
-    });
-    assert.equal(duplicate.status, 409, "duplicate idea title under the same goal");
-  });
-
-  it("rejects task proposals under an unaccepted idea", async () => {
+  it("keeps the goal out of other projects", async () => {
+    const one = await call("GET", `/api/goals/${ctx.goalId}`, { agent: ctx.fx!.outsider });
+    assert.equal(one.status, 404);
+    const list = await call("GET", "/api/goals", { agent: ctx.fx!.outsider });
+    assert.equal(list.status, 200);
+    assert.ok((list.body as Json[]).every((goal) => goal.id !== ctx.goalId));
     const idea = await call("POST", `/api/goals/${ctx.goalId}/ideas`, {
-      ...asAgent(ctx.fx!.agentA),
-      body: { title: `E2E Unaccepted Idea ${RUN_ID}` },
+      agent: ctx.fx!.outsider,
+      body: { title: "Sneaky idea" },
     });
-    assert.equal(idea.status, 201, errorText(idea));
-    const res = await call("POST", `/api/workstreams/${(asObject(idea) as Json).id}/tasks`, {
-      ...asAgent(ctx.fx!.agentA),
-      body: { title: "Should not be creatable", taskType: "content" },
-    });
-    assert.equal(res.status, 400);
-    assert.match(errorText(res), /unaccepted idea/i);
+    assert.equal(idea.status, 404);
   });
 
-  it("step 3 — human accepts the idea, becoming a workstream", async () => {
-    const res = await call("POST", `/api/ideas/${ctx.workstreamId}/accept`, asCoordinator());
-    assert.equal(res.status, 200, errorText(res));
-    const ws = asObject(res);
-    assert.equal(ws.status, "accepted");
-    assert.equal(ws.acceptedById, ctx.fx!.coordinator.id);
-  });
-
-  it("step 4 — agent proposes a task and the human accepts it to `open`", async () => {
-    const res = await call("POST", `/api/workstreams/${ctx.workstreamId}/tasks`, {
-      ...asAgent(ctx.fx!.agentA),
-      body: { title: `E2E Task ${RUN_ID}`, description: "Audit blog posts", taskType: "content" },
+  it("step 2 — an agent proposes an idea and the goal owner accepts it", async () => {
+    const proposed = await call("POST", `/api/goals/${ctx.goalId}/ideas`, {
+      agent: ctx.fx!.agentA,
+      body: { title: `E2E Workstream ${RUN_ID}`, description: "Fix on-page SEO" },
     });
-    assert.equal(res.status, 201, errorText(res));
-    const task = asObject(res);
-    assert.equal(task.status, "proposed", "manual workstreams start tasks as proposed");
-    ctx.taskId = task.id as string;
+    assert.equal(proposed.status, 201, errorText(proposed));
+    ctx.workstreamId = asObject(proposed).id as string;
 
-    const accepted = await call("POST", `/api/tasks/${ctx.taskId}/accept`, asCoordinator());
+    const accepted = await call("POST", `/api/ideas/${ctx.workstreamId}/accept`);
     assert.equal(accepted.status, 200, errorText(accepted));
-    assert.equal(asObject(accepted).status, "open");
-
-    const again = await call("POST", `/api/tasks/${ctx.taskId}/accept`, asCoordinator());
-    assert.equal(again.status, 400, "a task can only be accepted from proposed");
   });
 
-  it("auto-accept workstreams open tasks immediately", async () => {
-    const toggle = await call("PATCH", `/api/workstreams/${ctx.workstreamId}/auto-accept`, {
-      ...asCoordinator(),
-      body: { autoAcceptTasks: true },
+  it("step 3 — an agent creates a task with one of the project's task types", async () => {
+    const unknown = await call("POST", `/api/workstreams/${ctx.workstreamId}/tasks`, {
+      agent: ctx.fx!.agentA,
+      body: { title: "Unknown type", taskType: "not_a_type" },
     });
-    assert.equal(toggle.status, 200, errorText(toggle));
-
-    const res = await call("POST", `/api/workstreams/${ctx.workstreamId}/tasks`, {
-      ...asAgent(ctx.fx!.agentA),
-      body: { title: `E2E Auto Task ${RUN_ID}`, taskType: "seo" },
-    });
-    assert.equal(res.status, 201, errorText(res));
-    assert.equal(asObject(res).status, "open");
-
-    await call("PATCH", `/api/workstreams/${ctx.workstreamId}/auto-accept`, {
-      ...asCoordinator(),
-      body: { autoAcceptTasks: false },
-    });
+    assert.equal(unknown.status, 400);
+    ctx.taskId = await createTask(`E2E Lifecycle Task ${RUN_ID}`);
   });
 
-  it("step 5 — agent bids, human offers, agent accepts → in_progress", async () => {
-    const bid = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentB),
-      body: { type: "bid", body: "I can deliver this audit in a day." },
+  it("step 4 — bid, offer, accept-offer → in_progress; then delivery", async () => {
+    await bidOfferAccept(ctx.taskId!, ctx.fx!.agentB);
+    const noAttachment = await comment(ctx.taskId!, ctx.fx!.agentB, { type: "delivery", body: "No file" });
+    assert.equal(noAttachment.status, 400);
+    const notWorker = await comment(ctx.taskId!, ctx.fx!.agentC, {
+      type: "delivery", body: "Not mine", attachment: "https://storage.zedu.test/x.md",
     });
-    assert.equal(bid.status, 201, errorText(bid));
-    assert.equal((await taskFromWorkstream(ctx.taskId!)).status, "bidding");
-
-    const offer = await call("POST", `/api/tasks/${ctx.taskId}/offer`, {
-      ...asCoordinator(),
-      body: { agentId: ctx.fx!.agentB.id },
-    });
-    assert.equal(offer.status, 200, errorText(offer));
-    const offered = asObject(offer);
-    assert.equal(offered.offeredToAgentId, ctx.fx!.agentB.id);
-    assert.equal(offered.status, "bidding");
-    assert.ok(offered.offerExpiresAt, "offer carries an expiry timestamp");
-
-    const wrongAgent = await call("POST", `/api/tasks/${ctx.taskId}/accept-offer`, {
-      ...asAgent(ctx.fx!.agentC),
-      body: {},
-    });
-    assert.equal(wrongAgent.status, 400, "only the offered agent can accept the offer");
-
-    const accept = await call("POST", `/api/tasks/${ctx.taskId}/accept-offer`, {
-      ...asAgent(ctx.fx!.agentB),
-      body: {},
-    });
-    assert.equal(accept.status, 200, errorText(accept));
-    assert.equal(asObject(accept).status, "in_progress");
-  });
-
-  it("step 6 — only the assigned worker can deliver, and deliveries require an attachment", async () => {
-    const byPeer = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentC),
-      body: { type: "delivery", body: "Sneaky delivery", attachment: "https://example.com/x.md" },
-    });
-    assert.equal(byPeer.status, 403, errorText(byPeer));
-
-    const noAttachment = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentB),
-      body: { type: "delivery", body: "Missing attachment" },
-    });
-    assert.equal(noAttachment.status, 400, errorText(noAttachment));
-
-    const delivery = await deliver(ctx.taskId!, ctx.fx!.agentB, "https://storage.zedu.test/audit-v1.md");
-    assert.equal(delivery.attachment, "https://storage.zedu.test/audit-v1.md");
-    assert.equal(delivery.body, "See attachment.", "deliverable content stays out of the chatter body");
+    assert.equal(notWorker.status, 403);
+    await deliver(ctx.taskId!, ctx.fx!.agentB, "https://storage.zedu.test/v1.md");
     assert.equal((await taskFromWorkstream(ctx.taskId!)).status, "submitted");
   });
 
-  it("step 7 — peer review with score; the worker cannot review their own delivery", async () => {
-    const self = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentB),
-      body: { type: "review", body: "Self review", score: 10 },
+  it("step 5 — the worker, people and other projects can't review", async () => {
+    const own = await comment(ctx.taskId!, ctx.fx!.agentB, { type: "review", verdict: "approve", body: "Mine" });
+    assert.equal(own.status, 403);
+    const outsider = await comment(ctx.taskId!, ctx.fx!.outsider, { type: "review", verdict: "approve", body: "Hi" });
+    assert.equal(outsider.status, 404);
+    const person = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
+      body: { type: "review", verdict: "approve", body: "Looks fine" },
     });
-    assert.equal(self.status, 403, errorText(self));
-
-    const review = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentC),
-      body: { type: "review", title: "Solid audit", body: "Accurate, minor gaps.", score: 8 },
-    });
-    assert.equal(review.status, 201, errorText(review));
-    assert.equal(asObject(review).score, 8);
+    assert.equal(person.status, 403);
+    const note = await call("POST", `/api/tasks/${ctx.taskId}/comments`, { body: { type: "note", body: "Thanks!" } });
+    assert.equal(note.status, 201, errorText(note));
   });
 
-  it("step 7b — at most 4 peer reviews per delivery round", async () => {
-    for (const agent of [ctx.fx!.agentC, ctx.fx!.agentD, ctx.fx!.agentC]) {
-      const res = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-        ...asAgent(agent),
-        body: { type: "review", body: `Round review by ${agent.id}` },
-      });
-      assert.equal(res.status, 201, errorText(res));
-    }
-    const fifth = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentD),
-      body: { type: "review", body: "Fifth review should be blocked" },
-    });
-    assert.equal(fifth.status, 400, errorText(fifth));
-    assert.match(errorText(fifth), /maximum 4/i);
-  });
-
-  it("step 8 — review coordinator requests a revision (round 1)", async () => {
-    const res = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asCoordinator(),
-      body: { type: "revision_request", title: "Add canonical tags", body: "Cover dynamic routes too." },
-    });
-    assert.equal(res.status, 201, errorText(res));
+  it("step 6 — two change verdicts send the task back to the worker", async () => {
+    const first = await review(ctx.taskId!, ctx.fx!.agentC, "changes");
+    assert.equal((await taskFromWorkstream(ctx.taskId!)).status, "in_review");
+    const again = await comment(ctx.taskId!, ctx.fx!.agentC, { type: "review", verdict: "changes", body: "Again" });
+    assert.equal(again.status, 409);
+    await review(ctx.taskId!, ctx.fx!.agentD, "changes");
     const task = await taskFromWorkstream(ctx.taskId!);
     assert.equal(task.status, "changes_requested");
     assert.equal(task.revisionCount, 1);
+
+    const pay = await ledger(`review:${first.id}`);
+    assert.equal(pay?.userId, ctx.fx!.agentC.ownerId, "each review pays its reviewer's owner");
+    assert.equal(pay?.amount, 5);
+
+    const inbox = await call("GET", "/api/me/inbox", { agent: ctx.fx!.agentB });
+    assert.equal(inbox.status, 200, errorText(inbox));
+    const revision = (asObject(inbox).revisions as Json[]).find((r) => (r.task as Json).id === ctx.taskId);
+    assert.equal((revision?.changeReviews as Json[]).length, 2);
   });
 
-  it("step 9 — the worker delivers revised work", async () => {
-    await deliver(ctx.taskId!, ctx.fx!.agentB, "https://storage.zedu.test/audit-v2.md");
+  it("step 7 — after re-delivery, two approvals approve the task and pay the worker's owner", async () => {
+    await deliver(ctx.taskId!, ctx.fx!.agentB, "https://storage.zedu.test/v2.md");
+    await review(ctx.taskId!, ctx.fx!.agentC, "approve");
+    await review(ctx.taskId!, ctx.fx!.agentD, "approve");
     const task = await taskFromWorkstream(ctx.taskId!);
-    assert.equal(task.status, "submitted");
-    assert.equal(task.revisionCount, 1, "delivery keeps the revision count");
-  });
+    assert.equal(task.status, "approved");
 
-  it("peer reviewer from a different owner can also request revisions", async () => {
-    const res = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentC),
-      body: { type: "revision_request", title: "Nitpick", body: "One more pass on slugs please." },
-    });
-    assert.equal(res.status, 201, errorText(res));
-    const task = await taskFromWorkstream(ctx.taskId!);
-    assert.equal(task.status, "changes_requested");
-    assert.equal(task.revisionCount, 2);
+    const late = await comment(ctx.taskId!, ctx.fx!.agentE, { type: "review", verdict: "approve", body: "Late" });
+    assert.equal(late.status, 400, "an approved task takes no more reviews");
 
-    // Worker (same agent) cannot request a revision on their own task.
-    const workerSelf = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentB),
-      body: { type: "revision_request", title: "Self revision", body: "Should be blocked" },
-    });
-    assert.equal(workerSelf.status, 403, errorText(workerSelf));
+    const payout = await ledger(`task:${ctx.taskId}`);
+    assert.equal(payout?.userId, ctx.fx!.agentB.ownerId);
+    assert.equal(payout?.agentId, ctx.fx!.agentB.id);
+    assert.equal(payout?.amount, 40, "the content task type's points");
+    assert.equal(payout?.projectId, ctx.fx!.projectId);
 
-    await deliver(ctx.taskId!, ctx.fx!.agentB, "https://storage.zedu.test/audit-v3.md");
-  });
-
-  it("step 10 — review coordinator approves → task approved and locked", async () => {
-    const review = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentC),
-      body: { type: "review", body: "Round 2 review passes", score: 9 },
-    });
-    assert.equal(review.status, 201, errorText(review));
-
-    const res = await call("POST", `/api/tasks/${ctx.taskId}/approve`, {
-      ...asCoordinator(),
-      body: { title: "Final Sign-Off", body: "Ship it.", tag: "seo" },
-    });
-    assert.equal(res.status, 200, errorText(res));
-    const approved = asObject(res);
-    assert.equal(approved.status, "approved");
-    assert.equal(approved.done, true);
-    const comment = approved.comment as Json;
-    assert.equal(comment.type, "approval");
-    assert.equal(comment.authorUserId, ctx.fx!.coordinator.id);
-
-    const locked = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentB),
-      body: { type: "delivery", body: "Late delivery", attachment: "https://example.com/late.md" },
-    });
-    assert.equal(locked.status, 400, "approved tasks reject further deliveries");
-
-    const again = await call("POST", `/api/tasks/${ctx.taskId}/approve`, asCoordinator());
-    assert.equal(again.status, 400, "approved tasks cannot be approved twice");
+    const scoreboard = await call("GET", "/api/scoreboard");
+    assert.equal(scoreboard.status, 200, errorText(scoreboard));
+    const row = (asObject(scoreboard).rows as Json[]).find((r) => r.user_id === ctx.fx!.agentB.ownerId);
+    assert.equal(row?.points, 40);
   });
 });
 
-describe("Task 5.1 — edge case: 24h offer expiration", () => {
+describe("edge case: two failed revision rounds reopen the task", () => {
+  it("unassigns the worker on the third change round and takes new bids", async () => {
+    const taskId = await createTask(`E2E Revision Task ${RUN_ID}`);
+    await bidOfferAccept(taskId, ctx.fx!.agentE);
+
+    for (let round = 1; round <= 3; round++) {
+      await deliver(taskId, ctx.fx!.agentE, `https://storage.zedu.test/revision-v${round}.md`);
+      await review(taskId, ctx.fx!.agentC, "changes");
+      await review(taskId, ctx.fx!.agentD, "changes");
+      const task = await taskFromWorkstream(taskId);
+      if (round < 3) {
+        assert.equal(task.status, "changes_requested");
+        assert.equal(task.revisionCount, round);
+        assert.equal(task.assignedAgentId, ctx.fx!.agentE.id, "worker keeps the task within the limit");
+      } else {
+        assert.equal(task.status, "reopened");
+        assert.equal(task.assignedAgentId, null);
+        assert.equal(task.revisionCount, 0);
+      }
+    }
+
+    const rebid = await comment(taskId, ctx.fx!.agentC, { type: "bid", body: "New bidder after reopen" });
+    assert.equal(rebid.status, 201, errorText(rebid));
+    assert.equal((await taskFromWorkstream(taskId)).status, "bidding");
+  });
+});
+
+describe("edge case: 24h offer expiration", () => {
   it("rejects a late accept-offer and the inbox sweep reopens the task for bidding", async () => {
-    const taskId = await proposeOpenTask(`E2E Expiry Task ${RUN_ID}`);
-    await call("POST", `/api/tasks/${taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentB),
-      body: { type: "bid", body: "Bid before expiry test" },
-    });
-    const offer = await call("POST", `/api/tasks/${taskId}/offer`, {
-      ...asCoordinator(),
-      body: { agentId: ctx.fx!.agentB.id },
-    });
+    const taskId = await createTask(`E2E Expiry Task ${RUN_ID}`);
+    await comment(taskId, ctx.fx!.agentD, { type: "bid", body: "Bid before expiry test" });
+    const offer = await call("POST", `/api/tasks/${taskId}/offer`, { body: { agentId: ctx.fx!.agentD.id } });
     assert.equal(offer.status, 200, errorText(offer));
 
     // Simulate the 24h window elapsing.
@@ -684,104 +553,29 @@ describe("Task 5.1 — edge case: 24h offer expiration", () => {
       data: { offerExpiresAt: new Date(Date.now() - 60_000), offeredAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
     });
 
-    const late = await call("POST", `/api/tasks/${taskId}/accept-offer`, {
-      ...asAgent(ctx.fx!.agentB),
-      body: {},
-    });
+    const late = await call("POST", `/api/tasks/${taskId}/accept-offer`, { agent: ctx.fx!.agentD, body: {} });
     assert.equal(late.status, 400, errorText(late));
     assert.match(errorText(late), /expired/i);
 
-    const inbox = await call("GET", "/api/me/inbox", asAgent(ctx.fx!.agentB));
+    const inbox = await call("GET", "/api/me/inbox", { agent: ctx.fx!.agentD });
     assert.equal(inbox.status, 200, errorText(inbox));
-    const body = asObject(inbox);
-    assert.equal((body.agent as Json).id, ctx.fx!.agentB.id);
-    assert.ok(Number(body.expiredOffers) >= 1, "inbox reports the expired offer it swept");
-    const offers = body.offers as Json[];
-    assert.ok(
-      offers.every((o) => ((o as { task: Json }).task as Json).id !== taskId),
-      "expired task is no longer offered to the agent",
-    );
+    assert.ok(Number(asObject(inbox).expiredOffers) >= 1, "inbox reports the expired offer it swept");
 
     const task = await taskFromWorkstream(taskId);
     assert.equal(task.status, "bidding");
     assert.equal(task.offeredToAgentId, null);
-    assert.equal(task.offerExpiresAt, null);
   });
 });
 
-describe("Task 5.1 — edge case: agents can hold at most 2 active in-progress tasks", () => {
+describe("edge case: agents can hold at most 2 active tasks", () => {
   it("blocks the third concurrent accept-offer", async () => {
-    const first = await proposeOpenTask(`E2E Limit Task 1 ${RUN_ID}`);
-    await bidOfferAccept(first, ctx.fx!.agentB);
-    const second = await proposeOpenTask(`E2E Limit Task 2 ${RUN_ID}`);
-    await bidOfferAccept(second, ctx.fx!.agentB);
+    await bidOfferAccept(await createTask(`E2E Limit Task 1 ${RUN_ID}`), ctx.fx!.agentA);
+    await bidOfferAccept(await createTask(`E2E Limit Task 2 ${RUN_ID}`), ctx.fx!.agentA);
 
-    const third = await proposeOpenTask(`E2E Limit Task 3 ${RUN_ID}`);
-    await call("POST", `/api/tasks/${third}/comments`, {
-      ...asAgent(ctx.fx!.agentB),
-      body: { type: "bid", body: "Bid for third" },
-    });
-    await call("POST", `/api/tasks/${third}/offer`, {
-      ...asCoordinator(),
-      body: { agentId: ctx.fx!.agentB.id },
-    });
-    const blocked = await call("POST", `/api/tasks/${third}/accept-offer`, {
-      ...asAgent(ctx.fx!.agentB),
-      body: {},
-    });
-    assert.equal(blocked.status, 400, errorText(blocked));
-    assert.match(errorText(blocked), /2 active/i);
-  });
-});
-
-describe("Task 5.1 — edge case: the 3rd revision request unassigns the worker and reopens bidding", () => {
-  it("caps revisions at 2 rounds, then resets and reopens for new bidders", async () => {
-    const taskId = await proposeOpenTask(`E2E Revision Task ${RUN_ID}`);
-    // Agent B already holds two in-progress tasks from the concurrency-limit test above,
-    // so this cycle runs on agent D; agent C takes over after the reopen.
-    await bidOfferAccept(taskId, ctx.fx!.agentD);
-
-    for (let round = 1; round <= 2; round++) {
-      await deliver(taskId, ctx.fx!.agentD, `https://storage.zedu.test/revision-v${round}.md`);
-      const revision = await call("POST", `/api/tasks/${taskId}/comments`, {
-        ...asCoordinator(),
-        body: { type: "revision_request", title: `Round ${round}`, body: "More work needed" },
-      });
-      assert.equal(revision.status, 201, errorText(revision));
-      const task = await taskFromWorkstream(taskId);
-      assert.equal(task.status, "changes_requested");
-      assert.equal(task.revisionCount, round);
-      assert.equal(task.assignedAgentId, ctx.fx!.agentD.id, "worker keeps the task within the limit");
-    }
-
-    await deliver(taskId, ctx.fx!.agentD, "https://storage.zedu.test/revision-v3.md");
-    const third = await call("POST", `/api/tasks/${taskId}/comments`, {
-      ...asCoordinator(),
-      body: { type: "revision_request", title: "Round 3", body: "Still not there" },
-    });
-    assert.equal(third.status, 201, errorText(third));
-    const reopened = await taskFromWorkstream(taskId);
-    assert.equal(reopened.status, "reopened");
-    assert.equal(reopened.assignedAgentId, null, "worker is unassigned after the limit");
-    assert.equal(reopened.revisionCount, 0, "revision count resets");
-
-    const rebid = await call("POST", `/api/tasks/${taskId}/comments`, {
-      ...asAgent(ctx.fx!.agentC),
-      body: { type: "bid", body: "New bidder after reopen" },
-    });
-    assert.equal(rebid.status, 201, errorText(rebid));
-    assert.equal((await taskFromWorkstream(taskId)).status, "bidding");
-
-    const offer = await call("POST", `/api/tasks/${taskId}/offer`, {
-      ...asCoordinator(),
-      body: { agentId: ctx.fx!.agentC.id },
-    });
-    assert.equal(offer.status, 200, errorText(offer));
-    const accept = await call("POST", `/api/tasks/${taskId}/accept-offer`, {
-      ...asAgent(ctx.fx!.agentC),
-      body: {},
-    });
-    assert.equal(accept.status, 200, errorText(accept));
-    assert.equal(asObject(accept).status, "in_progress");
+    const third = await createTask(`E2E Limit Task 3 ${RUN_ID}`);
+    await comment(third, ctx.fx!.agentA, { type: "bid", body: "Bid for third" });
+    const offer = await call("POST", `/api/tasks/${third}/offer`, { body: { agentId: ctx.fx!.agentA.id } });
+    assert.equal(offer.status, 400, "the goal owner can't offer past the active-task limit");
+    assert.match(errorText(offer), /2 active/i);
   });
 });

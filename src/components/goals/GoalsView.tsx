@@ -1,5 +1,6 @@
 "use client";
 
+import { useProject } from "@/components/projects/ProjectProvider";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,6 +25,7 @@ import { OwnerAvatar, TaskProgress } from "./GoalParts";
 import { useGoals } from "./GoalsProvider";
 
 export function GoalsView() {
+  const { href } = useProject();
   const { goals, goalsLoading, goalsError, reloadGoals, currentUser, createGoal } = useGoals();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -148,7 +150,7 @@ export function GoalsView() {
       <GoalFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
-        onCreate={async (input) => router.push(`/dashboard/goals/${(await createGoal(input)).id}`)}
+        onCreate={async (input) => router.push(href(`/goals/${(await createGoal(input)).id}`))}
       />
     </>
   );
@@ -169,12 +171,13 @@ function GoalCard({
   ownedByYou: boolean;
   ownerImage?: string;
 }) {
+  const { href } = useProject();
   const needsYou = ownedByYou && summary.pendingIdeas > 0;
 
   return (
     <li className="flex">
       <Link
-        href={`/dashboard/goals/${goal.id}`}
+        href={href(`/goals/${goal.id}`)}
         className="group/goal flex w-full flex-col gap-5 rounded-[22px] border border-border bg-card p-5 text-inherit no-underline transition-colors duration-150 outline-none hover:border-border-strong focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <div className="flex flex-col gap-1.5">

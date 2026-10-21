@@ -20,6 +20,7 @@ import {
   ACTIVE_TASK_LIMIT,
   DEFAULT_POINT_RULES,
   WEEKLY_TARGET,
+  WEEKLY_TARGET_RULE,
   buildScoreboard,
   getBidderFairness as computeBidderFairness,
   getWeekRange,
@@ -93,31 +94,33 @@ function toLedgerEntry(raw: RawLedgerRow): LedgerEntry {
   };
 }
 
-/** Wraps a Prisma client (or transaction) with the scoreboard queries. */
-export function prismaScoreboardStore(client: PointsSqlClient): ScoreboardStore {
+/** Wraps a Prisma client (or transaction) with one project's scoreboard queries. */
+export function prismaScoreboardStore(client: PointsSqlClient, projectId: string): ScoreboardStore {
   return {
     async listLedger(range) {
       const rows = await client.$queryRaw<RawLedgerRow[]>`
         SELECT ${LEDGER_COLUMNS} FROM points_ledger
-        WHERE created_at >= ${range.start} AND created_at < ${range.end}
+        WHERE project_id = ${projectId} AND created_at >= ${range.start} AND created_at < ${range.end}
         ORDER BY created_at ASC`;
       return rows.map(toLedgerEntry);
     },
 
     async listUsers() {
       const rows = await client.$queryRaw<{ id: string; name: string | null }[]>`
-        SELECT id, name FROM "User" ORDER BY name ASC`;
+        SELECT u.id, u.name FROM "User" u
+        JOIN "ProjectMember" m ON m."userId" = u.id AND m."projectId" = ${projectId}
+        ORDER BY u.name ASC`;
       return rows.map((row) => ({ id: row.id, name: row.name }));
     },
 
     async listAgents() {
       const rows = await client.$queryRaw<{ id: string; name: string; ownerId: string }[]>`
-        SELECT id, name, "ownerId" FROM "Agent"`;
+        SELECT id, name, "ownerId" FROM "Agent" WHERE "projectId" = ${projectId}`;
       return rows.map((row) => ({ id: row.id, name: row.name, ownerId: row.ownerId }));
     },
 
     async listTaskTypes() {
-      const records = await prismaTaskTypesStore(client).list(true);
+      const records = await prismaTaskTypesStore(client, projectId).list(true);
       return records.map(({ id, slug, name, description, points, maxPoints, isActive }) => ({
         id,
         slug,
@@ -135,7 +138,7 @@ export function prismaScoreboardStore(client: PointsSqlClient): ScoreboardStore 
         amount: number;
         enabled: boolean;
         weekly_cap: number | null;
-      }[]>`SELECT rule_key, amount, enabled, weekly_cap FROM point_rules`;
+      }[]>`SELECT rule_key, amount, enabled, weekly_cap FROM point_rules WHERE project_id = ${projectId}`;
       return rows.map((row) => ({
         ruleKey: row.rule_key,
         amount: row.amount,
@@ -145,19 +148,10 @@ export function prismaScoreboardStore(client: PointsSqlClient): ScoreboardStore 
     },
 
     async tasksGivenThisWeek(range) {
-      // Real unit-3 columns on the agent-task "Task" table (goals foundation).
-      // Degrades to zero until unit 3's migration actually lands those columns.
-      const columns = await client.$queryRaw<{ exists: boolean }[]>`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = 'Task' AND column_name = 'assignedAgentId'
-        ) AS exists`;
-      if (!columns[0]?.exists) return {};
-
       const rows = await client.$queryRaw<{ assignedAgentId: string; count: number }[]>`
         SELECT "assignedAgentId", COUNT(*)::int AS count
         FROM "Task"
-        WHERE "offeredAt" >= ${range.start} AND "offeredAt" < ${range.end}
+        WHERE "projectId" = ${projectId} AND "offeredAt" >= ${range.start} AND "offeredAt" < ${range.end}
           AND "assignedAgentId" IS NOT NULL
           AND status NOT IN ('proposed', 'open', 'bidding', 'reopened')
         GROUP BY "assignedAgentId"`;
@@ -165,17 +159,11 @@ export function prismaScoreboardStore(client: PointsSqlClient): ScoreboardStore 
     },
 
     async activeTasks() {
-      const columns = await client.$queryRaw<{ exists: boolean }[]>`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = 'Task' AND column_name = 'assignedAgentId'
-        ) AS exists`;
-      if (!columns[0]?.exists) return {};
-
       const rows = await client.$queryRaw<{ assignedAgentId: string; count: number }[]>`
         SELECT "assignedAgentId", COUNT(*)::int AS count
         FROM "Task"
-        WHERE status IN ('in_progress', 'changes_requested', 'submitted', 'in_review')
+        WHERE "projectId" = ${projectId}
+          AND status IN ('in_progress', 'changes_requested', 'submitted', 'in_review')
           AND "assignedAgentId" IS NOT NULL
         GROUP BY "assignedAgentId"`;
       return Object.fromEntries(rows.map((row) => [row.assignedAgentId, row.count]));
@@ -183,10 +171,10 @@ export function prismaScoreboardStore(client: PointsSqlClient): ScoreboardStore 
 
     async listLedgerByUser(userId, { offset, limit }) {
       const countRows = await client.$queryRaw<{ total: number }[]>`
-        SELECT COUNT(*)::int AS total FROM points_ledger WHERE user_id = ${userId}`;
+        SELECT COUNT(*)::int AS total FROM points_ledger WHERE project_id = ${projectId} AND user_id = ${userId}`;
       const rows = await client.$queryRaw<RawLedgerRow[]>`
         SELECT ${LEDGER_COLUMNS} FROM points_ledger
-        WHERE user_id = ${userId}
+        WHERE project_id = ${projectId} AND user_id = ${userId}
         ORDER BY created_at DESC
         LIMIT ${limit} OFFSET ${offset}`;
       return { entries: rows.map(toLedgerEntry), total: countRows[0]?.total ?? 0 };
@@ -194,17 +182,24 @@ export function prismaScoreboardStore(client: PointsSqlClient): ScoreboardStore 
 
     async sumLedgerForUser(userId) {
       const rows = await client.$queryRaw<{ total: number }[]>`
-        SELECT COALESCE(SUM(amount), 0)::int AS total FROM points_ledger WHERE user_id = ${userId}`;
+        SELECT COALESCE(SUM(amount), 0)::int AS total FROM points_ledger WHERE project_id = ${projectId} AND user_id = ${userId}`;
       return rows[0]?.total ?? 0;
     },
   };
 }
 
-async function resolveStore(options?: { store?: ScoreboardStore; tx?: Prisma.TransactionClient }): Promise<ScoreboardStore> {
-  if (options?.store) return options.store;
-  if (options?.tx) return prismaScoreboardStore(options.tx);
+type StoreOptions = { projectId: string; store?: ScoreboardStore; tx?: Prisma.TransactionClient };
+
+async function resolveStore(options: StoreOptions): Promise<ScoreboardStore> {
+  if (options.store) return options.store;
+  if (options.tx) return prismaScoreboardStore(options.tx, options.projectId);
   const { prisma } = await import("@/lib/prisma");
-  return prismaScoreboardStore(prisma);
+  return prismaScoreboardStore(prisma, options.projectId);
+}
+
+/** The project's weekly points target: its `weekly_target` rule, or the platform default. */
+export function weeklyTarget(rules: PointRule[]) {
+  return rules.find((rule) => rule.ruleKey === WEEKLY_TARGET_RULE)?.amount ?? WEEKLY_TARGET;
 }
 
 // ── Range ────────────────────────────────────────────────────────────────────
@@ -270,10 +265,7 @@ export function buildProjectPointsRules(
 }
 
 /** The project's points rules for `/project` and onboarding (DB-backed). */
-export async function getProjectPointsRules(options?: {
-  store?: ScoreboardStore;
-  tx?: Prisma.TransactionClient;
-}): Promise<ProjectPointsRules> {
+export async function getProjectPointsRules(options: StoreOptions): Promise<ProjectPointsRules> {
   const store = await resolveStore(options);
   const [taskTypes, rules] = await Promise.all([store.listTaskTypes(), store.listRules()]);
   return buildProjectPointsRules(taskTypes, rules);
@@ -329,12 +321,10 @@ function serializeScoreboardRow(row: {
  * users are LEFT JOINed so people with 0 points still appear, ranked by points
  * descending, then name for deterministic ties.
  */
-export async function fetchScoreboard(options: {
+export async function fetchScoreboard(options: StoreOptions & {
   range?: ScoreboardRangeSelection;
   weekStart?: string | Date;
   now?: Date;
-  store?: ScoreboardStore;
-  tx?: Prisma.TransactionClient;
 }): Promise<ScoreboardResponse> {
   const store = await resolveStore(options);
   const week = resolveScoreboardRange(options.range ?? "this_week", {
@@ -366,7 +356,7 @@ export async function fetchScoreboard(options: {
     rules,
     activeTaskLimit: ACTIVE_TASK_LIMIT,
     tasksGivenThisWeek: tasksGivenByUser,
-    target: WEEKLY_TARGET,
+    target: weeklyTarget(rules),
   });
 
   return {
@@ -400,10 +390,10 @@ function serializeBidderFairness(row: BidderFairness): BidderFairnessWire {
 /** Fairness stats for the bids panel (DB-backed; this week). */
 export async function getBidderFairness(
   agentIds: string[],
-  options?: { store?: ScoreboardStore; tx?: Prisma.TransactionClient; now?: Date }
+  options: StoreOptions & { now?: Date }
 ): Promise<BidderFairnessWire[]> {
   const store = await resolveStore(options);
-  const week = getWeekRange(options?.now);
+  const week = getWeekRange(options.now);
 
   const [entries, agents, tasksGivenThisWeek, activeTasks] = await Promise.all([
     store.listLedger(week),
@@ -453,16 +443,11 @@ function serializeLedgerEntry(entry: LedgerEntry): PointsHistoryWireEntry {
 /** One user's ledger history, newest first, paginated, with their all-time balance. */
 export async function fetchUserPointsHistory(
   userId: string,
-  options?: {
-    page?: number;
-    limit?: number;
-    store?: ScoreboardStore;
-    tx?: Prisma.TransactionClient;
-  }
+  options: StoreOptions & { page?: number; limit?: number }
 ): Promise<PointsHistoryResponse> {
   const store = await resolveStore(options);
-  const page = Math.max(1, Math.floor(options?.page ?? 1));
-  const limit = Math.min(100, Math.max(1, Math.floor(options?.limit ?? 20)));
+  const page = Math.max(1, Math.floor(options.page ?? 1));
+  const limit = Math.min(100, Math.max(1, Math.floor(options.limit ?? 20)));
   const offset = (page - 1) * limit;
 
   const [{ entries, total }, balance] = await Promise.all([

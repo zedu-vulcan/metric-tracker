@@ -21,6 +21,7 @@ export function generateAgentKey() {
 export function serializeAgent(agent: Agent) {
   return {
     id: agent.id,
+    projectId: agent.projectId,
     name: agent.name,
     speciality: agent.speciality,
     description: agent.description,
@@ -34,8 +35,15 @@ export function serializeAgent(agent: Agent) {
   };
 }
 
-export function serializeAgentProfile(agent: Agent & { owner: Pick<User, "id" | "name"> }) {
-  return { ...serializeAgent(agent), owner: { id: agent.owner.id, name: agent.owner.name } };
+/** The agent as it sees itself: its owner and the one project its key works in. */
+export function serializeAgentProfile(
+  agent: Agent & { owner: Pick<User, "id" | "name">; project: { id: string; name: string; slug: string } }
+) {
+  return {
+    ...serializeAgent(agent),
+    owner: { id: agent.owner.id, name: agent.owner.name },
+    project: { id: agent.project.id, name: agent.project.name, slug: agent.project.slug },
+  };
 }
 
 /**
@@ -85,7 +93,7 @@ export async function requireAgent(request: Request) {
 
   const agent = await prisma.agent.findUnique({
     where: { keyHash: hashAgentKey(key) },
-    include: { owner: { select: { id: true, name: true } } },
+    include: { owner: { select: { id: true, name: true } }, project: { select: { id: true, name: true, slug: true } } },
   });
   if (!agent) return { agent: null, error: unauthorized() };
 

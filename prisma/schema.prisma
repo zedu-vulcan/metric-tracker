@@ -30,9 +30,9 @@ enum SubmissionStatus {
 }
 
 model User {
-  id                  String        @id @default(cuid())
+  id                  String          @id @default(cuid())
   name                String?
-  email               String?       @unique
+  email               String?         @unique
   emailVerified       DateTime?
   image               String?
   accounts            Account[]
@@ -40,16 +40,69 @@ model User {
   contentItems        ContentItem[]
   seoChecks           SeoCheck[]
   agents              Agent[]
-  createdGoals        Goal[]        @relation("GoalCreator")
-  acceptedWorkstreams Workstream[]  @relation("WorkstreamAcceptor")
-  taskComments        TaskComment[] @relation("UserCommentAuthor")
-  createdTasks        Task[]        @relation("TaskCreator")
-  assignedTasks       Task[]        @relation("TaskOwner")
-  isPlatformAdmin     Boolean       @default(false) @map("is_platform_admin")
+  createdGoals        Goal[]          @relation("GoalCreator")
+  acceptedWorkstreams Workstream[]    @relation("WorkstreamAcceptor")
+  taskComments        TaskComment[]   @relation("UserCommentAuthor")
+  createdTasks        Task[]          @relation("TaskCreator")
+  assignedTasks       Task[]          @relation("TaskOwner")
+  isPlatformAdmin     Boolean         @default(false) @map("is_platform_admin")
   ledgerEntries       PointsLedger[]
+  memberships         ProjectMember[]
+  createdProjects     Project[]       @relation("ProjectCreator")
+}
+
+enum ProjectRole {
+  owner
+  admin
+  member
+}
+
+/// A team's workspace. Everything (goals, agents, points, marketing data) belongs to one project.
+/// People join with the invite link (`inviteToken`) or the join code; admins regenerate both to revoke them.
+model Project {
+  id                String              @id @default(cuid())
+  name              String
+  slug              String              @unique
+  joinCode          String              @unique
+  inviteToken       String              @unique
+  createdById       String?
+  createdBy         User?               @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  members           ProjectMember[]
+  agents            Agent[]
+  goals             Goal[]
+  tasks             Task[]
+  taskTypes         TaskTypeDef[]
+  pointRules        PointRule[]
+  ledgerEntries     PointsLedger[]
+  contentItems      ContentItem[]
+  pressCoverage     PressCoverage[]
+  pressSubmissions  PressSubmission[]
+  pressOutlets      PressOutlet[]
+  seoChecks         SeoCheck[]
+  seoSettings       SeoSettings?
+  directories       Directory[]
+  directoryActivity DirectoryActivity[]
+  savedCopy         SavedCopy[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  projectId String
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      ProjectRole @default(member)
+  joinedAt  DateTime    @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
 }
 
 model ContentItem {
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   id          String    @id @default(cuid())
   userId      String
   title       String?
@@ -69,9 +122,12 @@ model ContentItem {
 
   @@index([userId, createdDate])
   @@index([userId, status])
+  @@index([projectId])
 }
 
 model PressCoverage {
+  projectId           String
+  project             Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   id                  String            @id @default(cuid())
   title               String
   outlet              String
@@ -87,9 +143,12 @@ model PressCoverage {
   pressOutlet         PressOutlet?      @relation(fields: [outletId], references: [id], onDelete: SetNull)
 
   @@index([outletId])
+  @@index([projectId])
 }
 
 model PressSubmission {
+  projectId           String
+  project             Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   id                  String           @id @default(cuid())
   title               String
   outlet              String
@@ -108,6 +167,8 @@ model PressSubmission {
   pressOutlet         PressOutlet?     @relation(fields: [outletId], references: [id], onDelete: SetNull)
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
+
+  @@index([projectId])
 }
 
 model Account {
@@ -145,6 +206,8 @@ model VerificationToken {
 }
 
 model SeoCheck {
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   id             String   @id @default(cuid())
   url            String
   normalizedUrl  String
@@ -158,10 +221,13 @@ model SeoCheck {
   createdAt      DateTime @default(now())
 
   @@index([normalizedUrl, createdAt])
+  @@index([projectId])
 }
 
 model SeoSettings {
-  id        String   @id @default("workspace")
+  id        String   @id @default(cuid())
+  projectId String   @unique
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   pageUrl   String
   updatedAt DateTime @updatedAt
 }
@@ -181,6 +247,8 @@ enum DirectoryPriority {
 }
 
 model Directory {
+  projectId      String
+  project        Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   id             String                   @id @default(cuid())
   name           String
   website        String
@@ -195,10 +263,13 @@ model Directory {
   checklistItems DirectoryChecklistItem[]
 
   @@index([status])
+  @@index([projectId])
 }
 
 /// A team-wide log of directory changes. Stores the directory's name so entries survive its deletion.
 model DirectoryActivity {
+  projectId     String
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   id            String           @id @default(cuid())
   directoryId   String?
   directory     Directory?       @relation(fields: [directoryId], references: [id], onDelete: SetNull)
@@ -208,6 +279,7 @@ model DirectoryActivity {
   createdAt     DateTime         @default(now())
 
   @@index([createdAt])
+  @@index([projectId])
 }
 
 model DirectoryChecklistItem {
@@ -226,6 +298,8 @@ model DirectoryChecklistItem {
 
 /// Team-wide reusable text for directory submissions (taglines, descriptions).
 model SavedCopy {
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   id        String   @id @default(cuid())
   label     String
   text      String
@@ -234,6 +308,7 @@ model SavedCopy {
   updatedAt DateTime @updatedAt
 
   @@index([position])
+  @@index([projectId])
 }
 
 enum OutletTier {
@@ -245,9 +320,11 @@ enum OutletTier {
 /// One media outlet, shared by every piece of coverage and pitch for it. `key` is the name with case,
 /// spaces and punctuation removed, so "TechCabal" and "Tech Cabal" are one outlet.
 model PressOutlet {
+  projectId    String
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   id           String            @id @default(cuid())
   name         String
-  key          String            @unique
+  key          String
   website      String?
   contactName  String?
   contactEmail String?
@@ -257,32 +334,37 @@ model PressOutlet {
   updatedAt    DateTime          @updatedAt
   coverage     PressCoverage[]
   submissions  PressSubmission[]
+
+  @@unique([projectId, key])
 }
 
 // An AI agent a user connects to the platform. The plain key is shown once at creation; only its hash is stored.
 model Agent {
-  id                  String        @id @default(cuid())
+  projectId           String
+  project             Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id                  String         @id @default(cuid())
   name                String
-  speciality          String        // e.g. "seo", "content", "research"
+  speciality          String // e.g. "seo", "content", "research"
   description         String?
-  avatarStyle         String        @default("bottts")
-  avatarSeed          String        @default("default")
-  keyHash             String        @unique
+  avatarStyle         String         @default("bottts")
+  avatarSeed          String         @default("default")
+  keyHash             String         @unique
   keyHint             String
   ownerId             String
-  owner               User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner               User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   connectedAt         DateTime?
   lastActiveAt        DateTime?
-  proposedWorkstreams Workstream[]  @relation("WorkstreamProposer")
-  assignedTasks       Task[]        @relation("AssignedAgent")
-  offeredTasks        Task[]        @relation("OfferedAgent")
-  comments            TaskComment[] @relation("AgentCommentAuthor")
+  proposedWorkstreams Workstream[]   @relation("WorkstreamProposer")
+  assignedTasks       Task[]         @relation("AssignedAgent")
+  offeredTasks        Task[]         @relation("OfferedAgent")
+  comments            TaskComment[]  @relation("AgentCommentAuthor")
   ledgerEntries       PointsLedger[]
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
   @@index([ownerId])
   @@index([keyHash])
+  @@index([projectId])
 }
 
 enum GoalType {
@@ -300,20 +382,23 @@ enum GoalStatus {
 }
 
 model Goal {
-  id          String        @id @default(cuid())
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id          String       @id @default(cuid())
   title       String
   description String?
-  type        GoalType      @default(marketing)
-  status      GoalStatus    @default(active)
+  type        GoalType     @default(marketing)
+  status      GoalStatus   @default(active)
   createdById String
-  createdBy   User          @relation("GoalCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("GoalCreator", fields: [createdById], references: [id], onDelete: Cascade)
   workstreams Workstream[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@index([type])
   @@index([status])
   @@index([createdById])
+  @@index([projectId])
 }
 
 enum WorkstreamStatus {
@@ -366,10 +451,12 @@ enum TaskStatus {
 }
 
 model Task {
+  projectId        String
+  project          Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   id               String        @id @default(cuid())
   workstreamId     String?
   workstream       Workstream?   @relation(fields: [workstreamId], references: [id], onDelete: Cascade)
-  taskType         String?       // "research", "lead_hunting", "content", "seo", "press"
+  taskType         String? // "research", "lead_hunting", "content", "seo", "press"
   type             TaskType      @default(Other)
   title            String
   description      String?
@@ -385,29 +472,32 @@ model Task {
   comments         TaskComment[]
 
   // Legacy Task fields retained as optional for backwards compatibility
-  dueAt            DateTime?
-  done             Boolean       @default(false)
-  completedAt      DateTime?
-  ownerId          String?
-  owner            User?         @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  userId           String?
-  user             User?         @relation("TaskCreator", fields: [userId], references: [id], onDelete: Cascade)
+  dueAt       DateTime?
+  done        Boolean   @default(false)
+  completedAt DateTime?
+  ownerId     String?
+  owner       User?     @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  userId      String?
+  user        User?     @relation("TaskCreator", fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([workstreamId, status])
   @@index([assignedAgentId])
   @@index([offeredToAgentId])
   @@index([userId, done])
-   @@index([ownerId])
+  @@index([ownerId])
+  @@index([projectId])
 }
 
-// Points-bearing task categories, managed by platform admins. Snake_case columns
+// Points-bearing task categories, managed by each project's owner and admins. Snake_case columns
 // per the PR 5 schema request (doc/points-schema-requests.md); archived via is_active.
 model TaskTypeDef {
   id          String   @id @default(cuid())
-  slug        String   @unique
+  projectId   String   @map("project_id")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slug        String
   name        String
   description String?
   points      Int
@@ -417,16 +507,20 @@ model TaskTypeDef {
   updatedAt   DateTime @updatedAt @map("updated_at")
   updatedBy   String?  @map("updated_by")
 
+  @@unique([projectId, slug])
   @@map("task_types")
 }
 
 // Seeded config rows: how many points each reason pays and whether it's on.
 model PointRule {
-  ruleKey   String  @id @map("rule_key")
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ruleKey   String  @map("rule_key")
   amount    Int
   enabled   Boolean @default(false)
   weeklyCap Int?    @map("weekly_cap")
 
+  @@id([projectId, ruleKey])
   @@map("point_rules")
 }
 
@@ -446,14 +540,17 @@ model PointsLedger {
   note            String?  @map("note")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  user  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agent Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  @@index([projectId, createdAt])
   @@index([userId, createdAt])
   @@index([agentId, createdAt])
   @@index([reason, createdAt])
   @@map("points_ledger")
 }
+
 enum CommentType {
   idea
   bid
@@ -465,25 +562,31 @@ enum CommentType {
   note
 }
 
+/// A peer reviewer's call on a delivery.
+enum ReviewVerdict {
+  approve
+  changes
+}
+
 model TaskComment {
-  id            String      @id @default(cuid())
+  id            String         @id @default(cuid())
   taskId        String
-  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  type          CommentType @default(note)
-  tag           String?     // e.g. "blog", "leads", "contact_list", "press", "seo"
+  task          Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  type          CommentType    @default(note)
+  tag           String? // e.g. "blog", "leads", "contact_list", "press", "seo"
   title         String?
   body          String
-  attachment    String?     // Deliverable text, URL, or link
-  score         Int?        // Peer review score (e.g. 1-10)
+  attachment    String? // Deliverable text, URL, or link
+  score         Int? // Peer review score (e.g. 1-10)
+  verdict       ReviewVerdict? // Set on `review` comments; two of one kind in a delivery round decide the task
   authorAgentId String?
-  authorAgent   Agent?      @relation("AgentCommentAuthor", fields: [authorAgentId], references: [id], onDelete: SetNull)
+  authorAgent   Agent?         @relation("AgentCommentAuthor", fields: [authorAgentId], references: [id], onDelete: SetNull)
   authorUserId  String?
-  authorUser    User?       @relation("UserCommentAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  authorUser    User?          @relation("UserCommentAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([taskId, type])
   @@index([authorAgentId])
   @@index([authorUserId])
 }
-

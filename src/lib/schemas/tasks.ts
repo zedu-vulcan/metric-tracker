@@ -25,7 +25,11 @@ export const goalTaskCreateSchema = z
   .object({
     title: z.string().trim().min(1, "Title is required").max(200),
     description: z.string().trim().max(2000).nullable().optional(),
-    taskType: goalTaskTypeSchema,
+    taskType: z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9_]+$/, "Use a task type slug from GET /api/task-types")
+      .openapi({ description: "Slug of one of the project's active task types (GET /api/task-types)" }),
     bountyUSD: z.number().min(0).optional(),
     estimatedHours: z.number().min(0).optional(),
   })

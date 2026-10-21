@@ -61,8 +61,8 @@ Do these yourself, without being asked, whenever the change applies. If you can'
 
 ### After adding a dashboard page
 
-- Put it at `src/app/dashboard/<feature>/page.tsx`. Start it with `PageHeader` and wrap the body in `PageContent` (both from `@/components/PageHeader`).
-- Add it to the `CHANNELS` list in `src/components/SidebarNav.tsx` (`{ href, label, icon }`). The nav sets `aria-current="page"` for you.
+- Put it at `src/app/p/[slug]/<feature>/page.tsx`. Start it with `PageHeader` and wrap the body in `PageContent` (both from `@/components/PageHeader`). Server components that read data call `getProjectPage(params.slug)` from `@/lib/project-page` and filter by `project.id`.
+- Add it to the `CHANNELS` list in `src/components/SidebarNav.tsx` (`{ href, label, icon }`, with `href` relative to the project, e.g. `/campaigns`). The nav sets `aria-current="page"` for you.
 
 ### After adding an environment variable
 
@@ -82,7 +82,7 @@ Do these yourself, without being asked, whenever the change applies. If you can'
 
 Every route handler in `src/app/api/<feature>/.../route.ts`:
 
-1. Starts with `const { session, error } = await requireAuth(); if (error) return error;` (from `@/lib/api`). The only exceptions are deliberately public routes such as `/api/health`.
+1. Starts with `const { projectId, error } = await requireProjectAccess(request); if (error) return error;` (from `@/lib/projects`; add `{ allowAgents: false }` for people-only routes, `{ minimumRole: "admin" }` for management) and filters every query by `projectId`, looking records up with `findFirst({ where: { id, projectId } })`. Only routes outside a project (`/api/projects*`) use `requireAuth()` from `@/lib/api`, and deliberately public routes such as `/api/health` use neither.
 2. Validates the request body and query with Zod `.safeParse()`. Schemas live in `src/lib/schemas/<feature>.ts`, and **`z` is imported from `@/lib/zod`, never from `"zod"`** (the `@/lib/zod` version adds `.openapi()`).
 3. Uses the shared client: `import { prisma } from "@/lib/prisma"`. Never write `new PrismaClient()`.
 4. Exports `export const dynamic = "force-dynamic";` when it reads the session or the database.
@@ -134,7 +134,7 @@ The design reference is `DESIGN.md` (principles) together with `src/app/globals.
 
 - TypeScript strict: no `any`, no `@ts-ignore`. Import through the `@/` alias (it maps to `src/`).
 - Components are server components by default. Add `"use client"` only for state, effects, event handlers or browser APIs.
-- Keep each team's code in its own folders: `src/app/dashboard/<feature>/`, `src/app/api/<feature>/`, `src/lib/schemas/<feature>.ts`, `src/components/<feature>/`. Keep edits to shared files minimal.
+- Keep each team's code in its own folders: `src/app/p/[slug]/<feature>/`, `src/app/api/<feature>/`, `src/lib/schemas/<feature>.ts`, `src/components/<feature>/`. Keep edits to shared files minimal.
 - Match the style of the code around you: PascalCase component files, named exports for components, and comments only where they add information.
 - Don't leave dead code, unused files, `console.log` calls or commented-out blocks behind.
 

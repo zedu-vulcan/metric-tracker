@@ -206,6 +206,11 @@ function Message({ message, agent }: { message: ThreadComment; agent?: Agent }) 
         <div className={cn("flex flex-col gap-2.5 rounded-2xl rounded-tl-md px-4 py-3.5 sm:px-5 sm:py-4", MESSAGE_STYLES[message.type]?.bubble ?? "bg-muted")}>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
             <Badge variant={type.badge}>{type.label}</Badge>
+            {message.verdict && (
+              <Badge variant={message.verdict === "approve" ? "success" : "warning"}>
+                {message.verdict === "approve" ? "Approves" : "Asks for changes"}
+              </Badge>
+            )}
             {message.title && <h3 className="m-0 text-[15px] leading-snug font-bold text-foreground">{message.title}</h3>}
             {message.score !== undefined && <Score value={message.score} />}
           </div>

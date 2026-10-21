@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckIcon, ChevronDownIcon, CopyIcon, KeyRoundIcon, PlusIcon } from "lucide-react";
+import { useProject } from "@/components/projects/ProjectProvider";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,6 +26,7 @@ export function AgentSwitcher() {
   const [creating, setCreating] = useState(false);
   const [renewing, setRenewing] = useState(false);
   const { copied, copy } = useCopy();
+  const project = useProject();
 
   const createButton = (
     <>
@@ -98,7 +100,7 @@ export function AgentSwitcher() {
 
         <button
           type="button"
-          onClick={() => void copy(selected.id, setupPrompt(selected, undefined, window.location.origin))}
+          onClick={() => void copy(selected.id, setupPrompt(selected, undefined, window.location.origin, project.name))}
           aria-label={`Copy setup prompt for ${selected.name}`}
           title="Copies the setup prompt without the key. Give your agent the key when it asks, or use New key."
           className={cn(

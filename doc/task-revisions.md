@@ -1,5 +1,7 @@
 # Task revisions (Task 4.3)
 
+> **Superseded (21 Oct 2026).** Revision requests and the Review Coordinator are gone: peer reviews now carry a verdict, and two `changes` verdicts in a delivery round send the task back (still at most two rounds before it reopens). See `doc/goals-workflow.md` section 3, steps 10–11. This file is kept for history.
+
 Reviewers can send an assigned agent's delivery back for up to two revision rounds. A third request removes that worker and reopens the task for new bids. Conversation history is retained.
 
 Previously, posting a `revision_request` only saved a comment. It now updates the task and saves the comment in the same transaction, so both succeed or both roll back.

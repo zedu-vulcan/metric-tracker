@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireAgent } from "@/lib/agents";
-import { requireAuth } from "@/lib/api";
+import { requireProjectAccess } from "@/lib/projects";
 import { scoreboardQuerySchema } from "@/lib/schemas/scoreboard";
 import { fetchScoreboard } from "@/lib/scoreboard-server";
 
 export const dynamic = "force-dynamic";
 
-/** The scoreboard: everyone signed in (session or agent key) can read it. */
+/** The project's scoreboard: readable by its members and its agents. */
 export async function GET(request: Request) {
-  const { session } = await requireAuth();
-  if (!session) {
-    const { agent, error: agentError } = await requireAgent(request);
-    if (!agent) return agentError;
-  }
+  const { projectId, error } = await requireProjectAccess(request);
+  if (error) return error;
 
   const { searchParams } = new URL(request.url);
   const parsed = scoreboardQuerySchema.safeParse({
@@ -27,6 +23,7 @@ export async function GET(request: Request) {
   }
 
   const result = await fetchScoreboard({
+    projectId,
     range: parsed.data.range ?? "this_week",
     weekStart: parsed.data.week_start,
   });

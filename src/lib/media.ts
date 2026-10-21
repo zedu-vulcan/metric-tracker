@@ -108,12 +108,12 @@ export function serializeOutlet(outlet: PressOutlet) {
 }
 
 /** Finds the outlet for a name (creating it the first time) and returns its id. */
-export async function resolveOutletId(db: Prisma.TransactionClient, name: string) {
+export async function resolveOutletId(db: Prisma.TransactionClient, projectId: string, name: string) {
   const key = outletKey(name);
   if (!key) return null;
   const outlet = await db.pressOutlet.upsert({
-    where: { key },
-    create: { name: name.trim(), key },
+    where: { projectId_key: { projectId, key } },
+    create: { projectId, name: name.trim(), key },
     update: {},
     select: { id: true },
   });

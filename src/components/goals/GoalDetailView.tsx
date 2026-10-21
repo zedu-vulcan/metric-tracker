@@ -1,5 +1,6 @@
 "use client";
 
+import { useProject } from "@/components/projects/ProjectProvider";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRightIcon, CheckIcon, LayersIcon, LightbulbIcon, TargetIcon, XIcon } from "lucide-react";
@@ -45,6 +46,7 @@ const KINDS = {
 export function GoalDetailView({ goalId }: { goalId: string }) {
   const { goals, goalsLoading, ideas, ideasStatus, loadIdeas, currentUser, agentFor, approveIdea, rejectIdea } =
     useGoals();
+  const { href } = useProject();
   const [rejecting, setRejecting] = useState<Idea | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
         title="Goal not found"
         description="It may have been deleted, or the link is wrong."
         icon={TargetIcon}
-        backHref="/dashboard/goals"
+        backHref={href("/goals")}
         backLabel="Back to goals"
       />
     );
@@ -107,7 +109,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
 
   return (
     <>
-      <BackLink href="/dashboard/goals" label="Goals" />
+      <BackLink href={href("/goals")} label="Goals" />
       <PageHeader title={goal.title} description={goal.description || undefined} className="pt-2" />
 
       <PageContent>
@@ -148,7 +150,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
                   return (
                     <li key={workstream.id}>
                       <Link
-                        href={`/dashboard/goals/${goal.id}/workstreams/${workstream.id}`}
+                        href={href(`/goals/${goal.id}/workstreams/${workstream.id}`)}
                         className={cn(ITEM_CARD, ITEM_LINK, "flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-10")}
                       >
                         <ItemHeading style={KINDS.workstream} title={workstream.title} interactive>

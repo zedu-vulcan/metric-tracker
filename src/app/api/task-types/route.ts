@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAgent } from "@/lib/agents";
-import { requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { hasRole, requireProjectAccess } from "@/lib/projects";
 import { taskTypeCreateSchema } from "@/lib/schemas/task-types";
 import {
   createTaskType,
@@ -12,19 +11,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** Active task types. Readable with a Google session OR an agent key. */
+/** The project's active task types. Readable by its members and its agents. */
 export async function GET(request: Request) {
-  const store = prismaTaskTypesStore(prisma);
-
-  const { session } = await requireAuth();
-  let isAdmin = false;
-  if (session) {
-    const userId = (session.user as { id?: string }).id;
-    if (userId) isAdmin = await store.userIsPlatformAdmin(userId);
-  } else {
-    const { agent, error: agentError } = await requireAgent(request);
-    if (!agent) return agentError;
-  }
+  const { projectId, role, error } = await requireProjectAccess(request);
+  if (error) return error;
+  const store = prismaTaskTypesStore(prisma, projectId);
+  const isAdmin = role !== null && hasRole(role, "admin");
 
   const { searchParams } = new URL(request.url);
   const includeArchived = searchParams.get("include_archived") === "true";
@@ -36,12 +28,12 @@ export async function GET(request: Request) {
   return NextResponse.json(types.map(serializeTaskType));
 }
 
-/** Create a task type — platform admins only, enforced server-side. */
+/** Create a task type: project owners and admins only. */
 export async function POST(request: Request) {
-  const { session, error } = await requireAuth();
+  const { projectId, user, error } = await requireProjectAccess(request, { allowAgents: false, minimumRole: "admin" });
   if (error) return error;
 
-  const userId = (session.user as { id?: string }).id;
+  const userId = user?.id;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -64,11 +56,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const store = prismaTaskTypesStore(prisma);
-  if (!(await store.userIsPlatformAdmin(userId))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+  const store = prismaTaskTypesStore(prisma, projectId);
   const result = await createTaskType(store, parsed.data, { isAdmin: true, userId });
   return taskTypeMutationResponse(result, true);
 }

@@ -15,6 +15,7 @@ import type { ScoreboardResponse } from "@/lib/schemas/scoreboard";
 import { EarnPanel } from "./EarnPanel";
 import { HistoryDialog } from "./HistoryDialog";
 import { PointsTable } from "./PointsTable";
+import { apiFetch } from "@/lib/request-json";
 
 type RangeSelection = "this_week" | "last_week" | "all_time";
 
@@ -29,7 +30,7 @@ function formatPoints(value: number): string {
 }
 
 async function fetchScoreboardJson(range: RangeSelection): Promise<ScoreboardResponse> {
-  const response = await fetch(`/api/scoreboard?range=${range}`);
+  const response = await apiFetch(`/api/scoreboard?range=${range}`);
   if (!response.ok) throw new Error(`Failed to load the scoreboard (${response.status})`);
   return (await response.json()) as ScoreboardResponse;
 }

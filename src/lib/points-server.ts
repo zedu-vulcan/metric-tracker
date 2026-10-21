@@ -15,7 +15,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import {
-  DEFAULT_PROJECT_ID,
   getWeekRange,
   idempotencyKeyFor,
   isPointReason,
@@ -43,7 +42,6 @@ export type AwardOptions = {
   db?: PointsDb;
   /** A caller's Prisma transaction — payout and the caller's write commit together. */
   tx?: Prisma.TransactionClient;
-  projectId?: string;
   /** For `review_submitted`: the worker agent's owner id, to block self-reviews. */
   workerOwnerId?: string;
   now?: Date;
@@ -58,12 +56,13 @@ export interface PointsDb {
   /** Owner id of an agent, or null when the agent doesn't exist. */
   agentOwnerId(agentId: string): Promise<string | null>;
   sumLedger(input: {
+    projectId?: string;
     userId?: string;
     agentId?: string;
     reason?: PointReason;
     range?: WeekRange;
   }): Promise<number>;
-  getRule(ruleKey: string): Promise<PointRule | null>;
+  getRule(projectId: string, ruleKey: string): Promise<PointRule | null>;
 }
 
 // ── Prisma adapter ───────────────────────────────────────────────────────────
@@ -145,11 +144,12 @@ export function prismaPointsDb(client: PointsSqlClient): PointsDb {
       return rows[0]?.ownerId ?? null;
     },
 
-    async sumLedger({ userId, agentId, reason, range }) {
+    async sumLedger({ projectId, userId, agentId, reason, range }) {
       const rows = await client.$queryRaw<{ total: number }[]>`
         SELECT COALESCE(SUM(amount), 0)::int AS total
         FROM points_ledger
-        WHERE (${userId ?? null}::text IS NULL OR user_id = ${userId ?? ""})
+        WHERE (${projectId ?? null}::text IS NULL OR project_id = ${projectId ?? ""})
+          AND (${userId ?? null}::text IS NULL OR user_id = ${userId ?? ""})
           AND (${agentId ?? null}::text IS NULL OR agent_id = ${agentId ?? ""})
           AND (${reason ?? null}::text IS NULL OR reason = ${reason ?? ""})
           AND (${range?.start ?? null}::timestamptz IS NULL OR created_at >= ${range?.start ?? new Date(0)})
@@ -157,13 +157,13 @@ export function prismaPointsDb(client: PointsSqlClient): PointsDb {
       return rows[0]?.total ?? 0;
     },
 
-    async getRule(ruleKey) {
+    async getRule(projectId, ruleKey) {
       const rows = await client.$queryRaw<{
         rule_key: string;
         amount: number;
         enabled: boolean;
         weekly_cap: number | null;
-      }[]>`SELECT rule_key, amount, enabled, weekly_cap FROM point_rules WHERE rule_key = ${ruleKey} LIMIT 1`;
+      }[]>`SELECT rule_key, amount, enabled, weekly_cap FROM point_rules WHERE project_id = ${projectId} AND rule_key = ${ruleKey} LIMIT 1`;
       const rule = rows[0];
       if (!rule) return null;
       return { ruleKey: rule.rule_key, amount: rule.amount, enabled: rule.enabled, weeklyCap: rule.weekly_cap };
@@ -186,6 +186,7 @@ async function resolveDb(options?: AwardOptions): Promise<PointsDb> {
  * throw; infrastructure errors propagate so the caller can surface a 500.
  */
 export async function awardPoints(
+  projectId: string,
   userId: string,
   amount: number,
   reason: PointReason,
@@ -211,7 +212,7 @@ export async function awardPoints(
     id: randomUUID(),
     userId,
     agentId: meta?.agentId ?? null,
-    projectId: options?.projectId ?? DEFAULT_PROJECT_ID,
+    projectId,
     amount,
     reason,
     sourceType: meta?.sourceType ?? null,
@@ -234,33 +235,39 @@ export async function awardPoints(
  * `weekly_cap` by summing that reason's entries for the current week.
  */
 export async function awardForRule(
+  projectId: string,
   ruleKey: string,
   userId: string,
   meta?: AwardMeta,
   options?: AwardOptions & { range?: WeekRange }
 ): Promise<AwardResult> {
   const db = await resolveDb(options);
-  const rule = await db.getRule(ruleKey);
+  const rule = await db.getRule(projectId, ruleKey);
   if (!rule || !rule.enabled) return { awarded: false, entryId: "" };
 
   let amount = rule.amount;
   if (rule.weeklyCap != null) {
     const range = options?.range ?? getWeekRange(options?.now);
-    const used = await db.sumLedger({ userId, reason: ruleKey as PointReason, range });
+    const used = await db.sumLedger({ projectId, userId, reason: ruleKey as PointReason, range });
     const remaining = rule.weeklyCap - used;
     if (remaining <= 0) return { awarded: false, entryId: "" };
     amount = Math.min(rule.amount, remaining);
   }
 
-  return awardPoints(userId, amount, ruleKey as PointReason, meta, options);
+  return awardPoints(projectId, userId, amount, ruleKey as PointReason, meta, options);
 }
 
 // ── Point lookups ────────────────────────────────────────────────────────────
 
-/** Total points for a user, optionally within a week. */
-export async function getUserPoints(userId: string, range?: WeekRange, options?: AwardOptions): Promise<number> {
+/** A user's points in one project, optionally within a week. */
+export async function getUserPoints(
+  projectId: string,
+  userId: string,
+  range?: WeekRange,
+  options?: AwardOptions
+): Promise<number> {
   const db = await resolveDb(options);
-  return db.sumLedger({ userId, range });
+  return db.sumLedger({ projectId, userId, range });
 }
 
 /** Points attributed to one agent (unit 1's agent card), optionally within a week. */

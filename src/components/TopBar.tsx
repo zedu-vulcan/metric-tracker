@@ -1,5 +1,6 @@
 "use client";
 
+import { useProject } from "@/components/projects/ProjectProvider";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { LogOutIcon, UserRoundIcon } from "lucide-react";
@@ -27,6 +28,8 @@ export function TopBar({
   image?: string;
   initials: string;
 }) {
+  const { href } = useProject();
+
   return (
     <div className="flex h-16 shrink-0 items-center justify-end gap-2 border-b sm:gap-3 border-border px-4 sm:px-6">
       <PointsTotal />
@@ -51,7 +54,7 @@ export function TopBar({
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile">
+            <Link href={href("/profile")}>
               <UserRoundIcon aria-hidden="true" />
               Profile
             </Link>

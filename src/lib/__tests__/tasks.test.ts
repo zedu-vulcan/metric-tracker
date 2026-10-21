@@ -29,10 +29,10 @@ describe("goalTaskCreateSchema", () => {
     assert.equal(result.success, false);
   });
 
-  it("rejects invalid taskType", () => {
+  it("rejects a taskType that isn't a slug", () => {
     const result = goalTaskCreateSchema.safeParse({
       title: "Invalid type task",
-      taskType: "invalid_type",
+      taskType: "Not A Slug",
     });
     assert.equal(result.success, false);
   });
@@ -102,6 +102,7 @@ describe("Tasks Validation & Serialization", () => {
   it("serializes task correctly with ISO dates and relations", () => {
     const dummyTask = {
       id: "task-1",
+      projectId: "p1",
       workstreamId: null,
       taskType: null,
       title: "Follow up with client",
@@ -210,6 +211,7 @@ describe("Comment Validation & Registration", () => {
       title: "Peer review",
       body: "Looks good overall.",
       score: 8,
+      verdict: "approve",
     });
     assert.equal(parsed.success, true);
     if (parsed.success) {

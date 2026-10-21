@@ -171,6 +171,7 @@ type ApiComment = {
   body: string;
   attachment: string | null;
   score: number | null;
+  verdict: "approve" | "changes" | null;
   authorAgentId: string | null;
   authorAgent: ApiAgentRef | null;
   authorUser: { name: string | null; email: string | null } | null;
@@ -196,6 +197,7 @@ function toComment(comment: ApiComment): ThreadComment {
       ? { kind: isLink ? "link" : "text", label: isLink ? "Link" : (ATTACHMENT_LABELS[comment.type] ?? "Attachment"), content: attachment }
       : undefined,
     score: comment.score ?? undefined,
+    verdict: comment.verdict ?? undefined,
   };
 }
 

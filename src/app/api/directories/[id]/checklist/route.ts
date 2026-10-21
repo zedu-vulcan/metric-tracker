@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
 import { serializeChecklistItem } from "@/lib/directories";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { checklistItemCreateSchema } from "@/lib/schemas/directories";
 
 export const dynamic = "force-dynamic";
 
 /** Adds a custom requirement to one directory's checklist. */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const { error } = await requireAuth();
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   let body: unknown;
@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "Validation failed", details: result.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const directory = await prisma.directory.findUnique({ where: { id: params.id }, select: { id: true } });
+  const directory = await prisma.directory.findFirst({ where: { id: params.id, projectId }, select: { id: true } });
   if (!directory) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const last = await prisma.directoryChecklistItem.findFirst({

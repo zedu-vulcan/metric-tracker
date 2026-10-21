@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthContext, requireUser } from "@/lib/api";
+import { callerInProject } from "@/lib/projects";
 import { prisma } from "@/lib/prisma";
 import { goalUpdateSchema } from "@/lib/schemas/goals";
 
@@ -10,8 +11,8 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const { error } = await getAuthContext(request);
-  if (error) return error;
+  const auth = await getAuthContext(request);
+  if (auth.error) return auth.error;
 
   const { id } = params;
 
@@ -42,7 +43,8 @@ export async function GET(
     },
   });
 
-  if (!goal) {
+  const caller = auth.type === "agent" ? { agent: auth.agent } : { userId: auth.user.id };
+  if (!goal || !(await callerInProject(goal.projectId, caller))) {
     return NextResponse.json({ error: "Goal not found" }, { status: 404 });
   }
 
@@ -71,7 +73,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   // Only humans modify top-level goals; requireUser blocks agent keys with 403.
-  const { error } = await requireUser(request);
+  const { user, error } = await requireUser(request);
   if (error) return error;
 
   const { id } = params;
@@ -80,7 +82,7 @@ export async function PATCH(
     where: { id },
   });
 
-  if (!existing) {
+  if (!existing || !user || !(await callerInProject(existing.projectId, { userId: user.id }))) {
     return NextResponse.json({ error: "Goal not found" }, { status: 404 });
   }
 

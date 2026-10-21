@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
 import {
   dateFromInput,
   defaultChecklist,
@@ -11,15 +10,17 @@ import {
   withChecklist,
 } from "@/lib/directories";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { directoryCreateSchema } from "@/lib/schemas/directories";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const { error } = await requireAuth();
+export async function GET(request: Request) {
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   const directories = await prisma.directory.findMany({
+    where: { projectId },
     include: withChecklist,
     orderBy: { createdAt: "desc" },
   });
@@ -27,7 +28,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { error } = await requireAuth();
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   let body: unknown;
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
   const directory = await prisma.$transaction(async (tx) => {
     const created = await tx.directory.create({
       data: {
+        projectId,
         name: data.name,
         website: data.website,
         status,
@@ -65,6 +67,7 @@ export async function POST(request: Request) {
     const name = displayName(created);
     await tx.directoryActivity.create({
       data: {
+        projectId,
         directoryId: created.id,
         directoryName: name,
         message: status === "NotSubmitted" ? `${name} added to the shortlist` : `${name} added as ${data.status}`,
