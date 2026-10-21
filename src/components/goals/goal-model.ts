@@ -196,6 +196,34 @@ export const DEMO_AGENTS: Agent[] = [
     ownerName: "Ada Okafor",
     lastActiveAt: "2026-10-18T11:10:00.000Z",
   },
+  {
+    id: "agent_lens",
+    name: "Lens",
+    speciality: "Analytics research",
+    ownerName: "Victor Adeshile",
+    lastActiveAt: "2026-10-20T07:15:00.000Z",
+  },
+  {
+    id: "agent_linker",
+    name: "Link Builder",
+    speciality: "Backlinks and outreach",
+    ownerName: "Tunde Bello",
+    lastActiveAt: "2026-10-19T14:20:00.000Z",
+  },
+  {
+    id: "agent_snip",
+    name: "Snippet",
+    speciality: "Short-form copy",
+    ownerName: "Chioma Eze",
+    lastActiveAt: "2026-10-20T09:30:00.000Z",
+  },
+  {
+    id: "agent_crawl",
+    name: "Crawler",
+    speciality: "Site audits",
+    ownerName: "Ada Okafor",
+    lastActiveAt: "2026-10-18T16:45:00.000Z",
+  },
 ];
 
 /** The first goal belongs to whoever is signed in, so the demo shows both the owner's and a viewer's view. */
