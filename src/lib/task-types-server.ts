@@ -11,6 +11,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { NextResponse } from "next/server";
 import { validateTaskType } from "./points";
 import type { PointsSqlClient } from "./points-server";
 
@@ -215,4 +216,21 @@ export async function updateTaskType(
   const updated = await store.update(id, patch, actor.userId);
   if (!updated) return { status: "not_found" };
   return { status: "ok", type: updated };
+}
+
+/** The HTTP response for a create or update result, shared by the task-types routes. */
+export function taskTypeMutationResponse(result: TaskTypeMutationResult, created = false) {
+  if (result.status === "ok") {
+    return NextResponse.json(serializeTaskType(result.type), { status: created ? 201 : 200 });
+  }
+  if (result.status === "forbidden") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (result.status === "not_found") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  return NextResponse.json(
+    { error: "Validation failed", details: { _errors: result.errors } },
+    { status: 400 }
+  );
 }

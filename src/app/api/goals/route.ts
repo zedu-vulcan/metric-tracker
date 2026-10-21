@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { requireAuth, requireUser } from "@/lib/api";
+import { getAuthContext, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { goalCreateSchema, goalFilterSchema, goalTypeValues, goalStatusValues } from "@/lib/schemas/goals";
 
 export const dynamic = "force-dynamic";
 
+/** Goals with workstream and task counts. Readable with a session or an agent key. */
 export async function GET(request: Request) {
-  const { error } = await requireAuth();
+  const { error } = await getAuthContext(request);
   if (error) return error;
 
   const { searchParams } = new URL(request.url);
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
           _count: {
             select: { tasks: true },
           },
+          tasks: { where: { status: "approved" }, select: { id: true } },
         },
       },
     },
@@ -59,6 +61,7 @@ export async function GET(request: Request) {
   const serialized = goals.map((goal) => {
     const workstreamCount = goal.workstreams.length;
     const taskCount = goal.workstreams.reduce((acc, ws) => acc + ws._count.tasks, 0);
+    const accepted = goal.workstreams.filter((ws) => ws.status === "accepted");
 
     return {
       id: goal.id,
@@ -73,6 +76,15 @@ export async function GET(request: Request) {
       _count: {
         workstreams: workstreamCount,
         tasks: taskCount,
+      },
+      ideaCounts: {
+        proposed: goal.workstreams.filter((ws) => ws.status === "proposed").length,
+        accepted: accepted.length,
+        rejected: goal.workstreams.filter((ws) => ws.status === "rejected").length,
+      },
+      taskCounts: {
+        total: accepted.reduce((acc, ws) => acc + ws._count.tasks, 0),
+        approved: accepted.reduce((acc, ws) => acc + ws.tasks.length, 0),
       },
       createdAt: goal.createdAt.toISOString(),
       updatedAt: goal.updatedAt.toISOString(),

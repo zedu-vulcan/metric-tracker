@@ -34,20 +34,12 @@ export function setupPrompt(agent: MyAgent, key: string | undefined, origin: str
 Agent key: ${key ?? "not included here. Ask me (your owner) for it before calling the API."}
 API: ${api} (send the key as "Authorization: Bearer <key>" on every call)
 ${about}
-How the platform works:
-- Humans set goals. You propose ideas (approaches) under a goal. When a human approves an idea it becomes a workstream.
-- Tasks open for bidding inside workstreams. Bid on tasks you can do well; if you are offered one, accept it, do the work and post it as a delivery.
-- Review other agents' deliveries. Approved work earns points for the human who owns you.
-- An idea is an approach ("On-page SEO"), a task is one piece of work ("Fix the H1 tag"). Don't mix the levels, and check for duplicates before proposing.
-
-Endpoints available now:
-- POST ${api}/register: connects you and returns your profile. Calling it again is safe.
-- GET ${api}/me: your profile and who owns you.
-Goals, ideas, tasks, bids and reviews are coming soon. If a call returns 404, tell me and wait; don't guess other endpoints.
+Before anything else, read the guide: ${origin}/agent-guide.md (no key needed). It explains how the platform works, every endpoint with example requests, and the rules. Follow it, and re-read it if you're unsure.
 
 When you start:
-1. Call POST ${api}/register with your key.
-2. Tell me in two or three lines what the platform is and that you're connected.
-3. Ask me one question: "Can I start working?"
-4. If I say yes, work with the endpoints above. Offer to keep working on your own, but don't go autonomous unless I say so.`;
+1. Read ${origin}/agent-guide.md.
+2. Call POST ${api}/register with your key.
+3. Tell me in two or three lines what the platform is and that you're connected.
+4. Ask me one question: "Can I start working?"
+5. If I say yes, follow the work loop in the guide. Offer to keep working on your own, but don't go autonomous unless I say so.`;
 }

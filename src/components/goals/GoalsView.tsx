@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRightIcon, PlusIcon, TargetIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
 import { PillSelect, SearchPill, Toolbar, ToolbarGroup } from "@/components/Toolbar";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,13 +17,14 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { GOAL_TYPES, summarizeGoal, type Goal, type GoalSummary } from "./goal-model";
+import { Skeleton } from "@/components/ui/skeleton";
+import { GOAL_TYPES, goalTypeLabel, type Goal, type GoalCounts } from "./goal-model";
 import { GoalFormDialog } from "./GoalFormDialog";
 import { OwnerAvatar, TaskProgress } from "./GoalParts";
 import { useGoals } from "./GoalsProvider";
 
 export function GoalsView() {
-  const { goals, ideas, tasks, currentUser, createGoal } = useGoals();
+  const { goals, goalsLoading, goalsError, reloadGoals, currentUser, createGoal } = useGoals();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
@@ -38,13 +40,13 @@ export function GoalsView() {
           (!query || goal.title.toLowerCase().includes(query) || goal.description.toLowerCase().includes(query))
       )
       .map((goal) => {
-        const summary = summarizeGoal(goal.id, ideas, tasks);
+        const summary = goal.counts;
         const ownedByYou = goal.ownerId === currentUser.id;
         const rank = ownedByYou && summary.pendingIdeas > 0 ? 0 : ownedByYou ? 1 : 2;
         return { goal, summary, ownedByYou, rank };
       })
       .sort((a, b) => a.rank - b.rank);
-  }, [goals, ideas, tasks, currentUser.id, search, typeFilter]);
+  }, [goals, currentUser.id, search, typeFilter]);
 
   const filtering = search !== "" || typeFilter !== "all";
 
@@ -60,13 +62,15 @@ export function GoalsView() {
               label="Type"
               value={typeFilter}
               onChange={setTypeFilter}
-              options={[{ value: "all", label: "All" }, ...GOAL_TYPES.map((type) => ({ value: type, label: type }))]}
+              options={[{ value: "all", label: "All" }, ...GOAL_TYPES]}
             />
           </ToolbarGroup>
           <div className="flex items-center justify-between gap-4">
-            <p className="m-0 text-sm text-muted-foreground tabular-nums" aria-live="polite">
-              {filtering ? `${filtered.length} of ${plural(goals.length, "goal")}` : plural(goals.length, "goal")}
-            </p>
+            {!goalsLoading && (
+              <p className="m-0 text-sm text-muted-foreground tabular-nums" aria-live="polite">
+                {filtering ? `${filtered.length} of ${plural(goals.length, "goal")}` : plural(goals.length, "goal")}
+              </p>
+            )}
             <Button onClick={() => setFormOpen(true)}>
               <PlusIcon data-icon="inline-start" aria-hidden="true" />
               New goal
@@ -74,7 +78,27 @@ export function GoalsView() {
           </div>
         </Toolbar>
 
-        {filtered.length === 0 ? (
+        {goalsError && (
+          <Alert variant="destructive">
+            <AlertTitle>Couldn&rsquo;t load goals</AlertTitle>
+            <AlertDescription>Check your connection and try again.</AlertDescription>
+            <AlertAction>
+              <Button variant="outline" size="sm" onClick={reloadGoals}>
+                Try again
+              </Button>
+            </AlertAction>
+          </Alert>
+        )}
+
+        {goalsLoading ? (
+          <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-4 p-0 md:grid-cols-2 2xl:grid-cols-3" aria-busy="true" aria-label="Loading goals">
+            {[0, 1, 2].map((index) => (
+              <li key={index}>
+                <Skeleton className="h-52 rounded-[22px]" />
+              </li>
+            ))}
+          </ul>
+        ) : goalsError && goals.length === 0 ? null : filtered.length === 0 ? (
           <section className="rounded-[22px] border border-border bg-card p-5">
             <Empty className="py-12">
               <EmptyHeader>
@@ -124,7 +148,7 @@ export function GoalsView() {
       <GoalFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
-        onCreate={(input) => router.push(`/dashboard/goals/${createGoal(input).id}`)}
+        onCreate={async (input) => router.push(`/dashboard/goals/${(await createGoal(input)).id}`)}
       />
     </>
   );
@@ -141,7 +165,7 @@ function GoalCard({
   ownerImage,
 }: {
   goal: Goal;
-  summary: GoalSummary;
+  summary: GoalCounts;
   ownedByYou: boolean;
   ownerImage?: string;
 }) {
@@ -174,7 +198,7 @@ function GoalCard({
           <p className="m-0 flex min-w-0 items-center gap-2 text-[13px] text-muted-foreground">
             <OwnerAvatar name={goal.ownerName} image={ownerImage} />
             <span className="truncate">
-              <span className="font-semibold text-foreground">{ownedByYou ? "You" : goal.ownerName}</span> · {goal.type} ·{" "}
+              <span className="font-semibold text-foreground">{ownedByYou ? "You" : goal.ownerName}</span> · {goalTypeLabel(goal.type)} ·{" "}
               {plural(summary.workstreams, "workstream")}
             </span>
           </p>

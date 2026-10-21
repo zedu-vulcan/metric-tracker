@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { requestJson } from "@/lib/request-json";
 import type { AgentAvatar, MyAgent } from "./agent-model";
 
 const SELECTED_KEY = "zedu-amp:selected-agent";
@@ -19,19 +20,6 @@ type AgentsContextValue = {
 };
 
 const AgentsContext = createContext<AgentsContextValue | undefined>(undefined);
-
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-  const body: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message = (body as { error?: string } | null)?.error;
-    throw new Error(message && message !== "Validation failed" ? message : "Something went wrong. Try again.");
-  }
-  return body as T;
-}
 
 function splitKey({ key, ...agent }: MyAgent & { key: string }): AgentWithKey {
   return { agent, key };

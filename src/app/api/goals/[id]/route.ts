@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireAuth, requireUser } from "@/lib/api";
+import { getAuthContext, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { goalUpdateSchema } from "@/lib/schemas/goals";
 
 export const dynamic = "force-dynamic";
 
+/** One goal with its accepted workstreams and pending ideas. Readable with a session or an agent key. */
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const { error } = await requireAuth();
+  const { error } = await getAuthContext(request);
   if (error) return error;
 
   const { id } = params;
@@ -22,7 +23,9 @@ export async function GET(
       },
       workstreams: {
         include: {
-          proposedByAgent: { select: { id: true, name: true, speciality: true } },
+          proposedByAgent: {
+            select: { id: true, name: true, speciality: true, lastActiveAt: true, owner: { select: { name: true } } },
+          },
           acceptedBy: { select: { id: true, name: true, email: true } },
           tasks: {
             select: {
@@ -45,6 +48,7 @@ export async function GET(
 
   const acceptedWorkstreams = goal.workstreams.filter((ws) => ws.status === "accepted");
   const pendingIdeas = goal.workstreams.filter((ws) => ws.status === "proposed");
+  const rejectedIdeas = goal.workstreams.filter((ws) => ws.status === "rejected");
 
   return NextResponse.json({
     id: goal.id,
@@ -56,6 +60,7 @@ export async function GET(
     createdBy: goal.createdBy,
     acceptedWorkstreams,
     pendingIdeas,
+    rejectedIdeas,
     createdAt: goal.createdAt.toISOString(),
     updatedAt: goal.updatedAt.toISOString(),
   });

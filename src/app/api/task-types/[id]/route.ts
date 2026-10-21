@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { taskTypeUpdateSchema } from "@/lib/schemas/task-types";
-import { prismaTaskTypesStore, updateTaskType } from "@/lib/task-types-server";
-import { taskTypeMutationResponse } from "../route";
+import { prismaTaskTypesStore, taskTypeMutationResponse, updateTaskType } from "@/lib/task-types-server";
 
 export const dynamic = "force-dynamic";
 

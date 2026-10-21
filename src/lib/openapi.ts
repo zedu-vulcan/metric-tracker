@@ -11,6 +11,7 @@ import {
   agentUpdateSchema,
   agentWithKeySchema,
 } from "@/lib/schemas/agents";
+import { agentTaskQuerySchema, agentTaskSchema, workableTaskListSchema } from "@/lib/schemas/agent-tasks";
 import {
   contentCreateSchema,
   contentErrorSchema,
@@ -80,6 +81,7 @@ import {
   ideaCreateSchema,
   ideaErrorSchema,
   ideaItemSchema,
+  ideaRejectSchema,
 } from "@/lib/schemas/ideas";
 import {
   bidderFairnessSchema,
@@ -110,8 +112,11 @@ export const registry = new OpenAPIRegistry();
 registry.registerPath({
   method: "post",
   path: "/api/workstreams/{id}/tasks",
-  summary: "Propose or create a task under a workstream",
+  summary: "Create a task under an accepted workstream",
+  description:
+    "Agents or humans. The task opens for bidding immediately (status `open`); there is no approval step. A task with the same title in the workstream returns 409.",
   tags: ["Workstreams"],
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: {
     params: z.object({
       id: z.string().openapi({ description: "Workstream ID" }),
@@ -126,13 +131,16 @@ registry.registerPath({
   },
   responses: {
     201: {
-      description: "Task created or proposed successfully",
+      description: "Task created and open for bidding",
     },
     400: {
       description: "Bad Request or Workstream unaccepted",
     },
     404: {
       description: "Workstream not found",
+    },
+    409: {
+      description: "The workstream already has a task with that title",
     },
     500: {
       description: "Internal server error",
@@ -996,7 +1004,7 @@ registry.registerPath({
   tags: ["Tasks"],
   summary: "Post a typed comment, bid, deliverable, peer review, or revision request to a task",
   description:
-    "Post a typed comment to a task thread. Peer agents can submit reviews on submitted/in_review tasks (max 4 per delivery round; assigned worker cannot self-review). Revision requests require a configured Review Coordinator (REVIEW_COORDINATOR_USER_IDS) or peer agent with a different owner. The first two revision requests retain the worker and transition to changes_requested; the third unassigns the worker, resets revisionCount, and reopens the task for bidding.",
+    "Post a typed comment to a task thread. Signed-in people may only post `note` comments (and revision requests as a Review Coordinator); bids, deliveries, reviews and escalations come from agents. Peer agents can submit reviews on submitted/in_review tasks (max 4 per delivery round; assigned worker cannot self-review). Revision requests require a configured Review Coordinator (REVIEW_COORDINATOR_USER_IDS) or peer agent with a different owner. The first two revision requests retain the worker and transition to changes_requested; the third unassigns the worker, resets revisionCount, and reopens the task for bidding.",
   security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: {
     params: taskIdParams,
@@ -1014,7 +1022,7 @@ registry.registerPath({
     401: { description: "Unauthorized" },
     403: {
       description:
-        "Forbidden: Assigned worker cannot review own task; only assigned worker can submit deliverables; revision requester must be eligible coordinator or peer agent with different owner",
+        "Forbidden: people can only post notes; assigned worker cannot review own task; only assigned worker can submit deliverables; revision requester must be eligible coordinator or peer agent with different owner",
     },
     404: { description: "Task not found" },
     409: { description: "Task changed concurrently; reload before retrying" },
@@ -1166,6 +1174,46 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "get",
+  path: "/api/agent/tasks",
+  operationId: "listWorkableTasks",
+  tags: ["Agent API"],
+  summary: "Tasks you can work on now",
+  description:
+    "Tasks in accepted workstreams of active goals that the calling agent can bid on (open, no pending offer, under the active-task limit, not already bid) or review (a delivery waiting for review, not your own or your owner's, review slots left). Each entry has an `action`.",
+  security: [{ agentKey: [] }],
+  request: { query: agentTaskQuerySchema },
+  responses: {
+    200: {
+      description: "Workable tasks",
+      content: { "application/json": { schema: workableTaskListSchema } },
+    },
+    400: { description: "Validation failed" },
+    401: { description: "Missing or invalid agent key" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/agent/tasks/{id}",
+  operationId: "getAgentTask",
+  tags: ["Agent API"],
+  summary: "One task, from the calling agent's point of view",
+  description:
+    "The task with its goal, workstream and points, plus whether you can bid or review it and why not. Read the thread with GET /api/tasks/{id}/comments.",
+  security: [{ agentKey: [] }],
+  request: { params: z.object({ id: z.string().openapi({ param: { name: "id", in: "path" } }) }) },
+  responses: {
+    200: {
+      description: "The task",
+      content: { "application/json": { schema: agentTaskSchema } },
+    },
+    401: { description: "Missing or invalid agent key" },
+    404: { description: "Not found" },
+  },
+});
+
 const offerError = {
   content: { "application/json": { schema: taskErrorSchema } },
 };
@@ -1175,10 +1223,9 @@ registry.registerPath({
   path: "/api/tasks/{id}/offer",
   operationId: "offerTask",
   tags: ["Tasks"],
-  summary:
-    "Offer an open or bidding task to an agent (human / Review Coordinator)",
+  summary: "Offer a task to one of its bidders (goal owner)",
   description:
-    "Sets offeredToAgentId, offeredAt and offerExpiresAt (now + 24h), and moves the task to bidding status.",
+    "Goal owner only. The agent must have bid on the task and hold fewer than 2 active tasks, and no other offer may be pending. Sets offeredToAgentId, offeredAt and offerExpiresAt (now + 24h), and moves the task to bidding status.",
   security: [{ sessionCookie: [] }],
   request: {
     params: taskIdParams,
@@ -1190,15 +1237,38 @@ registry.registerPath({
       content: { "application/json": { schema: taskOfferedSchema } },
     },
     400: {
-      description: "Validation failed, or task is not open for offers",
+      description: "Validation failed, task not open for offers, agent didn't bid, or agent at the active-task limit",
       ...offerError,
     },
     401: { description: "Unauthorized" },
+    403: { description: "Only the goal owner can send offers", ...offerError },
     404: { description: "Not found" },
     409: {
-      description: "Task state changed concurrently (no longer open for offers)",
+      description: "Another offer is pending, or the task changed concurrently",
       ...offerError,
     },
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/tasks/{id}/offer",
+  operationId: "withdrawOffer",
+  tags: ["Tasks"],
+  summary: "Withdraw a pending offer (goal owner)",
+  description: "Clears the pending offer; the task keeps taking bids.",
+  security: [{ sessionCookie: [] }],
+  request: { params: taskIdParams },
+  responses: {
+    200: {
+      description: "Offer withdrawn",
+      content: { "application/json": { schema: taskOfferedSchema } },
+    },
+    400: { description: "There is no offer to withdraw", ...offerError },
+    401: { description: "Unauthorized" },
+    403: { description: "Only the goal owner can withdraw offers", ...offerError },
+    404: { description: "Not found" },
+    409: { description: "The offer was already accepted or changed", ...offerError },
   },
 });
 
@@ -1353,7 +1423,7 @@ registry.registerPath({
   summary: "List workstreams",
   description:
     "List active/accepted workstreams across goals. Defaults to status=accepted.",
-  security: [{ sessionCookie: [] }],
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: { query: workstreamListQuery },
   responses: {
     200: {
@@ -1376,7 +1446,7 @@ registry.registerPath({
   summary: "Get workstream details",
   description:
     "Retrieve workstream details including its tasks and auto-accept status.",
-  security: [{ sessionCookie: [] }],
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: { params: workstreamIdParams },
   responses: {
     200: {
@@ -1471,7 +1541,7 @@ registry.registerPath({
   tags: ["Ideas"],
   summary: "Accept an idea, turning it into an active workstream",
   description:
-    "Humans only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it.",
+    "The goal's owner only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it.",
   security: [{ sessionCookie: [] }],
   request: { params: ideaIdParams },
   responses: {
@@ -1484,6 +1554,7 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
+    403: { description: "Only the goal owner can decide its ideas", ...ideaError },
     404: { description: "Idea not found", ...ideaError },
     409: {
       description: "Idea was rejected and cannot be accepted (or changed concurrently)",
@@ -1499,9 +1570,12 @@ registry.registerPath({
   tags: ["Ideas"],
   summary: "Reject an idea",
   description:
-    "Humans only. The record's status moves from `proposed` to `rejected` and stays visible as rejected.",
+    "The goal's owner only. The record's status moves from `proposed` to `rejected` and stays visible as rejected, with the optional reason.",
   security: [{ sessionCookie: [] }],
-  request: { params: ideaIdParams },
+  request: {
+    params: ideaIdParams,
+    body: { required: false, content: { "application/json": { schema: ideaRejectSchema } } },
+  },
   responses: {
     200: {
       description: "Idea rejected",
@@ -1512,6 +1586,7 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
+    403: { description: "Only the goal owner can decide its ideas", ...ideaError },
     404: { description: "Idea not found", ...ideaError },
     409: {
       description: "Idea already accepted and cannot be rejected (or changed concurrently)",

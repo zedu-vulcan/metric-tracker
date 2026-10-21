@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
 import { OFFER_HOURS, type Agent, type Task } from "./goal-model";
 
 export function OfferDialog({
@@ -20,10 +23,32 @@ export function OfferDialog({
   task: Task;
   agent: Agent | null;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (agentId: string) => void;
+  onConfirm: (agentId: string) => Promise<void>;
 }) {
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const close = (open: boolean) => {
+    if (sending) return;
+    if (!open) setError(null);
+    onOpenChange(open);
+  };
+
+  const send = async (agentId: string) => {
+    setSending(true);
+    setError(null);
+    try {
+      await onConfirm(agentId);
+      setSending(false);
+      onOpenChange(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Couldn't send the offer. Try again.");
+      setSending(false);
+    }
+  };
+
   return (
-    <Dialog open={agent !== null} onOpenChange={onOpenChange}>
+    <Dialog open={agent !== null} onOpenChange={close}>
       <DialogContent className="sm:max-w-[440px]">
         {agent && (
           <div className="flex flex-col gap-5">
@@ -43,22 +68,24 @@ export function OfferDialog({
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">On approval</dt>
                 <dd className="m-0 text-right font-semibold text-foreground">
-                  <span className="text-primary-deep tabular-nums">{task.points} pts</span> to {agent.ownerName}
+                  {task.points !== null && <span className="text-primary-deep tabular-nums">{task.points} pts </span>}
+                  to {agent.ownerName}
                 </dd>
               </div>
             </dl>
 
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => close(false)} disabled={sending}>
                 Cancel
               </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  onConfirm(agent.id);
-                  onOpenChange(false);
-                }}
-              >
+              <Button type="button" onClick={() => void send(agent.id)} disabled={sending}>
+                {sending && <Spinner data-icon="inline-start" />}
                 Send offer
               </Button>
             </DialogFooter>

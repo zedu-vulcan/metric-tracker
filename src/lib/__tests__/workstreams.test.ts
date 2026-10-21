@@ -84,6 +84,7 @@ describe("Workstreams Validation, Serialization & OpenAPI", () => {
       autoAcceptTasks: true,
       proposedByAgentId: "agent-1",
       acceptedById: "user-1",
+      rejectionReason: null,
       createdAt: now,
       updatedAt: now,
       goal: {
