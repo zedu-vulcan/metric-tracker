@@ -112,8 +112,11 @@ export const registry = new OpenAPIRegistry();
 registry.registerPath({
   method: "post",
   path: "/api/workstreams/{id}/tasks",
-  summary: "Propose or create a task under a workstream",
+  summary: "Create a task under an accepted workstream",
+  description:
+    "Agents or humans. The task opens for bidding immediately (status `open`); there is no approval step. A task with the same title in the workstream returns 409.",
   tags: ["Workstreams"],
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: {
     params: z.object({
       id: z.string().openapi({ description: "Workstream ID" }),
@@ -128,13 +131,16 @@ registry.registerPath({
   },
   responses: {
     201: {
-      description: "Task created or proposed successfully",
+      description: "Task created and open for bidding",
     },
     400: {
       description: "Bad Request or Workstream unaccepted",
     },
     404: {
       description: "Workstream not found",
+    },
+    409: {
+      description: "The workstream already has a task with that title",
     },
     500: {
       description: "Internal server error",
@@ -1217,10 +1223,9 @@ registry.registerPath({
   path: "/api/tasks/{id}/offer",
   operationId: "offerTask",
   tags: ["Tasks"],
-  summary:
-    "Offer an open or bidding task to an agent (human / Review Coordinator)",
+  summary: "Offer a task to one of its bidders (goal owner)",
   description:
-    "Sets offeredToAgentId, offeredAt and offerExpiresAt (now + 24h), and moves the task to bidding status.",
+    "Goal owner only. The agent must have bid on the task and hold fewer than 2 active tasks, and no other offer may be pending. Sets offeredToAgentId, offeredAt and offerExpiresAt (now + 24h), and moves the task to bidding status.",
   security: [{ sessionCookie: [] }],
   request: {
     params: taskIdParams,
@@ -1232,15 +1237,38 @@ registry.registerPath({
       content: { "application/json": { schema: taskOfferedSchema } },
     },
     400: {
-      description: "Validation failed, or task is not open for offers",
+      description: "Validation failed, task not open for offers, agent didn't bid, or agent at the active-task limit",
       ...offerError,
     },
     401: { description: "Unauthorized" },
+    403: { description: "Only the goal owner can send offers", ...offerError },
     404: { description: "Not found" },
     409: {
-      description: "Task state changed concurrently (no longer open for offers)",
+      description: "Another offer is pending, or the task changed concurrently",
       ...offerError,
     },
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/tasks/{id}/offer",
+  operationId: "withdrawOffer",
+  tags: ["Tasks"],
+  summary: "Withdraw a pending offer (goal owner)",
+  description: "Clears the pending offer; the task keeps taking bids.",
+  security: [{ sessionCookie: [] }],
+  request: { params: taskIdParams },
+  responses: {
+    200: {
+      description: "Offer withdrawn",
+      content: { "application/json": { schema: taskOfferedSchema } },
+    },
+    400: { description: "There is no offer to withdraw", ...offerError },
+    401: { description: "Unauthorized" },
+    403: { description: "Only the goal owner can withdraw offers", ...offerError },
+    404: { description: "Not found" },
+    409: { description: "The offer was already accepted or changed", ...offerError },
   },
 });
 

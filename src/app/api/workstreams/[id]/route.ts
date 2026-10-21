@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { taskBoardExtras } from "@/lib/task-board";
 import { authenticateAgentRequest, serializeWorkstreamDetail } from "@/lib/workstreams";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(serializeWorkstreamDetail(workstream));
+  const extras = await taskBoardExtras(workstream.tasks);
+  const detail = serializeWorkstreamDetail(workstream);
+
+  return NextResponse.json({
+    ...detail,
+    tasks: detail.tasks.map((task) => ({ ...task, ...extras.get(task.id) })),
+  });
 }
 

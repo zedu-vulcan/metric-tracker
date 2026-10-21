@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { TabsTrigger } from "@/components/ui/tabs";
@@ -130,6 +131,20 @@ export function GoalPageLoading() {
       <Skeleton className="h-4 w-full max-w-xl rounded-full" />
       <Skeleton className="mt-4 h-40 w-full rounded-[22px]" />
     </PageContent>
+  );
+}
+
+/** A failed first load, with a retry. */
+export function LoadError({ children, onRetry }: { children: React.ReactNode; onRetry: () => void }) {
+  return (
+    <Alert variant="destructive">
+      <AlertDescription>{children}</AlertDescription>
+      <AlertAction>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          Try again
+        </Button>
+      </AlertAction>
+    </Alert>
   );
 }
 

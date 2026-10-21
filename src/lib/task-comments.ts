@@ -1,11 +1,12 @@
 import type { Prisma, Task } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { commentCreateSchema } from "@/lib/schemas/comments";
+import { commentAuthorAgentSelect, serializeAgentRef } from "@/lib/task-board";
 import { taskIdParamsSchema } from "@/lib/schemas/tasks";
 import type { z } from "@/lib/zod";
 
 export const commentAuthors = {
-  authorAgent: { select: { id: true, name: true, speciality: true } },
+  authorAgent: { select: commentAuthorAgentSelect },
   authorUser: { select: { id: true, name: true, email: true } },
 } satisfies Prisma.TaskCommentInclude;
 
@@ -39,6 +40,7 @@ export function isReviewCoordinator(userId: string, configuredIds = process.env.
 export function serializeTaskComment(comment: SavedTaskComment) {
   return {
     ...comment,
+    authorAgent: comment.authorAgent ? serializeAgentRef(comment.authorAgent) : null,
     createdAt: comment.createdAt.toISOString(),
     updatedAt: comment.updatedAt.toISOString(),
   };

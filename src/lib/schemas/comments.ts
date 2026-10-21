@@ -52,6 +52,8 @@ export const commentItemSchema = z
         id: z.string(),
         name: z.string(),
         speciality: z.string(),
+        ownerName: z.string().nullable(),
+        lastActiveAt: z.iso.datetime(),
       })
       .nullable()
       .optional(),

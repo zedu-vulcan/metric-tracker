@@ -49,7 +49,7 @@ export async function POST(
   // Rule: Tasks cannot be proposed under an unaccepted idea/workstream.
   const workstream = await prisma.workstream.findUnique({
     where: { id: workstreamId },
-    select: { id: true, status: true, autoAcceptTasks: true },
+    select: { id: true, status: true },
   });
 
   if (!workstream) {
@@ -68,17 +68,26 @@ export async function POST(
 
   const { title, description, taskType } = result.data;
 
-  // 5. Determine initial status based on workstream's autoAcceptTasks setting
-  const initialStatus = workstream.autoAcceptTasks ? "open" : "proposed";
+  // 5. Agents check for duplicates before proposing; enforce it for exact title matches.
+  const duplicate = await prisma.task.findFirst({
+    where: { workstreamId, title: { equals: title, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (duplicate) {
+    return NextResponse.json(
+      { error: "This workstream already has a task with that title", taskId: duplicate.id },
+      { status: 409 },
+    );
+  }
 
-  // 6. Create the task record
+  // 6. Tasks open for bidding as soon as they're created; there is no human approval step.
   const newTask = await prisma.task.create({
     data: {
       workstreamId,
       title,
       description: description ?? null,
       taskType,
-      status: initialStatus,
+      status: "open",
     },
   });
 

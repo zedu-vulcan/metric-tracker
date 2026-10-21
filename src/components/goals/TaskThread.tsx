@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import {
   CheckIcon,
   CopyIcon,
-  FileIcon,
   FileTextIcon,
   LinkIcon,
   MessagesSquareIcon,
@@ -27,16 +26,13 @@ import {
   type Attachment,
   type CommentType,
   type ThreadComment,
-  type ThreadEntry,
 } from "./thread-model";
 
 type Filter = "all" | CommentType;
 
-/** What the agents themselves posted. Bids have their own tab; status events and human decisions aren't shown in the thread. */
-export function agentMessages(entries: ThreadEntry[]): ThreadComment[] {
-  return entries.filter(
-    (entry): entry is ThreadComment => entry.kind === "comment" && entry.author.kind === "agent" && entry.type !== "bid"
-  );
+/** What the agents themselves posted. Bids have their own tab; human decisions aren't shown in the thread. */
+export function agentMessages(comments: ThreadComment[]): ThreadComment[] {
+  return comments.filter((comment) => comment.author.kind === "agent" && comment.type !== "bid");
 }
 
 /**
@@ -145,7 +141,7 @@ function Message({ message, agent }: { message: ThreadComment; agent?: Agent }) 
         <div className={cn("flex flex-col gap-2.5 rounded-2xl rounded-tl-md px-4 py-3.5 sm:px-5 sm:py-4", MESSAGE_STYLES[message.type]?.bubble ?? "bg-muted")}>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
             <Badge variant={type.badge}>{type.label}</Badge>
-            <h3 className="m-0 text-[15px] leading-snug font-bold text-foreground">{message.title}</h3>
+            {message.title && <h3 className="m-0 text-[15px] leading-snug font-bold text-foreground">{message.title}</h3>}
             {message.score !== undefined && <Score value={message.score} />}
           </div>
           <p className="m-0 max-w-[72ch] text-sm leading-relaxed whitespace-pre-line text-foreground/85">{message.body}</p>
@@ -172,7 +168,7 @@ function Score({ value }: { value: number }) {
   );
 }
 
-const ATTACHMENT_ICONS = { text: FileTextIcon, file: FileIcon, link: LinkIcon };
+const ATTACHMENT_ICONS = { text: FileTextIcon, link: LinkIcon };
 
 /** The deliverable on its own, so copying it gives only the work and none of the chatter. */
 function AttachmentBlock({ attachment }: { attachment: Attachment }) {
@@ -205,9 +201,20 @@ function AttachmentBlock({ attachment }: { attachment: Attachment }) {
           {copied ? "Copied" : "Copy"}
         </Button>
       </div>
-      <pre className="m-0 max-h-64 overflow-auto px-3.5 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground/85">
-        {attachment.content}
-      </pre>
+      {attachment.kind === "link" ? (
+        <a
+          href={attachment.content}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="truncate px-3.5 py-3 font-mono text-xs text-primary-deep underline-offset-2 hover:underline"
+        >
+          {attachment.content}
+        </a>
+      ) : (
+        <pre className="m-0 max-h-64 overflow-auto px-3.5 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground/85">
+          {attachment.content}
+        </pre>
+      )}
     </div>
   );
 }

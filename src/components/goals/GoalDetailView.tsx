@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { goalTypeLabel, shortDate, summarizeGoal, summarizeTasks, type Agent, type Idea } from "./goal-model";
+import { goalTypeLabel, shortDate, summarizeTasks, type Agent, type Idea } from "./goal-model";
 import {
   BackLink,
   GoalPageLoading,
@@ -43,7 +43,7 @@ const KINDS = {
 } satisfies Record<string, ItemStyle>;
 
 export function GoalDetailView({ goalId }: { goalId: string }) {
-  const { goals, goalsLoading, ideas, ideasStatus, loadIdeas, tasks, currentUser, agentFor, approveIdea, rejectIdea } =
+  const { goals, goalsLoading, ideas, ideasStatus, loadIdeas, currentUser, agentFor, approveIdea, rejectIdea } =
     useGoals();
   const [rejecting, setRejecting] = useState<Idea | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
@@ -90,7 +90,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
   const proposed = goalIdeas.filter((idea) => idea.status === "proposed");
   const rejected = goalIdeas.filter((idea) => idea.status === "rejected");
   const workstreams = goalIdeas.filter((idea) => idea.status === "accepted");
-  const summary = summarizeGoal(goal.id, ideas, tasks);
+  const summary = summarizeTasks(workstreams.flatMap((workstream) => workstream.taskStatuses));
   const status = ideasStatus(goal.id);
   const ideasPending = status === undefined || status === "loading";
   const loadFailed = (
@@ -144,7 +144,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
             ) : (
               <CardStack>
                 {workstreams.map((workstream) => {
-                  const work = summarizeTasks(tasks.filter((task) => task.workstreamId === workstream.id));
+                  const work = summarizeTasks(workstream.taskStatuses);
                   return (
                     <li key={workstream.id}>
                       <Link

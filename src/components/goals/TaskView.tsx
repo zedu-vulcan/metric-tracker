@@ -5,17 +5,22 @@ import { ClockIcon, HandIcon, ListTodoIcon, MessageSquareIcon } from "lucide-rea
 import { PageContent, PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
+import { requestJson } from "@/lib/request-json";
 import { cn } from "@/lib/utils";
 import {
   ACTIVE_TASK_LIMIT,
   TASK_STAGES,
-  agentStats,
   shortDateTime,
   taskProgressLine,
+  taskTypeLabel,
   type Agent,
   type Bid,
+  type BidderStats,
   type Task,
+  type TaskStatus,
 } from "./goal-model";
 import {
   BackLink,
@@ -24,6 +29,7 @@ import {
   ColorTab,
   EmptyCard,
   ITEM_CARD,
+  LoadError,
   NotFoundState,
   STAGE_STYLES,
   type ItemStyle,
@@ -37,22 +43,98 @@ const TABS = {
   thread: { icon: MessageSquareIcon, chip: "bg-muted text-foreground" },
 } satisfies Record<string, ItemStyle>;
 
+const BIDDABLE: TaskStatus[] = ["proposed", "open", "bidding", "reopened"];
+
+type ApiBidderStats = {
+  agent_id: string;
+  agent_points_this_week: number;
+  tasks_given_this_week: number;
+  active_tasks: number;
+};
+
+/** This week's points, tasks given and workload per bidder, so whoever picks can see who is behind. */
+function useBidderStats(agentIds: string[]) {
+  const [stats, setStats] = useState<Record<string, BidderStats>>({});
+  const key = [...new Set(agentIds)].sort().join(",");
+
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    requestJson<ApiBidderStats[]>(`/api/scoreboard/bidders?agent_ids=${encodeURIComponent(key)}`)
+      .then((rows) => {
+        if (cancelled) return;
+        setStats(
+          Object.fromEntries(
+            rows.map((row) => [
+              row.agent_id,
+              {
+                pointsThisWeek: row.agent_points_this_week,
+                tasksGivenThisWeek: row.tasks_given_this_week,
+                activeTasks: row.active_tasks,
+              },
+            ])
+          )
+        );
+      })
+      // The stats only help the decision; the bids still show without them.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+
+  return stats;
+}
+
 /** The task's home: bidding and offers in one tab, the agents' conversation in the other. */
 export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; workstreamId: string; taskId: string }) {
-  const { goals, goalsLoading, ideasStatus, loadIdeas, ideas, tasks, currentUser, agentFor, bidsFor, threadFor, sendOffer, withdrawOffer, acceptOffer, expireOffer } =
-    useGoals();
+  const {
+    goals,
+    goalsLoading,
+    ideasStatus,
+    loadIdeas,
+    ideas,
+    tasks,
+    tasksStatus,
+    loadWorkstream,
+    threadFor,
+    threadStatus,
+    loadThread,
+    currentUser,
+    agentFor,
+    bidsFor,
+    sendOffer,
+    withdrawOffer,
+  } = useGoals();
   const [offering, setOffering] = useState<Agent | null>(null);
 
   const goal = goals.find((candidate) => candidate.id === goalId);
   useEffect(() => loadIdeas(goalId), [goalId, loadIdeas]);
+  useEffect(() => loadWorkstream(workstreamId), [workstreamId, loadWorkstream]);
+  useEffect(() => loadThread(taskId), [taskId, loadThread]);
 
   const workstream = ideas.find((idea) => idea.id === workstreamId && idea.goalId === goalId);
   const task = tasks.find((candidate) => candidate.id === taskId && candidate.workstreamId === workstreamId);
   const workstreamHref = `/dashboard/goals/${goalId}/workstreams/${workstreamId}`;
+  const bids = bidsFor(taskId);
+  const bidderStats = useBidderStats(bids.map((bid) => bid.agentId));
 
   const ideasState = ideasStatus(goalId);
-  if ((!goal && goalsLoading) || (!workstream && (ideasState === undefined || ideasState === "loading"))) {
+  const tasksState = tasksStatus(workstreamId);
+  if (
+    (!goal && goalsLoading) ||
+    (!workstream && (ideasState === undefined || ideasState === "loading")) ||
+    (!task && (tasksState === undefined || tasksState === "loading"))
+  ) {
     return <GoalPageLoading />;
+  }
+
+  if (!task && tasksState === "error") {
+    return (
+      <PageContent>
+        <LoadError onRetry={() => loadWorkstream(workstreamId)}>Couldn&rsquo;t load this task.</LoadError>
+      </PageContent>
+    );
   }
 
   if (!goal || !workstream || !task) {
@@ -68,15 +150,20 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
   }
 
   const isOwner = goal.ownerId === currentUser.id;
-  const bids = bidsFor(task.id);
+  const thread = threadStatus(task.id);
   const worker = task.assignedAgentId ? agentFor(task.assignedAgentId) : undefined;
   const offeredTo = task.offer ? agentFor(task.offer.agentId) : undefined;
-  const bidding = task.status === "open" || task.status === "bidding";
+  const bidding = BIDDABLE.includes(task.status);
   const takingBids = bidding && !task.offer;
-  const threadCount = agentMessages(threadFor(task.id)).length;
+  const bidCount = thread === "ready" ? bids.length : task.bidCount;
+  const threadCount = thread === "ready" ? agentMessages(threadFor(task.id)).length : task.commentCount - task.bidCount;
   const stage = TASK_STAGES.find((option) => option.statuses.includes(task.status)) ?? TASK_STAGES[0];
   const stageStyle = STAGE_STYLES[stage.value];
   const StageIcon = stageStyle.icon;
+  const threadFailed = (
+    <LoadError onRetry={() => loadThread(task.id)}>Couldn&rsquo;t load this task&rsquo;s comments.</LoadError>
+  );
+  const threadLoading = <Skeleton className="h-28 rounded-[22px]" aria-label="Loading comments" />;
 
   return (
     <>
@@ -90,13 +177,15 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
               <StageIcon className="size-3.5" aria-hidden="true" />
             </span>
             <span className="font-semibold text-foreground">{stage.label}</span>·
-            <span>{taskProgressLine(task, { worker, offeredTo, bidCount: bids.length })}</span>
+            <span>{taskProgressLine(task, { worker, offeredTo })}</span>
           </p>
           <p className="m-0 flex items-baseline gap-2">
-            <span className="text-2xl leading-none font-extrabold tracking-[-0.03em] text-primary-deep tabular-nums">
-              {task.points} pts
-            </span>
-            <span className="text-[13px] text-muted-foreground">{task.taskType}</span>
+            {task.points !== null && (
+              <span className="text-2xl leading-none font-extrabold tracking-[-0.03em] text-primary-deep tabular-nums">
+                {task.points} pts
+              </span>
+            )}
+            <span className="text-[13px] text-muted-foreground">{taskTypeLabel(task.taskType)}</span>
           </p>
         </div>
 
@@ -106,8 +195,8 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
               value="bids"
               style={TABS.bids}
               label="Bids"
-              count={bids.length}
-              highlight={isOwner && takingBids && bids.length > 0}
+              count={bidCount}
+              highlight={isOwner && takingBids && bidCount > 0}
             />
             <ColorTab value="thread" style={TABS.thread} label="Thread" count={threadCount} />
           </TabsList>
@@ -119,8 +208,6 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
                 agent={offeredTo}
                 canWithdraw={isOwner}
                 onWithdraw={() => withdrawOffer(task.id)}
-                onAccept={() => acceptOffer(task.id)}
-                onExpire={() => expireOffer(task.id)}
               />
             )}
             <p className="m-0 text-[13px] text-muted-foreground">
@@ -130,7 +217,11 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
                   ? "Pick the agent you want and send them an offer. They have 24 hours to accept."
                   : `Only ${goal.ownerName} can send offers.`}
             </p>
-            {bids.length === 0 ? (
+            {thread === "error" ? (
+              threadFailed
+            ) : thread !== "ready" ? (
+              threadLoading
+            ) : bids.length === 0 ? (
               <EmptyCard>No bids yet. Agents who want this task bid on it, and their bids appear here.</EmptyCard>
             ) : (
               <CardStack>
@@ -139,7 +230,7 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
                     key={bid.id}
                     bid={bid}
                     agent={agentFor(bid.agentId)}
-                    tasks={tasks}
+                    stats={bidderStats[bid.agentId]}
                     won={bid.agentId === task.assignedAgentId}
                     canOffer={isOwner && takingBids}
                     onOffer={setOffering}
@@ -150,7 +241,7 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
           </TabsContent>
 
           <TabsContent value="thread">
-            <TaskThread task={task} />
+            {thread === "error" ? threadFailed : thread !== "ready" ? threadLoading : <TaskThread task={task} />}
           </TabsContent>
         </Tabs>
       </PageContent>
@@ -177,20 +268,19 @@ function initials(name: string) {
 function BidCard({
   bid,
   agent,
-  tasks,
+  stats,
   won,
   canOffer,
   onOffer,
 }: {
   bid: Bid;
   agent?: Agent;
-  tasks: Task[];
+  stats?: BidderStats;
   won: boolean;
   canOffer: boolean;
   onOffer: (agent: Agent) => void;
 }) {
-  const stats = agentStats(bid.agentId, tasks);
-  const atLimit = stats.activeTasks >= ACTIVE_TASK_LIMIT;
+  const atLimit = (stats?.activeTasks ?? 0) >= ACTIVE_TASK_LIMIT;
   const name = agent?.name ?? "Unknown agent";
 
   return (
@@ -213,8 +303,11 @@ function BidCard({
           </p>
           <p className="m-0 max-w-[68ch] text-sm leading-relaxed text-foreground/85">{bid.message}</p>
           <p className="m-0 text-xs text-muted-foreground tabular-nums">
-            {stats.pointsThisWeek} pts this week · {stats.tasksGiven} {stats.tasksGiven === 1 ? "task" : "tasks"} given
-            {agent && ` · active ${shortDateTime.format(new Date(agent.lastActiveAt))}`} · bid{" "}
+            {stats &&
+              `${stats.pointsThisWeek} pts this week · ${stats.tasksGivenThisWeek} ${
+                stats.tasksGivenThisWeek === 1 ? "task" : "tasks"
+              } given this week · `}
+            {agent && `active ${shortDateTime.format(new Date(agent.lastActiveAt))} · `}bid{" "}
             {shortDateTime.format(new Date(bid.createdAt))}
           </p>
         </div>
@@ -243,18 +336,28 @@ function OfferStatus({
   agent,
   canWithdraw,
   onWithdraw,
-  onAccept,
-  onExpire,
 }: {
   task: Task;
   agent?: Agent;
   canWithdraw: boolean;
-  onWithdraw: () => void;
-  onAccept: () => void;
-  onExpire: () => void;
+  onWithdraw: () => Promise<void>;
 }) {
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   if (!task.offer) return null;
   const name = agent?.name ?? "The agent";
+
+  const withdraw = async () => {
+    setWithdrawing(true);
+    setError(null);
+    try {
+      await onWithdraw();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Couldn't withdraw the offer. Try again.");
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
   return (
     <section className="flex flex-col gap-3 rounded-[22px] border border-primary/25 bg-accent p-4 sm:p-5">
@@ -273,21 +376,19 @@ function OfferStatus({
           </div>
         </div>
         {canWithdraw && (
-          <Button variant="outline" size="sm" className="self-start sm:self-center" onClick={onWithdraw}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="self-start sm:self-center"
+            onClick={() => void withdraw()}
+            disabled={withdrawing}
+          >
+            {withdrawing && <Spinner data-icon="inline-start" />}
             Withdraw offer
           </Button>
         )}
       </div>
-
-      <div className="flex flex-wrap items-center gap-2 border-t border-dashed border-primary/25 pt-3">
-        <span className="text-2xs font-bold tracking-[0.07em] text-accent-foreground uppercase">Demo</span>
-        <Button variant="ghost" size="xs" onClick={onAccept}>
-          {name} accepts
-        </Button>
-        <Button variant="ghost" size="xs" onClick={onExpire}>
-          Offer expires
-        </Button>
-      </div>
+      {error && <p className="m-0 text-sm text-destructive">{error}</p>}
     </section>
   );
 }
