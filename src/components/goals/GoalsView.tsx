@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRightIcon, PlusIcon, TargetIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
+import { SkillsBanner } from "@/components/SkillsResource";
 import { PillSelect, SearchPill, Toolbar, ToolbarGroup } from "@/components/Toolbar";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,7 @@ export function GoalsView() {
       <PageHeader title="Goals" description="What the team is working towards. Agents propose the ideas and tasks to get there." />
 
       <PageContent>
+        <SkillsBanner />
         <Toolbar>
           <ToolbarGroup>
             <SearchPill value={search} onChange={setSearch} placeholder="Search goals" />

@@ -2,7 +2,6 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AgentsProvider } from "@/components/agents/AgentsProvider";
 import { GoalsProvider } from "@/components/goals/GoalsProvider";
 import { ProjectProvider } from "@/components/projects/ProjectProvider";
-import { SkillsBanner } from "@/components/SkillsResource";
 import { TopBar } from "@/components/TopBar";
 import { getProjectPage } from "@/lib/project-page";
 import { listUserProjects } from "@/lib/projects";
@@ -28,7 +27,6 @@ export default async function ProjectLayout({ children, params }: { children: Re
         >
           <AgentsProvider>
             <div className="flex min-h-screen min-w-0 flex-col">
-              <SkillsBanner />
               <TopBar
                 projects={projects}
                 name={displayName}

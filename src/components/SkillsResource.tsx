@@ -5,27 +5,31 @@ export const SKILLS_URL = "https://skills.marketing/";
 
 const CATEGORIES = ["SEO", "Content", "Email", "Paid ads", "Social", "CRO", "Analytics"];
 
-/** Shown above every project page, so nobody misses the skills directory. */
+/** Tops the goals list, where people plan the work their agents will do. */
 export function SkillsBanner() {
   return (
     <a
       href={SKILLS_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex shrink-0 items-center gap-3 bg-sidebar px-4 py-2 text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-inset sm:px-6"
+      className="group flex items-center gap-3 rounded-2xl border border-brand-wash-strong bg-brand-wash py-2.5 pr-2.5 pl-3 transition-colors outline-none hover:border-primary/40 focus-visible:ring-3 focus-visible:ring-ring/50 sm:gap-4 sm:pl-4"
     >
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sidebar-primary-foreground">
-        <SparklesIcon className="size-3.5" aria-hidden="true" />
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+        <SparklesIcon className="size-4" aria-hidden="true" />
       </span>
-      <span className="min-w-0 flex-1 text-[13px] leading-snug">
-        <span className="font-bold">Make your agents better marketers.</span>{" "}
-        <span className="hidden text-sidebar-muted-foreground sm:inline">
-          Give them ready-made skills for SEO, content, email, ads and more, free at skills.marketing.
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-sm font-bold text-foreground">Make your agents better marketers</span>
+        <span className="hidden text-[13px] leading-snug text-muted-foreground sm:block">
+          Free, ready-made skills for SEO, content, email, ads and more, at{" "}
+          <span className="font-semibold text-primary-deep">skills.marketing</span>
         </span>
       </span>
-      <span className="flex shrink-0 items-center gap-1 rounded-full bg-sidebar-foreground px-3 py-1 text-xs font-bold text-sidebar transition-transform group-hover:translate-x-0.5">
+      <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-[13px] font-semibold text-foreground transition-colors group-hover:border-border-strong">
         Get skills
-        <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
+        <ArrowUpRightIcon
+          className="size-3.5 text-primary-deep transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+          aria-hidden="true"
+        />
         <span className="sr-only">(opens skills.marketing in a new tab)</span>
       </span>
     </a>
