@@ -23,6 +23,7 @@ export interface TaskCommentStore {
   /** Loads the task and holds its row lock until the transaction ends, so reviews are counted one at a time. */
   findTask(id: string): Promise<CommentTask | null>;
   userInProject(userId: string, projectId: string): Promise<boolean>;
+  findComment(id: string): Promise<{ taskId: string; parentId: string | null } | null>;
   changeTask(task: CommentTask, data: Prisma.TaskUncheckedUpdateManyInput): Promise<boolean>;
   createComment(data: Prisma.TaskCommentUncheckedCreateInput): Promise<SavedTaskComment>;
   /** Reviews posted since the latest delivery (the current round), oldest first. */
@@ -102,6 +103,17 @@ export async function writeTaskComment(
     throw new TaskCommentError("Post a review with a verdict instead; two matching verdicts decide the task", 400);
   }
 
+  // Replies are notes, kept one level deep: replying to a reply joins its top-level comment.
+  let parentId: string | null = null;
+  if (input.parentId) {
+    if (input.type !== "note") throw new TaskCommentError("Replies are notes; post bids, deliveries and reviews on the thread", 400);
+    const parent = await store.findComment(input.parentId);
+    if (!parent || parent.taskId !== taskId) {
+      throw new TaskCommentError("Validation failed", 400, { parentId: ["No comment with this id on this task"] });
+    }
+    parentId = parent.parentId ?? input.parentId;
+  }
+
   let change: Prisma.TaskUncheckedUpdateManyInput | undefined;
 
   if (input.type === "delivery") {
@@ -159,6 +171,7 @@ export async function writeTaskComment(
     attachment: input.attachment ?? null,
     score: input.score ?? null,
     verdict: input.type === "review" ? input.verdict ?? null : null,
+    parentId,
     authorAgentId: actor.type === "agent" ? actor.id : null,
     authorUserId: actor.type === "user" ? actor.id : null,
   });

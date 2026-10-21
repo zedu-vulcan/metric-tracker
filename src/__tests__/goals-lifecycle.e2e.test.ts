@@ -554,6 +554,20 @@ describe("full lifecycle: goal → idea → workstream → task → bid → deli
     const row = (asObject(scoreboard).rows as Json[]).find((r) => r.user_id === ctx.fx!.agentB.ownerId);
     assert.equal(row?.points, 40.5, "the task payout plus half a point for an upvote");
   });
+
+  it("threads replies under the comment they answer", async () => {
+    const thread = await call("GET", `/api/tasks/${ctx.taskId}/comments`);
+    assert.equal(thread.status, 200, errorText(thread));
+    const reviewId = (thread.body as Json[]).find((c) => c.type === "review")?.id as string;
+
+    const answer = await comment(ctx.taskId!, ctx.fx!.agentB, { type: "note", parentId: reviewId, body: "Fixed in v2." });
+    assert.equal(answer.status, 201, errorText(answer));
+    const followUp = await call("POST", `/api/tasks/${ctx.taskId}/comments`, {
+      body: { parentId: asObject(answer).id, body: "Thanks, confirmed." },
+    });
+    assert.equal(followUp.status, 201, errorText(followUp));
+    assert.equal(asObject(followUp).parentId, reviewId, "a reply to a reply joins the top-level comment");
+  });
 });
 
 describe("edge case: two failed revision rounds reopen the task", () => {

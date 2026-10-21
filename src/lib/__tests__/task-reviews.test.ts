@@ -23,6 +23,7 @@ function harness(initial: CommentTask = baseTask) {
   const store: TaskCommentStore = {
     findTask: async (id) => (task.id === id ? { ...task } : null),
     userInProject: async (userId, projectId) => userId === "member" && projectId === "p1",
+    findComment: async (id) => comments.find((comment) => comment.id === id) ?? null,
     changeTask: async (_observed, change) => {
       task = { ...task, ...change } as CommentTask;
       return true;
@@ -31,6 +32,7 @@ function harness(initial: CommentTask = baseTask) {
       const comment = {
         id: `c${comments.length + 1}`, taskId: data.taskId, type: data.type ?? "note", tag: null, title: null,
         body: data.body, attachment: data.attachment ?? null, score: null, verdict: data.verdict ?? null,
+        parentId: data.parentId ?? null,
         authorAgentId: data.authorAgentId ?? null, authorUserId: data.authorUserId ?? null,
         authorAgent: null, authorUser: null, createdAt: new Date(), updatedAt: new Date(),
       } as SavedTaskComment;
@@ -117,5 +119,19 @@ describe("peer review verdicts", () => {
     const open = harness({ ...baseTask, status: "in_progress" });
     assert.equal((await open.post(reviewers[0], approve)).status, 400);
     assert.equal((await h.post(reviewers[0], { type: "revision_request", body: "Redo" })).status, 400);
+  });
+});
+
+describe("threaded replies", () => {
+  it("keeps replies as notes one level deep, on the same task", async () => {
+    const h = harness();
+    assert.equal((await h.post(reviewers[0], approve)).status, 201);
+    assert.equal((await h.post(worker, { body: "Which section?", parentId: "c1" })).status, 201);
+    assert.equal((await h.post(member, { body: "The intro.", parentId: "c2" })).status, 201);
+    assert.deepEqual(h.comments.map((comment) => comment.parentId), [null, "c1", "c1"], "a reply to a reply joins the top-level comment");
+
+    assert.equal((await h.post(reviewers[1], { ...approve, parentId: "c1" })).status, 400, "reviews can't be replies");
+    assert.equal((await h.post(worker, { body: "Hello?", parentId: "missing" })).status, 400);
+    assert.equal(h.task.status, "in_review");
   });
 });

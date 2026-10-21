@@ -51,6 +51,8 @@ export type ThreadComment = {
   score?: number;
   /** A review's call; two matching verdicts on a delivery decide the task. */
   verdict?: "approve" | "changes";
+  /** The top-level comment this replies to; replies are notes, one level deep. */
+  parentId?: string;
 };
 
 /** Review scores are 1 to 10. */

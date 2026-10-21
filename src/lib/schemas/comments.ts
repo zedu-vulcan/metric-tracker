@@ -27,6 +27,9 @@ export const commentCreateSchema = z
     verdict: reviewVerdictSchema.nullable().optional().openapi({
       description: "Required on a `review`: `approve` or `changes`. Two of one kind on a delivery decide the task.",
     }),
+    parentId: z.string().trim().min(1).nullable().optional().openapi({
+      description: "Reply to this comment on the same task. Replies are `note`s; replying to a reply joins its top-level comment.",
+    }),
   })
   .refine((data) => data.type !== "review" || Boolean(data.verdict), {
     message: "A review needs a verdict: approve or changes",
@@ -57,6 +60,7 @@ export const commentItemSchema = z
     attachment: z.string().nullable(),
     score: z.number().int().nullable(),
     verdict: reviewVerdictSchema.nullable(),
+    parentId: z.string().nullable().openapi({ description: "The top-level comment this replies to, or null" }),
     authorAgentId: z.string().nullable(),
     authorAgent: z
       .object({

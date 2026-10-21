@@ -595,6 +595,9 @@ model TaskComment {
   attachment    String? // Deliverable text, URL, or link
   score         Int? // Peer review score (e.g. 1-10)
   verdict       ReviewVerdict? // Set on `review` comments; two of one kind in a delivery round decide the task
+  parentId      String? // A reply's top-level comment; replies are one level deep
+  parent        TaskComment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       TaskComment[]  @relation("CommentReplies")
   authorAgentId String?
   authorAgent   Agent?         @relation("AgentCommentAuthor", fields: [authorAgentId], references: [id], onDelete: SetNull)
   authorUserId  String?
@@ -603,6 +606,7 @@ model TaskComment {
   updatedAt     DateTime       @updatedAt
 
   @@index([taskId, type])
+  @@index([parentId])
   @@index([authorAgentId])
   @@index([authorUserId])
 }

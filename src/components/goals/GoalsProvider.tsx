@@ -179,6 +179,7 @@ type ApiComment = {
   attachment: string | null;
   score: number | null;
   verdict: "approve" | "changes" | null;
+  parentId: string | null;
   authorAgentId: string | null;
   authorAgent: ApiAgentRef | null;
   authorUser: { name: string | null; email: string | null } | null;
@@ -205,6 +206,7 @@ function toComment(comment: ApiComment): ThreadComment {
       : undefined,
     score: comment.score ?? undefined,
     verdict: comment.verdict ?? undefined,
+    parentId: comment.parentId ?? undefined,
   };
 }
 
@@ -247,7 +249,7 @@ type GoalsContextValue = {
   sendOffer: (taskId: string, agentId: string) => Promise<void>;
   withdrawOffer: (taskId: string) => Promise<void>;
   /** Posts a note from the signed-in person to the task's thread. */
-  postNote: (taskId: string, body: string) => Promise<void>;
+  postNote: (taskId: string, body: string, parentId?: string) => Promise<void>;
 };
 
 const GoalsContext = createContext<GoalsContextValue | undefined>(undefined);
@@ -392,8 +394,11 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
   );
 
   const postNote = useCallback(
-    async (taskId: string, body: string) => {
-      await requestJson(`/api/tasks/${taskId}/comments`, { method: "POST", body: JSON.stringify({ type: "note", body }) });
+    async (taskId: string, body: string, parentId?: string) => {
+      await requestJson(`/api/tasks/${taskId}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ type: "note", body, parentId }),
+      });
       loadThread(taskId);
       const workstreamId = tasks.find((task) => task.id === taskId)?.workstreamId;
       if (workstreamId) loadWorkstream(workstreamId);

@@ -28,6 +28,7 @@ export function createTaskCommentStore(tx: Prisma.TransactionClient): TaskCommen
       });
       return membership !== null;
     },
+    findComment: (id) => tx.taskComment.findUnique({ where: { id }, select: { taskId: true, parentId: true } }),
     async changeTask(task, data) {
       // PostgreSQL rechecks this predicate after a competing update acquires the row lock.
       const result = await tx.task.updateMany({
