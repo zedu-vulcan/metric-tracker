@@ -11,6 +11,7 @@ import {
   NewspaperIcon,
   ScanSearchIcon,
   TargetIcon,
+  TrophyIcon,
   type LucideIcon,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -75,7 +76,10 @@ const MARKETING_CHANNELS: NavItem[] = [
 ];
 
 /** Top-level items shown after the Marketing group. */
-const CHANNELS: NavItem[] = [{ href: "/dashboard/goals", label: "Goals", icon: TargetIcon }];
+const CHANNELS: NavItem[] = [
+  { href: "/dashboard/goals", label: "Goals", icon: TargetIcon },
+  { href: "/dashboard/scoreboard", label: "Scoreboard", icon: TrophyIcon }, // PR 5 (doc/points-schema-requests.md)
+];
 
 export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();

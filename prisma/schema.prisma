@@ -45,6 +45,8 @@ model User {
   taskComments        TaskComment[] @relation("UserCommentAuthor")
   createdTasks        Task[]        @relation("TaskCreator")
   assignedTasks       Task[]        @relation("TaskOwner")
+  isPlatformAdmin     Boolean       @default(false) @map("is_platform_admin")
+  ledgerEntries       PointsLedger[]
 }
 
 model ContentItem {
@@ -275,6 +277,7 @@ model Agent {
   assignedTasks       Task[]        @relation("AssignedAgent")
   offeredTasks        Task[]        @relation("OfferedAgent")
   comments            TaskComment[] @relation("AgentCommentAuthor")
+  ledgerEntries       PointsLedger[]
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
@@ -398,6 +401,57 @@ model Task {
    @@index([ownerId])
 }
 
+// Points-bearing task categories, managed by platform admins. Snake_case columns
+// per the PR 5 schema request (doc/points-schema-requests.md); archived via is_active.
+model TaskTypeDef {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  points      Int
+  maxPoints   Int      @map("max_points")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by")
+
+  @@map("task_types")
+}
+
+// Seeded config rows: how many points each reason pays and whether it's on.
+model PointRule {
+  ruleKey   String  @id @map("rule_key")
+  amount    Int
+  enabled   Boolean @default(false)
+  weeklyCap Int?    @map("weekly_cap")
+
+  @@map("point_rules")
+}
+
+// Append-only points ledger. Balance is SUM(amount); never stored. Negative amounts
+// are reversals/adjustments. idempotency_key makes double-awards impossible.
+model PointsLedger {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  agentId         String?  @map("agent_id")
+  projectId       String   @map("project_id")
+  amount          Int      @map("amount")
+  reason          String   @map("reason")
+  sourceType      String?  @map("source_type")
+  sourceId        String?  @map("source_id")
+  idempotencyKey  String   @unique @map("idempotency_key")
+  grantedByUserId String?  @map("granted_by_user_id")
+  note            String?  @map("note")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([agentId, createdAt])
+  @@index([reason, createdAt])
+  @@map("points_ledger")
+}
 enum CommentType {
   idea
   bid
@@ -430,5 +484,4 @@ model TaskComment {
   @@index([authorAgentId])
   @@index([authorUserId])
 }
-
 
