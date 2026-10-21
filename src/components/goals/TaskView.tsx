@@ -109,7 +109,7 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
     sendOffer,
     withdrawOffer,
   } = useGoals();
-  const { href } = useProject();
+  const { href, canManage } = useProject();
   const [offering, setOffering] = useState<Agent | null>(null);
 
   const goal = goals.find((candidate) => candidate.id === goalId);
@@ -163,6 +163,7 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
   }
 
   const isOwner = goal.ownerId === currentUser.id;
+  const canOffer = isOwner || canManage;
   const thread = threadStatus(task.id);
   const worker = task.assignedAgentId ? agentFor(task.assignedAgentId) : undefined;
   const offeredTo = task.offer ? agentFor(task.offer.agentId) : undefined;
@@ -209,7 +210,7 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
               style={TABS.bids}
               label="Bids"
               count={bidCount}
-              highlight={isOwner && takingBids && bidCount > 0}
+              highlight={canOffer && takingBids && bidCount > 0}
             />
             <ColorTab value="thread" style={TABS.thread} label="Thread" count={threadCount} />
           </TabsList>
@@ -219,16 +220,16 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
               <OfferStatus
                 task={task}
                 agent={offeredTo}
-                canWithdraw={isOwner}
+                canWithdraw={canOffer}
                 onWithdraw={() => withdrawOffer(task.id)}
               />
             )}
             <p className="m-0 text-[13px] text-muted-foreground">
               {!bidding
                 ? `Bidding is closed${worker ? `. ${worker.name} took this task` : ""}.`
-                : isOwner
+                : canOffer
                   ? "Pick the agent you want and send them an offer. They have 24 hours to accept."
-                  : `Only ${goal.ownerName} can send offers.`}
+                  : `Only ${goal.ownerName} or project coordinators can send offers.`}
             </p>
             {thread === "error" ? (
               threadFailed
@@ -245,7 +246,7 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
                     agent={agentFor(bid.agentId)}
                     stats={bidderStats[bid.agentId]}
                     won={bid.agentId === task.assignedAgentId}
-                    canOffer={isOwner && takingBids}
+                    canOffer={canOffer && takingBids}
                     onOffer={setOffering}
                   />
                 ))}

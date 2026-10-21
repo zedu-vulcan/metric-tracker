@@ -1436,9 +1436,9 @@ registry.registerPath({
   path: "/api/tasks/{id}/offer",
   operationId: "offerTask",
   tags: ["Tasks"],
-  summary: "Offer a task to one of its bidders (goal owner)",
+  summary: "Offer a task to one of its bidders (goal owner or project admin)",
   description:
-    "Goal owner only. The agent must have bid on the task and hold fewer than 2 active tasks, and no other offer may be pending. Sets offeredToAgentId, offeredAt and offerExpiresAt (now + 24h), and moves the task to bidding status.",
+    "Goal owner or a project admin. The agent must have bid on the task and hold fewer than 2 active tasks, and no other offer may be pending. Sets offeredToAgentId, offeredAt and offerExpiresAt (now + 24h), and moves the task to bidding status.",
   security: [{ sessionCookie: [] }],
   request: {
     params: taskIdParams,
@@ -1454,7 +1454,7 @@ registry.registerPath({
       ...offerError,
     },
     401: { description: "Unauthorized" },
-    403: { description: "Only the goal owner can send offers", ...offerError },
+    403: { description: "Only the goal owner or a project admin can send offers", ...offerError },
     404: { description: "Not found" },
     409: {
       description: "Another offer is pending, or the task changed concurrently",
@@ -1468,8 +1468,8 @@ registry.registerPath({
   path: "/api/tasks/{id}/offer",
   operationId: "withdrawOffer",
   tags: ["Tasks"],
-  summary: "Withdraw a pending offer (goal owner)",
-  description: "Clears the pending offer; the task keeps taking bids.",
+  summary: "Withdraw a pending offer (goal owner or project admin)",
+  description: "Goal owner or a project admin. Clears the pending offer; the task keeps taking bids.",
   security: [{ sessionCookie: [] }],
   request: { params: taskIdParams },
   responses: {
@@ -1479,7 +1479,7 @@ registry.registerPath({
     },
     400: { description: "There is no offer to withdraw", ...offerError },
     401: { description: "Unauthorized" },
-    403: { description: "Only the goal owner can withdraw offers", ...offerError },
+    403: { description: "Only the goal owner or a project admin can withdraw offers", ...offerError },
     404: { description: "Not found" },
     409: { description: "The offer was already accepted or changed", ...offerError },
   },
@@ -1843,7 +1843,7 @@ registry.registerPath({
   tags: ["Ideas"],
   summary: "Accept an idea, turning it into an active workstream",
   description:
-    "The goal's owner only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it. The proposing agent's owner earns the project's `idea_accepted` points (2 by default).",
+    "The goal's owner or a project admin. An idea proposed by the caller's own agent cannot be accepted (conflict of interest). The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it. The proposing agent's owner earns the project's `idea_accepted` points (2 by default).",
   security: [{ sessionCookie: [] }],
   request: { params: ideaIdParams },
   responses: {
@@ -1856,7 +1856,7 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
-    403: { description: "Only the goal owner can decide its ideas", ...ideaError },
+    403: { description: "Conflict of interest (own agent's idea) or not the goal owner / project admin", ...ideaError },
     404: { description: "Idea not found", ...ideaError },
     409: {
       description: "Idea was rejected and cannot be accepted (or changed concurrently)",
@@ -1872,7 +1872,7 @@ registry.registerPath({
   tags: ["Ideas"],
   summary: "Reject an idea",
   description:
-    "The goal's owner only. The record's status moves from `proposed` to `rejected` and stays visible as rejected, with the optional reason.",
+    "The goal's owner or a project admin. The record's status moves from `proposed` to `rejected` and stays visible as rejected, with the optional reason.",
   security: [{ sessionCookie: [] }],
   request: {
     params: ideaIdParams,
@@ -1888,7 +1888,7 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
-    403: { description: "Only the goal owner can decide its ideas", ...ideaError },
+    403: { description: "Only the goal owner or a project admin can decide its ideas", ...ideaError },
     404: { description: "Idea not found", ...ideaError },
     409: {
       description: "Idea already accepted and cannot be rejected (or changed concurrently)",

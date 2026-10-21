@@ -47,7 +47,7 @@ const KINDS = {
 export function GoalDetailView({ goalId }: { goalId: string }) {
   const { goals, goalsLoading, ideas, ideasStatus, loadIdeas, currentUser, agentFor, approveIdea, rejectIdea } =
     useGoals();
-  const { href } = useProject();
+  const { href, canManage } = useProject();
   const [rejecting, setRejecting] = useState<Idea | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
@@ -90,6 +90,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
   }
 
   const isOwner = goal.ownerId === currentUser.id;
+  const canDecide = isOwner || canManage;
   const proposed = goalIdeas.filter((idea) => idea.status === "proposed");
   const rejected = goalIdeas.filter((idea) => idea.status === "rejected");
   const workstreams = goalIdeas.filter((idea) => idea.status === "accepted");
@@ -187,8 +188,10 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
           <TabsContent value="ideas" className="flex flex-col gap-4">
             {!isOwner && proposed.length > 0 && (
               <p className="m-0 text-[13px] text-muted-foreground">
-                Only {goal.ownerName} can approve or reject ideas. An idea with {UPVOTES_TO_PROMOTE} upvotes from agents
-                becomes a workstream on its own, and one with {DOWNVOTES_TO_REMOVE} downvotes is removed.
+                {canManage && !isOwner
+                  ? "As a project admin, you can approve or reject ideas for this goal."
+                  : `Only ${goal.ownerName} can approve or reject ideas.`}{" "}
+                An idea with {UPVOTES_TO_PROMOTE} upvotes from agents becomes a workstream on its own, and one with {DOWNVOTES_TO_REMOVE} downvotes is removed.
               </p>
             )}
             {decisionError && (
@@ -204,30 +207,43 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
               <EmptyCard>No ideas waiting. When an agent proposes an approach, it appears here.</EmptyCard>
             ) : (
               <CardStack>
-                {proposed.map((idea) => (
-                  <IdeaCard key={idea.id} idea={idea} agentFor={agentFor}>
-                    {isOwner ? (
-                      <div className="flex shrink-0 gap-2">
-                        <Button variant="outline" onClick={() => setRejecting(idea)} disabled={approving === idea.id}>
-                          <XIcon data-icon="inline-start" aria-hidden="true" />
-                          Reject
-                        </Button>
-                        <Button variant="secondary" onClick={() => void approve(idea)} disabled={approving === idea.id}>
-                          {approving === idea.id ? (
-                            <Spinner data-icon="inline-start" />
+                {proposed.map((idea) => {
+                  const agent = agentFor(idea.agentId);
+                  const isOwnAgent =
+                    Boolean(agent?.ownerId && agent.ownerId === currentUser.id) ||
+                    Boolean(agent?.ownerName && agent.ownerName === currentUser.name);
+
+                  return (
+                    <IdeaCard key={idea.id} idea={idea} agentFor={agentFor}>
+                      {canDecide ? (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Button variant="outline" onClick={() => setRejecting(idea)} disabled={approving === idea.id}>
+                            <XIcon data-icon="inline-start" aria-hidden="true" />
+                            Reject
+                          </Button>
+                          {isOwnAgent ? (
+                            <Badge variant="outline" className="text-muted-foreground border-warning/40">
+                              Proposed by your agent
+                            </Badge>
                           ) : (
-                            <CheckIcon data-icon="inline-start" aria-hidden="true" />
+                            <Button variant="secondary" onClick={() => void approve(idea)} disabled={approving === idea.id}>
+                              {approving === idea.id ? (
+                                <Spinner data-icon="inline-start" />
+                              ) : (
+                                <CheckIcon data-icon="inline-start" aria-hidden="true" />
+                              )}
+                              Approve
+                            </Button>
                           )}
-                          Approve
-                        </Button>
-                      </div>
-                    ) : (
-                      <Badge variant="warning" className="self-start">
-                        Waiting for {goal.ownerName}
-                      </Badge>
-                    )}
-                  </IdeaCard>
-                ))}
+                        </div>
+                      ) : (
+                        <Badge variant="warning" className="self-start">
+                          Waiting for {goal.ownerName}
+                        </Badge>
+                      )}
+                    </IdeaCard>
+                  );
+                })}
               </CardStack>
             )}
 
