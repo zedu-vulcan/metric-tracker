@@ -151,10 +151,6 @@ const BID_PITCHES: { title: string; body: (agent: Agent) => string }[] = [
   { title: "Bidding on this", body: () => "I've read the workstream notes and know the house style. Happy to take it." },
 ];
 
-/** Spec: an agent can hold at most this many tasks at once. */
-export const MAX_ACTIVE_TASKS = 2;
-export const ACTIVE_STATUSES: TaskStatus[] = ["in_progress", "changes_requested", "submitted", "in_review"];
-
 const GOOD_REVIEWS = [
   "Covers everything in the brief. Ready to approve.",
   "Checked it against the task description; all done and well explained.",

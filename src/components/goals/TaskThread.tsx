@@ -1,38 +1,27 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState } from "react";
 import {
   CheckIcon,
-  CircleDotIcon,
   CopyIcon,
   FileIcon,
   FileTextIcon,
   LinkIcon,
-  MessageSquareIcon,
-  UserCheckIcon,
+  MessagesSquareIcon,
+  PackageCheckIcon,
+  StarIcon,
+  StickyNoteIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { shortDateTime, type Agent, type Task } from "./goal-model";
-import { Panel, QuietEmpty } from "./GoalParts";
+import { ColorTab, EmptyCard, type ItemStyle } from "./GoalParts";
 import { useGoals } from "./GoalsProvider";
 import {
-  ACTIVE_STATUSES,
   COMMENT_TYPES,
-  MAX_ACTIVE_TASKS,
   REVIEW_SCALE,
   THREAD_FILTERS,
   type Attachment,
@@ -80,75 +69,56 @@ export function TaskThread({ task }: { task: Task }) {
   const visible = filter === "all" ? messages : messages.filter((message) => message.type === filter);
 
   return (
-    <Panel
-      title="Thread"
-      count={total}
-      action={<span className="text-xs text-muted-foreground">Agents bid, deliver and review here</span>}
-    >
-      {entries.length === 0 ? (
-        <Empty className="py-10">
-          <EmptyHeader>
-            <EmptyMedia className="size-12 rounded-full bg-accent text-primary-deep">
-              <MessageSquareIcon className="size-5" aria-hidden="true" />
-            </EmptyMedia>
-            <EmptyTitle>No activity yet</EmptyTitle>
-            <EmptyDescription>Bids from interested agents will show up here.</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <Tabs value={filter} onValueChange={(value) => setFilter(value as Filter)} className="pt-1">
-          <TabsList className="max-w-full justify-start overflow-x-auto" aria-label="Filter the thread by comment type">
-            {filters.map((value) => (
-              <TabsTrigger key={value} value={value} className="flex-none">
-                {value === "all" ? "All" : COMMENT_TYPES[value].plural}{" "}
-                <span className="tabular-nums opacity-70">{value === "all" ? total : counts.get(value)}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+    <section className="flex flex-col gap-5 rounded-[22px] border border-border bg-card p-5 sm:p-6" aria-label="Thread">
+      <div className="flex flex-wrap items-center gap-3">
+        {filters.length > 2 && (
+          <Tabs value={filter} onValueChange={(value) => setFilter(value as Filter)} className="max-w-full">
+            <TabsList className="h-11! max-w-full justify-start overflow-x-auto p-1" aria-label="Filter the thread by message type">
+              {filters.map((value) => (
+                <ColorTab
+                  key={value}
+                  value={value}
+                  style={value === "all" ? ALL_STYLE : (MESSAGE_STYLES[value] ?? ALL_STYLE)}
+                  label={value === "all" ? "All" : COMMENT_TYPES[value].plural}
+                  count={value === "all" ? messages.length : (counts.get(value) ?? 0)}
+                  highlight={value === "escalation"}
+                />
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
+        <p className="m-0 ml-auto text-[13px] text-muted-foreground tabular-nums" aria-live="polite">
+          {filter === "all"
+            ? `${messages.length} ${messages.length === 1 ? "message" : "messages"}`
+            : `${visible.length} of ${messages.length} messages`}
+        </p>
+      </div>
 
-          {filters.map((value) => {
-            const visible =
-              value === "all" ? entries : entries.filter((entry) => entry.kind === "comment" && entry.type === value);
-            return (
-              <TabsContent key={value} value={value}>
-                {visible.length === 0 ? (
-                  <QuietEmpty>Nothing here yet.</QuietEmpty>
-                ) : (
-                  <ol className="m-0 flex list-none flex-col divide-y divide-border p-0">
-                    {visible.map((entry) => (
-                      <ThreadItem key={entry.id} entry={entry} task={task} />
-                    ))}
-                  </ol>
-                )}
-              </TabsContent>
-            );
-          })}
-        </Tabs>
-      )}
-
-      <NoteComposer taskId={task.id} onPost={(body) => addNote(task.id, body)} />
-    </Panel>
+      <ol className="relative m-0 flex list-none flex-col gap-6 p-0 before:absolute before:top-5 before:bottom-5 before:left-5 before:w-px before:bg-border">
+        {visible.map((message) => (
+          <Message
+            key={message.id}
+            message={message}
+            agent={message.author.kind === "agent" ? agentFor(message.author.agentId) : undefined}
+          />
+        ))}
+      </ol>
+    </section>
   );
 }
 
-function ThreadItem({ entry, task }: { entry: ThreadEntry; task: Task }) {
-  if (entry.kind === "event") {
-    return (
-      <li className="flex items-center gap-2 py-2.5 text-xs text-muted-foreground">
-        <CircleDotIcon className="size-3.5 shrink-0" aria-hidden="true" />
-        <span className="min-w-0 flex-1">{entry.text}</span>
-        <EntryTime at={entry.at} />
-      </li>
-    );
-  }
-  return <CommentItem comment={entry} task={task} />;
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
-function CommentItem({ comment, task }: { comment: ThreadComment; task: Task }) {
-  const { agentFor, currentUser } = useGoals();
-  const author = describeAuthor(comment.author, agentFor, currentUser.name);
-  const type = COMMENT_TYPES[comment.type];
-  const bidder = comment.type === "bid" && comment.author.kind === "agent" ? agentFor(comment.author.agentId) : undefined;
+function Message({ message, agent }: { message: ThreadComment; agent?: Agent }) {
+  const type = COMMENT_TYPES[message.type];
+  const name = agent?.name ?? "Unknown agent";
 
   return (
     <li className="flex gap-3 sm:gap-4">
@@ -186,71 +156,19 @@ function CommentItem({ comment, task }: { comment: ThreadComment; task: Task }) 
   );
 }
 
-/** Lets a human assign the task to this bidder, showing how busy the bidder already is. */
-function BidActions({ bidder, task }: { bidder: Agent; task: Task }) {
-  const { tasks, assignTask } = useGoals();
-  const [confirming, setConfirming] = useState(false);
-
-  const biddingOpen = task.status === "open" || task.status === "bidding";
-  const assigned = task.assignedAgentId === bidder.id;
-  if (!biddingOpen && !assigned) return null;
-
-  const activeTasks = tasks.filter(
-    (candidate) => candidate.assignedAgentId === bidder.id && ACTIVE_STATUSES.includes(candidate.status)
-  ).length;
-  const atLimit = activeTasks >= MAX_ACTIVE_TASKS;
-  const otherBidders = Math.max(task.bidCount - 1, 0);
-
+/** A review score as filled dots, with the number for screen readers and for reading at a glance. */
+function Score({ value }: { value: number }) {
   return (
-    <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-      <span className="text-xs text-muted-foreground tabular-nums">
-        {activeTasks} of {MAX_ACTIVE_TASKS} active tasks
+    <span className="ml-auto flex items-center gap-2" aria-label={`Score ${value} of ${REVIEW_SCALE}`}>
+      <span className="flex gap-1" aria-hidden="true">
+        {Array.from({ length: REVIEW_SCALE }, (_, index) => (
+          <span key={index} className={cn("size-2 rounded-full", index < value ? "bg-primary" : "bg-chart-track")} />
+        ))}
       </span>
-
-      {assigned ? (
-        <Badge variant="success">
-          <CheckIcon data-icon="inline-start" aria-hidden="true" />
-          Assigned
-        </Badge>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={atLimit}
-          onClick={() => setConfirming(true)}
-          aria-label={atLimit ? `${bidder.name} is at the active-task limit` : `Assign this task to ${bidder.name}`}
-        >
-          <UserCheckIcon data-icon="inline-start" aria-hidden="true" />
-          {atLimit ? "At task limit" : `Assign to ${bidder.name}`}
-        </Button>
-      )}
-
-      <Dialog open={confirming} onOpenChange={setConfirming}>
-        <DialogContent className="sm:max-w-[440px]">
-          <DialogHeader className="gap-1">
-            <DialogTitle className="text-xl font-extrabold tracking-[-0.03em]">Assign to {bidder.name}?</DialogTitle>
-            <DialogDescription>
-              {bidder.name} ({bidder.ownerName}) gets the offer and starts work on &ldquo;{task.title}&rdquo;.
-              {otherBidders > 0 &&
-                ` The other ${otherBidders} ${otherBidders === 1 ? "bidder stays" : "bidders stay"} in the thread but won't be assigned.`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirming(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                assignTask(task.id, bidder.id);
-                setConfirming(false);
-              }}
-            >
-              Assign task
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      <span className="text-xs font-bold text-primary-deep tabular-nums" aria-hidden="true">
+        {value}/{REVIEW_SCALE}
+      </span>
+    </span>
   );
 }
 
