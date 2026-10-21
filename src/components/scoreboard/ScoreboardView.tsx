@@ -1,58 +1,55 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { TrophyIcon } from "lucide-react";
-import { KpiCard, KpiGrid } from "@/components/KpiCard";
+import { HistoryIcon, RotateCwIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
-import { PillSelect, Toolbar, ToolbarGroup } from "@/components/Toolbar";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { POINTS_TIMEZONE, WEEKLY_TARGET, daysLeftInWeek } from "@/lib/points";
+import { POINTS_TIMEZONE } from "@/lib/points";
+import { apiFetch } from "@/lib/request-json";
 import type { ScoreboardResponse } from "@/lib/schemas/scoreboard";
+import { cn } from "@/lib/utils";
 import { EarnPanel } from "./EarnPanel";
 import { HistoryDialog } from "./HistoryDialog";
 import { PointsTable } from "./PointsTable";
-import { apiFetch } from "@/lib/request-json";
 
-type RangeSelection = "this_week" | "last_week" | "all_time";
+export type RangeSelection = "this_week" | "last_week" | "all_time";
 
-const RANGE_OPTIONS: { value: RangeSelection; label: string }[] = [
+const RANGES: { value: RangeSelection; label: string }[] = [
   { value: "this_week", label: "This week" },
   { value: "last_week", label: "Last week" },
   { value: "all_time", label: "All time" },
 ];
 
-function formatPoints(value: number): string {
-  return value.toLocaleString("en-GB");
+const weekDay = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: POINTS_TIMEZONE });
+
+async function fetchScoreboard(range: RangeSelection): Promise<ScoreboardResponse> {
+  const response = await apiFetch(`/api/scoreboard?range=${range}`);
+  if (!response.ok) throw new Error("Couldn't load the scoreboard.");
+  return (await response.json()) as ScoreboardResponse;
 }
 
-async function fetchScoreboardJson(range: RangeSelection): Promise<ScoreboardResponse> {
-  const response = await apiFetch(`/api/scoreboard?range=${range}`);
-  if (!response.ok) throw new Error(`Failed to load the scoreboard (${response.status})`);
-  return (await response.json()) as ScoreboardResponse;
+function weekLabel(board: ScoreboardResponse) {
+  // The range end is exclusive (next Monday 00:00), so step back a minute to land on Sunday.
+  const end = new Date(new Date(board.range.end).getTime() - 60_000);
+  return `${weekDay.format(new Date(board.range.start))} – ${weekDay.format(end)}`;
 }
 
 export function ScoreboardView({ currentUser }: { currentUser: { id: string; name: string } }) {
   const [range, setRange] = useState<RangeSelection>("this_week");
-  const [thisWeek, setThisWeek] = useState<ScoreboardResponse | null>(null);
-  const [selected, setSelected] = useState<ScoreboardResponse | null>(null);
+  const [boards, setBoards] = useState<Partial<Record<RangeSelection, ScoreboardResponse>>>({});
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const load = useCallback(async (selection: RangeSelection) => {
     setError(null);
     try {
-      const [week, chosen] = await Promise.all([
-        fetchScoreboardJson("this_week"),
-        selection === "this_week" ? null : fetchScoreboardJson(selection),
-      ]);
-      setThisWeek(week);
-      setSelected(chosen ?? week);
+      const board = await fetchScoreboard(selection);
+      setBoards((previous) => ({ ...previous, [selection]: board }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Failed to load the scoreboard.");
+      setError(cause instanceof Error ? cause.message : "Couldn't load the scoreboard.");
     }
   }, []);
 
@@ -60,117 +57,99 @@ export function ScoreboardView({ currentUser }: { currentUser: { id: string; nam
     void load("this_week");
   }, [load]);
 
-  const changeRange = (value: string) => {
-    setRange(value as RangeSelection);
-    void load(value as RangeSelection);
+  const changeRange = (next: RangeSelection) => {
+    setRange(next);
+    void load(next);
   };
 
-  const currentRow = thisWeek?.rows.find((row) => row.user_id === currentUser.id);
-  const atTarget = thisWeek?.rows.filter((row) => row.points >= thisWeek.target).length ?? 0;
-  const daysLeft = thisWeek
-    ? daysLeftInWeek({ start: new Date(thisWeek.range.start), end: new Date(thisWeek.range.end) }, new Date())
-    : daysLeftInWeek({ start: new Date(), end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }, new Date());
-
-  const loading = !selected && !error;
+  const selected = boards[range] ?? null;
+  const thisWeek = boards.this_week ?? null;
+  const rangeLabel = RANGES.find((option) => option.value === range)?.label ?? "This week";
 
   return (
     <>
       <PageHeader
         title="Scoreboard"
-        description={`Weekly points for the Zedu project. Reach ${thisWeek?.target ?? WEEKLY_TARGET} to hit target.`}
+        description={
+          thisWeek
+            ? `Week of ${weekLabel(thisWeek)} · resets Sunday 23:59, Lagos time. Everyone aims for ${thisWeek.target} points a week.`
+            : "Points earned by everyone in this project, week by week."
+        }
+        actions={
+          <Button variant="outline" onClick={() => setHistoryOpen(true)}>
+            <HistoryIcon data-icon="inline-start" aria-hidden="true" />
+            My points history
+          </Button>
+        }
       />
 
       <PageContent>
-        <Toolbar>
-          <ToolbarGroup>
-            <PillSelect
-              label="Range"
-              value={range}
-              onChange={changeRange}
-              options={RANGE_OPTIONS}
-              defaultValue="this_week"
-            />
-          </ToolbarGroup>
-        </Toolbar>
-
-        {loading ? (
-          <KpiGrid>
-            {[0, 1, 2].map((index) => (
-              <Skeleton key={index} className="h-[140px] rounded-[22px]" />
-            ))}
-          </KpiGrid>
-        ) : (
-          <KpiGrid>
-            <KpiCard
-              title="Your points this week"
-              value={formatPoints(currentRow?.points ?? 0)}
-              context={`of ${thisWeek?.target ?? WEEKLY_TARGET} target`}
-              action={{ label: "Open my points history", onClick: () => setHistoryOpen(true) }}
-            />
-            <KpiCard
-              title="Team at target"
-              value={`${atTarget} of ${thisWeek?.rows.length ?? 0}`}
-              context={`reached ${thisWeek?.target ?? WEEKLY_TARGET} this week`}
-            />
-            <KpiCard
-              title="Days left in the week"
-              value={String(daysLeft)}
-              context={`until Sunday 23:59 (${POINTS_TIMEZONE})`}
-            />
-          </KpiGrid>
-        )}
-
         {error && (
           <Alert variant="destructive">
             <AlertTitle>Something went wrong</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
-            <Button variant="outline" size="sm" className="mt-2 self-start" onClick={() => void load(range)}>
-              Try again
-            </Button>
+            <AlertAction>
+              <Button variant="outline" size="sm" onClick={() => void load(range)}>
+                <RotateCwIcon data-icon="inline-start" aria-hidden="true" />
+                Try again
+              </Button>
+            </AlertAction>
           </Alert>
         )}
 
-        {!error && (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
-            <Card>
-              <CardHeader>
-                <div className="flex w-full items-center justify-between gap-3">
-                  <CardTitle>Leaderboard</CardTitle>
-                  {selected && (
-                    <span className="text-sm font-semibold text-muted-foreground tabular-nums">{selected.rows.length} people</span>
-                  )}
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+          <Card>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex flex-col gap-1">
+                <CardTitle>Leaderboard</CardTitle>
+                <CardDescription>
+                  {selected
+                    ? `${selected.rows.length} ${selected.rows.length === 1 ? "person" : "people"} · ${rangeLabel.toLowerCase()}`
+                    : "Loading…"}
+                </CardDescription>
+              </div>
+              <div role="group" aria-label="Period" className="flex shrink-0 rounded-full bg-muted p-1">
+                {RANGES.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={range === option.value}
+                    onClick={() => changeRange(option.value)}
+                    className={cn(
+                      "h-8 rounded-full px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                      range === option.value
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {selected ? (
+                <PointsTable
+                  rows={selected.rows}
+                  target={range === "all_time" ? null : selected.target}
+                  currentUserId={currentUser.id}
+                />
+              ) : (
+                <div className="flex flex-col gap-2" aria-busy="true">
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <Skeleton key={index} className="h-14 w-full rounded-xl" />
+                  ))}
                 </div>
-              </CardHeader>
-              <CardContent className="px-2 sm:px-4">
-                {loading && (
-                  <div className="flex flex-col gap-2 py-1">
-                    {Array.from({ length: 5 }, (_, index) => (
-                      <Skeleton key={index} className="h-14 w-full rounded-xl" />
-                    ))}
-                  </div>
-                )}
+              )}
+            </CardContent>
+          </Card>
 
-                {selected && selected.rows.length === 0 && (
-                  <Empty className="py-12">
-                    <EmptyHeader>
-                      <EmptyMedia className="size-12 rounded-full bg-accent text-primary-deep">
-                        <TrophyIcon className="size-5" aria-hidden="true" />
-                      </EmptyMedia>
-                      <EmptyTitle>No points earned yet</EmptyTitle>
-                      <EmptyDescription>Points appear here once work is approved and reviewed.</EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                )}
-
-                {selected && selected.rows.length > 0 && (
-                  <PointsTable rows={selected.rows} target={selected.target} currentUserId={currentUser.id} />
-                )}
-              </CardContent>
-            </Card>
-
-            {selected && <EarnPanel rules={selected.rules} />}
-          </div>
-        )}
+          {selected ?? thisWeek ? (
+            <EarnPanel rules={(selected ?? thisWeek)!.rules} />
+          ) : (
+            <Skeleton className="h-[420px] rounded-[22px]" aria-label="Loading ways to earn" />
+          )}
+        </div>
       </PageContent>
 
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />

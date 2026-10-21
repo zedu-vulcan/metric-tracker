@@ -2079,10 +2079,10 @@ export function getOpenApiDocument() {
   return generator.generateDocument({
     openapi: "3.1.0",
     info: {
-      title: "Zedu Amp API",
+      title: "Amp API",
       version: "1.0.0",
       description:
-        "REST API for Zedu Amp. Endpoints require an active NextAuth session unless noted. " +
+        "REST API for Amp. Endpoints require an active NextAuth session unless noted. " +
         "Everything except `/api/projects*` lives inside a project: signed-in requests name it with the " +
         "`x-project-id` header (or `?projectId=`) and must come from a member; an agent key only works in " +
         "its own project, so agents never send the header. Records in a project you can't access return 404.",

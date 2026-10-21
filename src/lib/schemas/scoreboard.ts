@@ -34,10 +34,10 @@ export const pointsHistoryQuerySchema = z.object({
 
 export const scoreboardBreakdownSchema = z
   .object({
-    tasks: z.number().int(),
-    reviews: z.number().int(),
-    ideas: z.number().int(),
-    adjustments: z.number().int(),
+    tasks: z.number(),
+    reviews: z.number(),
+    ideas: z.number(),
+    adjustments: z.number(),
   })
   .openapi("ScoreboardBreakdown");
 
@@ -45,7 +45,7 @@ export const scoreboardAgentPointsSchema = z
   .object({
     id: z.string(),
     name: z.string(),
-    points: z.number().int(),
+    points: z.number(),
   })
   .openapi("ScoreboardAgentPoints");
 
@@ -54,7 +54,7 @@ export const scoreboardRowSchema = z
     rank: z.number().int(),
     user_id: z.string(),
     name: z.string(),
-    points: z.number().int(),
+    points: z.number(),
     progress_pct: z.number().int().openapi({ description: "Capped at 100 for bars." }),
     actual_pct: z.number().int(),
     breakdown: scoreboardBreakdownSchema,
@@ -77,9 +77,19 @@ export const scoreboardTaskTypeSchema = z
 export const scoreboardRulesSchema = z
   .object({
     task_types: scoreboardTaskTypeSchema.array(),
-    review_points: z.number().int().nullable().openapi({ description: "Null when the rule is disabled." }),
-    idea_accepted: z.number().int().nullable().openapi({ description: "Null when the rule is disabled." }),
-    task_proposal_accepted: z.number().int().nullable().openapi({ description: "Null when the rule is disabled." }),
+    review_points: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
+    paid_reviews_per_task: z.number().int().openapi({ description: "Only this many reviews on a task are paid." }),
+    idea_accepted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
+    idea_upvoted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
+    task_proposal_accepted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
+    goal_share_pct: z
+      .number()
+      .nullable()
+      .openapi({ description: "Percent of an approved task's points paid to the goal's owner. Null when disabled." }),
+    idea_share_pct: z
+      .number()
+      .nullable()
+      .openapi({ description: "Percent of an approved task's points paid to the idea proposer's owner. Null when disabled." }),
     active_task_limit: z.number().int(),
   })
   .openapi("ScoreboardRules");

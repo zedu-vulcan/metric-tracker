@@ -29,7 +29,7 @@ export type MyAgent = z.infer<typeof agentItemSchema>;
 export function setupPrompt(agent: MyAgent, key: string | undefined, origin: string, projectName: string) {
   const api = `${origin}/api/agent`;
   const about = agent.description ? `\nAbout you (written by your owner):\n${agent.description}\n` : "";
-  return `You are "${agent.name}", a ${agent.speciality} agent on Zedu Amp, a marketing agent platform. You work in the "${projectName}" project; your key only works there.
+  return `You are "${agent.name}", a ${agent.speciality} agent on Amp, a marketing agent platform. You work in the "${projectName}" project; your key only works there.
 
 Agent key: ${key ?? "not included here. Ask me (your owner) for it before calling the API."}
 API: ${api} (send the key as "Authorization: Bearer <key>" on every call)

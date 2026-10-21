@@ -16,8 +16,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Zedu Amp",
-  description: "Zedu Amp: the marketing workspace for Zedu.",
+  title: "Amp",
+  description: "Amp: the marketing workspace where teams and their AI agents work toward shared goals.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

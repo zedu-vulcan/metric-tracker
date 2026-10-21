@@ -8,7 +8,7 @@ import { authOptions } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 const SIGN_IN_ERRORS: Record<string, string> = {
-  AccessDenied: "That Google account doesn't have access. Use your Zedu account.",
+  AccessDenied: "That Google account doesn't have access. Try a different one.",
   OAuthAccountNotLinked: "That email is already linked to a different sign-in. Use the Google account you used before.",
 };
 
@@ -28,7 +28,7 @@ export default async function Home({ searchParams }: { searchParams: { error?: s
         <section className="flex w-full flex-col gap-6 rounded-[22px] border border-border bg-card p-6 sm:p-8">
           <div className="flex flex-col gap-1.5 text-center">
             <h1 className="m-0 text-[22px] leading-tight font-extrabold tracking-[-0.03em] text-foreground">Sign in</h1>
-            <p className="m-0 text-sm text-muted-foreground">Use your Zedu Google account.</p>
+            <p className="m-0 text-sm text-muted-foreground">Continue with your Google account.</p>
           </div>
 
           {error && (

@@ -1,5 +1,5 @@
 /**
- * Points & scoreboard domain logic for the Zedu agent platform.
+ * Points & scoreboard domain logic for the Amp agent platform.
  *
  * Pure, database-free logic shared by the screens and the server contracts.
  * The database-backed implementations (`awardPoints`, `awardForRule`,

@@ -1,4 +1,4 @@
-# Zedu Amp design system
+# Amp design system
 
 > **Source of truth:** tokens live in `src/app/globals.css` and are exposed as Tailwind classes (`bg-primary`, `text-muted-foreground`, …). This document says *how* to use them and what each building block looks like. If the two disagree, the CSS wins; fix this file in the same PR.
 >
@@ -6,7 +6,7 @@
 
 ## 1. Direction
 
-**Bold, complete, compact.** Zedu Amp takes its form from the FinSet dashboard and its brand from Zedu:
+**Bold, complete, compact.** Amp takes its form from the FinSet dashboard and its violet brand from Zedu, where it started:
 
 - A **deep Zedu-violet sidebar** with a solid violet pill marking where you are.
 - A **white workspace** where every block of information is its own rounded, hairline-bordered card. There's no grey canvas and no drop shadows. Cards are defined by their border, generous corner radius and bold titles.
@@ -81,7 +81,7 @@ One family, **Manrope** (`font-sans`), used heavy. **JetBrains Mono** (`font-mon
 
 ```
 ┌──────────────┬──────────────────────────────────────────────────────────────┐
-│ ◉ Zedu Amp  ‹│  Welcome back, Abraham!                      (⌕) (🔔) [◯ Abraham ▾]│
+│ ◉ Amp       ‹│  Welcome back, Abraham!                      (⌕) (🔔) [◯ Abraham ▾]│
 │              │  Here's what moved this week                                 │
 │ ▉ Overview   │                                                              │
 │   Content    │  (📅)(This month ▾)            [Manage ▢] [＋ Add content]    │

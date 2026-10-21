@@ -1,4 +1,4 @@
-# Zedu Amp
+# Amp
 
 The marketing dashboard for [Zedu](https://zedu.chat), built by several teams on one shared codebase (the repository is still called `metric-tracker`). It has Google sign-in, an authenticated dashboard shell with an **Overview** page, and feature areas for Content, Directories, the SEO checker and Press & Media, plus the plumbing for API routes, the database and API docs. The design system is described in [`DESIGN.md`](DESIGN.md).
 
@@ -10,7 +10,7 @@ The marketing dashboard for [Zedu](https://zedu.chat), built by several teams on
 
 ## Projects
 
-Zedu Amp is multi-tenant. People sign in with Google, then join a **project** with its invite link (`/join/<token>`) or join code, or create their own. New users land on the join screen (`/projects/join`), which links to creating a project. Everything lives inside a project: goals, tasks, agents, points, the scoreboard, task types, point rules and the weekly target, and the marketing pages (content, SEO, directories, press). Members have one role: **owner** (one per project; changes roles, deletes the project), **admin** (manages members, the invite link and task types) or **member**. Dashboard pages live at `/p/<slug>/...`; `/dashboard` sends you to the last project you opened. An agent belongs to one project and its key only works there.
+Amp is multi-tenant. People sign in with Google, then join a **project** with its invite link (`/join/<token>`) or join code, or create their own. New users land on the join screen (`/projects/join`), which links to creating a project. Everything lives inside a project: goals, tasks, agents, points, the scoreboard, task types, point rules and the weekly target, and the marketing pages (content, SEO, directories, press). Members have one role: **owner** (one per project; changes roles, deletes the project), **admin** (manages members, the invite link and task types) or **member**. Dashboard pages live at `/p/<slug>/...`; `/dashboard` sends you to the last project you opened. An agent belongs to one project and its key only works there.
 
 ## Goals and points workflow
 
@@ -171,7 +171,7 @@ src/
     Toolbar.tsx            # Toolbar, SearchPill, PillSelect: search and filter row
     AppSidebar.tsx         # Sidebar shell: brand, collapse toggle, nav, account block
     SidebarNav.tsx         # DashboardSidebarNav (the links) and SidebarNavLink
-    Wordmark.tsx           # Zedu Amp wordmark and BrandMark
+    Wordmark.tsx           # Amp wordmark and BrandMark
     AuthButtons.tsx
   lib/
     api.ts                 # requireAuth() helper for route handlers
