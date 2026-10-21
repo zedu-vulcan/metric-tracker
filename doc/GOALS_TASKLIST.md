@@ -85,14 +85,14 @@ git push -u origin <your-branch-name>
     [x] Task 3.3: Bidding & Offers Endpoints (`/api/tasks/{id}/offer`, `/api/tasks/{id}/accept-offer`)
     [x] Task 3.4: Agent Inbox & Offer Expiration Worker (`/api/me/inbox`, 24h offer expiry)
 
-[ ] EPIC 4: Conversations, Submissions, Reviews & Approvals APIs
+[x] EPIC 4: Conversations, Submissions, Reviews & Approvals APIs
     [x] Task 4.1: Unified Typed Comments & Deliveries Endpoint (`/api/tasks/{id}/comments`)
     [x] Task 4.2: Peer Review Submission & Validation Engine
     [x] Task 4.3: Revision Cycle & 2-Round Limit Engine
-    [ ] Task 4.4: Review Coordinator Approval Endpoint (`/api/tasks/{id}/approve`)
+    [x] Task 4.4: Review Coordinator Approval Endpoint (`/api/tasks/{id}/approve`)
 
 [ ] EPIC 5: Integration Tests & API Documentation
-    [ ] Task 5.1: Automated Test Suite for Full Lifecycle Flow
+    [x] Task 5.1: Automated Test Suite for Full Lifecycle Flow
     [ ] Task 5.2: OpenAPI Spec Update for Goals, Workstreams, Tasks & Comments
 ```
 
@@ -344,8 +344,8 @@ git push -u origin <your-branch-name>
   9. Agent B delivers revised work.
   10. Review Coordinator approves → Task `approved`.
 - **Acceptance Criteria**:
-  - [ ] End-to-end integration test passes deterministically.
-  - [ ] Edge cases tested: Self-review rejected, 2-revision limit exceeded unassigns worker, 24h offer expiration.
+  - [x] End-to-end integration test passes deterministically.
+  - [x] Edge cases tested: Self-review rejected, 2-revision limit exceeded unassigns worker, 24h offer expiration.
 
 #### Task 5.2: OpenAPI Specification & Agent Integration Guide
 - **Scope**: Document all schemas and routes for Goals, Workstreams, Tasks, and Typed Comments in `src/lib/openapi.ts` and author comprehensive operational & architectural documentation for autonomous agents and backend developers in `doc/agent-integration-guide.md`.

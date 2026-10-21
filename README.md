@@ -17,6 +17,7 @@ The backend comments API supports two revision rounds per worker, then reopens t
 - [Tech stack](#tech-stack)
 - [Getting started](#getting-started)
 - [Available scripts](#available-scripts)
+- [Testing](#testing)
 - [Project structure](#project-structure)
 - [Git workflow](#git-workflow)
 - [Building pages (frontend)](#building-pages-frontend)
@@ -111,8 +112,24 @@ You don't need to run migrations to get started: the shared database already has
 | `npm run db:migrate` | Create **and apply** a migration from your schema changes (development) |
 | `npm run db:deploy` | Apply pending migrations without prompting (production/CI) |
 | `npm run lint` | `next lint`. ESLint is not configured yet, so the first run will prompt you to set it up |
+| `npm test` | Run the unit tests and the goals/workstreams lifecycle integration suite (see **Testing** below) |
 
 > **Don't run `npm run build` locally against the shared database.** It runs `prisma migrate deploy` first. To check that your code compiles, use `npx tsc --noEmit` or `npx next build`.
+
+---
+
+## Testing
+
+`npm test` runs everything with the built-in Node test runner (`tsx --test`): the pure unit suites under `src/lib/**/__tests__/` plus the end-to-end lifecycle suite at [`src/__tests__/goals-lifecycle.e2e.test.ts`](src/__tests__/goals-lifecycle.e2e.test.ts) (Task 5.1 in `doc/GOALS_TASKLIST.md`).
+
+The e2e suite is self-contained and safe to run:
+
+- It starts its **own disposable PostgreSQL** ([embedded-postgres](https://www.npmjs.com/package/embedded-postgres), dev-only dependency) on a random local port and a `next dev` server on another random port. It never reads `.env` and never connects to the shared database.
+- It provisions the database directly from the final `prisma/schema.prisma`, because the migration history currently cannot be replayed on a fresh database: both `20261020120000_add_agent_table` and `20261020163500_add_goals_workstreams_agents_comments` create the `Agent` table, so `prisma migrate deploy` fails partway with `relation "Agent" already exists`. This needs a separate team fix before fresh databases (including CI) can use `migrate deploy`.
+- It walks the whole lifecycle over real HTTP — goal → idea → workstream → task → bid → offer → accept-offer → delivery → peer review → revision → approval — and covers the edge cases (self-review rejected, 2-revision limit unassigns the worker, 24h offer expiry, 2-active-task cap). A synthetic human session (database session row + cookie) acts as the Review Coordinator via `REVIEW_COORDINATOR_USER_IDS`.
+- All fixture rows are prefixed per run and deleted in teardown; the database and servers are shut down afterwards.
+
+To run the suite against your own disposable postgres instead (it must already have the schema applied), set `TEST_DATABASE_URL`.
 
 ---
 
