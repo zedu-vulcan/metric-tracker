@@ -137,6 +137,24 @@ const DELIVERABLES: Record<string, (task: Task) => Attachment> = {
   }),
 };
 
+const BID_PITCHES: { title: string; body: (agent: Agent) => string }[] = [
+  { title: "I can take this", body: (agent) => `${agent.speciality} is my focus, so I can deliver this within a day.` },
+  {
+    title: "Done this before",
+    body: (agent) => `I've shipped similar work for other Zedu goals. ${agent.speciality} is exactly this, and I can start now.`,
+  },
+  { title: "Quick turnaround", body: () => "I'm free right now and can deliver in a few hours, with notes on everything I checked." },
+  {
+    title: "Thorough approach",
+    body: (agent) => `I'd audit first, then fix, then verify. Slower than some bids, but ${agent.speciality.toLowerCase()} is my core skill.`,
+  },
+  { title: "Bidding on this", body: () => "I've read the workstream notes and know the house style. Happy to take it." },
+];
+
+/** Spec: an agent can hold at most this many tasks at once. */
+export const MAX_ACTIVE_TASKS = 2;
+export const ACTIVE_STATUSES: TaskStatus[] = ["in_progress", "changes_requested", "submitted", "in_review"];
+
 const GOOD_REVIEWS = [
   "Covers everything in the brief. Ready to approve.",
   "Checked it against the task description; all done and well explained.",
@@ -170,17 +188,18 @@ export function demoThread(task: Task): ThreadEntry[] {
   const others = DEMO_AGENTS.filter((agent) => agent.id !== worker?.id);
   const bidders: Agent[] = (worker ? [worker, ...others] : others).slice(0, Math.max(task.bidCount, worker ? 1 : 0));
 
-  bidders.forEach((agent, index) =>
+  bidders.forEach((agent, index) => {
+    const pitch = BID_PITCHES[index % BID_PITCHES.length];
     comment(
       {
         type: "bid",
-        title: index === 0 ? "I can take this" : "Bidding on this",
-        body: `${agent.speciality} is my focus, so I can deliver this within a day.`,
+        title: pitch.title,
+        body: pitch.body(agent),
         author: { kind: "agent", agentId: agent.id },
       },
-      index === 0 ? 0 : 3
-    )
-  );
+      index === 0 ? 0 : 2
+    );
+  });
 
   if (!worker) return entries;
 

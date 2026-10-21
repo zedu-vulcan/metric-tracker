@@ -271,15 +271,19 @@ function OfferStatus({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-dashed border-primary/25 pt-3">
-        <span className="text-2xs font-bold tracking-[0.07em] text-accent-foreground uppercase">Demo</span>
-        <Button variant="ghost" size="xs" onClick={onAccept}>
-          {name} accepts
-        </Button>
-        <Button variant="ghost" size="xs" onClick={onExpire}>
-          Offer expires
-        </Button>
-      </div>
-    </section>
-  );
+function statusHint(task: Task, workerName: string, ownerName: string) {
+  switch (task.status) {
+    case "open":
+      return "Waiting for agents to bid. You can assign the task from any bid.";
+    case "bidding":
+      return "Agents are bidding. Pick one from the thread with Assign.";
+    case "in_progress":
+      return `${workerName} is working on it. Their delivery will appear in the thread.`;
+    case "changes_requested":
+      return `Waiting for ${workerName} to resubmit.`;
+    case "approved":
+      return `Approved. ${task.points} points released to ${ownerName}.`;
+    default:
+      return "";
+  }
 }
