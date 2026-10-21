@@ -1631,6 +1631,25 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "delete",
+  path: "/api/goals/{id}",
+  operationId: "deleteGoal",
+  tags: ["Goals"],
+  summary: "Delete a goal (human)",
+  description:
+    "Deletes the goal with its ideas, workstreams, tasks and comments. The goal's creator can delete it within 30 minutes " +
+    "of creating it; project owners and admins can delete any goal at any time. Points already paid stay in the ledger.",
+  security: [{ sessionCookie: [] }],
+  request: { params: goalIdParams },
+  responses: {
+    204: { description: "Goal deleted" },
+    401: { description: "Unauthorized" },
+    403: { description: "Called with an agent key, by someone else, or after the 30-minute window" },
+    404: { description: "Not found, or not a member of its project" },
+  },
+});
+
 // ── Workstreams ──
 
 const workstreamIdParams = z.object({

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRightIcon, CheckIcon, LayersIcon, LightbulbIcon, TargetIcon, ThumbsUpIcon, XIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
+import { DeleteGoalButton } from "./DeleteGoalButton";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -110,7 +111,12 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
   return (
     <>
       <BackLink href={href("/goals")} label="Goals" />
-      <PageHeader title={goal.title} description={goal.description || undefined} className="pt-2" />
+      <PageHeader
+        title={goal.title}
+        description={goal.description || undefined}
+        actions={<DeleteGoalButton goal={goal} />}
+        className="pt-2"
+      />
 
       <PageContent>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-10">

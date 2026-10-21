@@ -244,6 +244,7 @@ type GoalsContextValue = {
   bidsFor: (taskId: string) => Bid[];
   agentFor: (agentId: string) => Agent | undefined;
   createGoal: (input: NewGoal) => Promise<Goal>;
+  deleteGoal: (goalId: string) => Promise<void>;
   approveIdea: (ideaId: string) => Promise<void>;
   rejectIdea: (ideaId: string, reason: string) => Promise<void>;
   sendOffer: (taskId: string, agentId: string) => Promise<void>;
@@ -298,6 +299,11 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
     );
     setGoals((previous) => [goal, ...previous.filter((candidate) => candidate.id !== goal.id)]);
     return goal;
+  }, []);
+
+  const deleteGoal = useCallback(async (goalId: string) => {
+    await requestJson(`/api/goals/${goalId}`, { method: "DELETE" });
+    setGoals((previous) => previous.filter((goal) => goal.id !== goalId));
   }, []);
 
   const rememberAgents = useCallback((refs: (ApiAgentRef | null | undefined)[], fallbackActiveAt: string) => {
@@ -430,6 +436,7 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
         ),
       agentFor: (agentId) => apiAgents[agentId],
       createGoal,
+      deleteGoal,
       approveIdea: (ideaId) => decide(ideaId, "accept"),
       rejectIdea: (ideaId, reason) => decide(ideaId, "reject", reason),
       sendOffer: (taskId, agentId) => changeOffer(taskId, "POST", agentId),
@@ -453,6 +460,7 @@ export function GoalsProvider({ currentUser, children }: { currentUser: DemoUser
       loadThread,
       apiAgents,
       createGoal,
+      deleteGoal,
       decide,
       changeOffer,
       postNote,
