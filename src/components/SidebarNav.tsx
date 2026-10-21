@@ -10,6 +10,7 @@ import {
   MegaphoneIcon,
   NewspaperIcon,
   ScanSearchIcon,
+  SettingsIcon,
   TargetIcon,
   TrophyIcon,
   type LucideIcon,
@@ -22,6 +23,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useProject } from "@/components/projects/ProjectProvider";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEM =
@@ -67,38 +69,48 @@ export function SidebarNavLink({ icon, badge, collapsed = false, children, class
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
 
-/** Marketing channels, grouped under one expandable "Marketing" item. */
+/** Marketing channels, grouped under one expandable "Marketing" item. Paths are inside the current project. */
 const MARKETING_CHANNELS: NavItem[] = [
-  { href: "/dashboard/content", label: "Content", icon: FileTextIcon },
-  { href: "/dashboard/directories", label: "Directories", icon: FolderOpenIcon },
-  { href: "/dashboard/seo", label: "SEO checker", icon: ScanSearchIcon },
-  { href: "/dashboard/media", label: "Press & Media", icon: NewspaperIcon },
+  { href: "/content", label: "Content", icon: FileTextIcon },
+  { href: "/directories", label: "Directories", icon: FolderOpenIcon },
+  { href: "/seo", label: "SEO checker", icon: ScanSearchIcon },
+  { href: "/media", label: "Press & Media", icon: NewspaperIcon },
 ];
 
 /** Top-level items shown after the Marketing group. */
 const CHANNELS: NavItem[] = [
-  { href: "/dashboard/goals", label: "Goals", icon: TargetIcon },
-  { href: "/dashboard/scoreboard", label: "Scoreboard", icon: TrophyIcon }, // PR 5 (doc/points-schema-requests.md)
+  { href: "/goals", label: "Goals", icon: TargetIcon },
+  { href: "/scoreboard", label: "Scoreboard", icon: TrophyIcon },
+  { href: "/settings", label: "Project settings", icon: SettingsIcon },
 ];
 
 export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
-  const isCurrent = (href: string) => (href === "/dashboard" ? pathname === href : pathname.startsWith(href));
+  const { href: projectPath } = useProject();
+  const overview = projectPath();
+  const isCurrent = (href: string) => (href === overview ? pathname === href : pathname.startsWith(href));
   const current = (href: string) => (isCurrent(href) ? "page" : undefined);
+  const inProject = (items: NavItem[]) => items.map((item) => ({ ...item, href: projectPath(item.href) }));
 
   return (
     <SidebarNavList aria-label="Main navigation">
       <SidebarNavLink
-        aria-current={current("/dashboard")}
-        href="/dashboard"
+        aria-current={current(overview)}
+        href={overview}
         collapsed={collapsed}
         icon={<LayoutDashboardIcon aria-hidden="true" />}
       >
         Overview
       </SidebarNavLink>
       <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-sidebar-border lg:mx-3 lg:my-1.5 lg:h-px lg:w-auto" />
-      <SidebarNavGroup label="Marketing" icon={MegaphoneIcon} items={MARKETING_CHANNELS} collapsed={collapsed} isCurrent={isCurrent} />
-      {CHANNELS.map(({ href, label, icon: Icon }) => (
+      <SidebarNavGroup
+        label="Marketing"
+        icon={MegaphoneIcon}
+        items={inProject(MARKETING_CHANNELS)}
+        collapsed={collapsed}
+        isCurrent={isCurrent}
+      />
+      {inProject(CHANNELS).map(({ href, label, icon: Icon }) => (
         <SidebarNavLink
           key={href}
           aria-current={current(href)}

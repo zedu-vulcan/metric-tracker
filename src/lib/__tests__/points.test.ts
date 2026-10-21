@@ -62,7 +62,7 @@ function inMemoryPointsDb(input: {
         )
         .reduce((total, row) => total + row.amount, 0);
     },
-    async getRule(ruleKey) {
+    async getRule(_projectId, ruleKey) {
       return rules.find((rule) => rule.ruleKey === ruleKey) ?? null;
     },
   };
@@ -145,11 +145,11 @@ describe("awardPoints", () => {
     const db = inMemoryPointsDb({ users: ["u1"] });
     const meta = { sourceType: "task" as const, sourceId: "t1" };
 
-    const first = await awardPoints("u1", 30, "task_approved", meta, { db });
+    const first = await awardPoints("p1", "u1", 30, "task_approved", meta, { db });
     assert.equal(first.awarded, true);
     assert.equal(db.rows.length, 1);
 
-    const second = await awardPoints("u1", 30, "task_approved", meta, { db });
+    const second = await awardPoints("p1", "u1", 30, "task_approved", meta, { db });
     assert.equal(second.awarded, false);
     assert.equal(second.entryId, first.entryId);
     assert.equal(db.rows.length, 1);
@@ -160,7 +160,7 @@ describe("awardPoints", () => {
     const meta = { sourceType: "task" as const, sourceId: "t1" };
 
     const results = await Promise.all(
-      Array.from({ length: 10 }, () => awardPoints("u1", 30, "task_approved", meta, { db }))
+      Array.from({ length: 10 }, () => awardPoints("p1", "u1", 30, "task_approved", meta, { db }))
     );
 
     const awarded = results.filter((result) => result.awarded);
@@ -174,13 +174,13 @@ describe("awardPoints", () => {
   it("refuses non-zero-integer violations, unknown users, and unknown reasons", async () => {
     const db = inMemoryPointsDb({ users: ["u1"] });
 
-    const zero = await awardPoints("u1", 0, "task_approved", undefined, { db });
+    const zero = await awardPoints("p1", "u1", 0, "task_approved", undefined, { db });
     assert.equal(zero.awarded, false);
 
-    const missingUser = await awardPoints("ghost", 10, "task_approved", undefined, { db });
+    const missingUser = await awardPoints("p1", "ghost", 10, "task_approved", undefined, { db });
     assert.equal(missingUser.awarded, false);
 
-    const badReason = await awardPoints("u1", 10, "nope" as PointReason, undefined, { db });
+    const badReason = await awardPoints("p1", "u1", 10, "nope" as PointReason, undefined, { db });
     assert.equal(badReason.awarded, false);
 
     assert.equal(db.rows.length, 0);
@@ -190,11 +190,11 @@ describe("awardPoints", () => {
     const db = inMemoryPointsDb({ users: ["u1", "u2"], agents: { a1: "u1" } });
     const meta = { agentId: "a1", sourceType: "comment" as const, sourceId: "c1" };
 
-    const blocked = await awardPoints("u1", 1, "review_submitted", meta, { db, workerOwnerId: "u1" });
+    const blocked = await awardPoints("p1", "u1", 1, "review_submitted", meta, { db, workerOwnerId: "u1" });
     assert.equal(blocked.awarded, false);
     assert.equal(db.rows.length, 0);
 
-    const allowed = await awardPoints("u1", 1, "review_submitted", meta, { db, workerOwnerId: "u2" });
+    const allowed = await awardPoints("p1", "u1", 1, "review_submitted", meta, { db, workerOwnerId: "u2" });
     assert.equal(allowed.awarded, true);
     assert.equal(db.rows.length, 1);
   });
@@ -217,7 +217,7 @@ describe("awardForRule", () => {
       users: ["u1"],
       rules: [{ ruleKey: "idea_accepted", amount: 5, enabled: false, weeklyCap: null }],
     });
-    const result = await awardForRule("idea_accepted", "u1", undefined, { db, now: NOW });
+    const result = await awardForRule("p1", "idea_accepted", "u1", undefined, { db, now: NOW });
     assert.equal(result.awarded, false);
     assert.equal(db.rows.length, 0);
   });
@@ -229,8 +229,7 @@ describe("awardForRule", () => {
     });
 
     for (let i = 0; i < 3; i++) {
-      const result = await awardForRule(
-        "review_submitted",
+      const result = await awardForRule("p1", "review_submitted",
         "u1",
         { sourceType: "comment", sourceId: `c${i}` },
         { db, now: NOW }
@@ -239,8 +238,7 @@ describe("awardForRule", () => {
     }
     assert.equal(db.rows.length, 3);
 
-    const capped = await awardForRule(
-      "review_submitted",
+    const capped = await awardForRule("p1", "review_submitted",
       "u1",
       { sourceType: "comment", sourceId: "c4" },
       { db, now: NOW }
@@ -264,8 +262,8 @@ describe("getUserPoints / getAgentPoints", () => {
       ],
     });
 
-    assert.equal(await getUserPoints("u1", W0, { db }), 22);
-    assert.equal(await getUserPoints("u1", undefined, { db }), 121);
+    assert.equal(await getUserPoints("p1", "u1", W0, { db }), 22);
+    assert.equal(await getUserPoints("p1", "u1", undefined, { db }), 121);
     assert.equal(await getAgentPoints("a1", W0, { db }), 15);
     assert.equal(await getAgentPoints("a2", W0, { db }), 7);
   });

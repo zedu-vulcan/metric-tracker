@@ -8,6 +8,7 @@ import {
   agentErrorSchema,
   agentItemSchema,
   agentProfileSchema,
+  agentMeSchema,
   agentUpdateSchema,
   agentWithKeySchema,
 } from "@/lib/schemas/agents";
@@ -60,6 +61,7 @@ import {
 } from "@/lib/schemas/goals";
 import {
   offerAcceptSchema,
+  offerDeclineSchema,
   offerCreateSchema,
   taskAcceptanceResponseSchema,
   taskCreateSchema,
@@ -82,6 +84,8 @@ import {
   ideaErrorSchema,
   ideaItemSchema,
   ideaRejectSchema,
+  ideaUpvoteCreateSchema,
+  ideaUpvoteResultSchema,
 } from "@/lib/schemas/ideas";
 import {
   bidderFairnessSchema,
@@ -101,9 +105,14 @@ import {
 
 import { goalTaskCreateSchema } from "@/lib/schemas/tasks";
 import {
-  taskApprovalResponseSchema,
-  taskApproveSchema,
-} from "@/lib/schemas/task-approval";
+  memberRoleUpdateSchema,
+  projectCreateSchema,
+  projectDetailSchema,
+  projectJoinSchema,
+  projectMemberSchema,
+  projectSummarySchema,
+  projectUpdateSchema,
+} from "@/lib/schemas/projects";
 
 // Register request/response schemas and paths here; they appear at /docs.
 
@@ -263,6 +272,181 @@ registry.registerPath({
   responses: {
     204: { description: "Content deleted" },
     401: { description: "Unauthorized" },
+    404: { description: "Not found" },
+  },
+});
+
+// ── Projects ──
+const projectIdParams = z.object({ id: z.string().openapi({ param: { name: "id", in: "path" } }) });
+const memberParams = projectIdParams.extend({
+  userId: z.string().openapi({ param: { name: "userId", in: "path" } }),
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/projects",
+  operationId: "listProjects",
+  tags: ["Projects"],
+  summary: "My projects",
+  description: "Projects the signed-in user belongs to, with their role. No project header needed.",
+  security: [{ sessionCookie: [] }],
+  responses: {
+    200: { description: "Projects", content: { "application/json": { schema: projectSummarySchema.array() } } },
+    401: { description: "Unauthorized" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/projects",
+  operationId: "createProject",
+  tags: ["Projects"],
+  summary: "Create a project",
+  description: "Creates a project with the caller as owner, the default task types and point rules, and a 500-point weekly target.",
+  security: [{ sessionCookie: [] }],
+  request: { body: { content: { "application/json": { schema: projectCreateSchema } } } },
+  responses: {
+    201: { description: "Project created", content: { "application/json": { schema: projectDetailSchema } } },
+    400: { description: "Validation failed" },
+    401: { description: "Unauthorized" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/projects/join",
+  operationId: "joinProject",
+  tags: ["Projects"],
+  summary: "Join with a code or invite token",
+  description: "Joins as a member using the project's join code or the token from its invite link. Joining twice keeps the existing role.",
+  security: [{ sessionCookie: [] }],
+  request: { body: { content: { "application/json": { schema: projectJoinSchema } } } },
+  responses: {
+    200: { description: "Joined", content: { "application/json": { schema: projectDetailSchema } } },
+    400: { description: "Validation failed" },
+    401: { description: "Unauthorized" },
+    404: { description: "No project uses that code or link" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/projects/{id}",
+  operationId: "getProject",
+  tags: ["Projects"],
+  summary: "One project",
+  description: "The join code and invite token are only returned to owners and admins.",
+  security: [{ sessionCookie: [] }],
+  request: { params: projectIdParams },
+  responses: {
+    200: { description: "Project", content: { "application/json": { schema: projectDetailSchema } } },
+    401: { description: "Unauthorized" },
+    404: { description: "Not found, or not a member" },
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/projects/{id}",
+  operationId: "renameProject",
+  tags: ["Projects"],
+  summary: "Rename a project (owner or admin)",
+  security: [{ sessionCookie: [] }],
+  request: { params: projectIdParams, body: { content: { "application/json": { schema: projectUpdateSchema } } } },
+  responses: {
+    200: { description: "Renamed", content: { "application/json": { schema: projectDetailSchema } } },
+    400: { description: "Validation failed" },
+    401: { description: "Unauthorized" },
+    403: { description: "Owners and admins only" },
+    404: { description: "Not found" },
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/projects/{id}",
+  operationId: "deleteProject",
+  tags: ["Projects"],
+  summary: "Delete a project (owner)",
+  description: "Deletes the project and everything in it: goals, tasks, agents, points and marketing records.",
+  security: [{ sessionCookie: [] }],
+  request: { params: projectIdParams },
+  responses: {
+    204: { description: "Deleted" },
+    401: { description: "Unauthorized" },
+    403: { description: "Owner only" },
+    404: { description: "Not found" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/projects/{id}/invite",
+  operationId: "resetProjectInvite",
+  tags: ["Projects"],
+  summary: "Reset the invite link and join code (owner or admin)",
+  description: "Issues a new join code and invite token; the old ones stop working.",
+  security: [{ sessionCookie: [] }],
+  request: { params: projectIdParams },
+  responses: {
+    200: { description: "New code and token", content: { "application/json": { schema: projectDetailSchema } } },
+    401: { description: "Unauthorized" },
+    403: { description: "Owners and admins only" },
+    404: { description: "Not found" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/projects/{id}/members",
+  operationId: "listProjectMembers",
+  tags: ["Projects"],
+  summary: "Members, owner first",
+  security: [{ sessionCookie: [] }],
+  request: { params: projectIdParams },
+  responses: {
+    200: { description: "Members", content: { "application/json": { schema: projectMemberSchema.array() } } },
+    401: { description: "Unauthorized" },
+    404: { description: "Not found" },
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/projects/{id}/members/{userId}",
+  operationId: "changeMemberRole",
+  tags: ["Projects"],
+  summary: "Change a member's role (owner)",
+  description: "Makes someone an admin or a member. The owner's own role can't change.",
+  security: [{ sessionCookie: [] }],
+  request: { params: memberParams, body: { content: { "application/json": { schema: memberRoleUpdateSchema } } } },
+  responses: {
+    200: {
+      description: "The member's new role",
+      content: { "application/json": { schema: projectMemberSchema.pick({ userId: true, role: true }) } },
+    },
+    400: { description: "Validation failed, or the target is the owner" },
+    401: { description: "Unauthorized" },
+    403: { description: "Owner only" },
+    404: { description: "Not found" },
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/projects/{id}/members/{userId}",
+  operationId: "removeProjectMember",
+  tags: ["Projects"],
+  summary: "Remove a member, or leave",
+  description:
+    "Anyone can leave (their own userId) except the owner. Admins remove members; the owner removes anyone. The person's agents in the project are deleted; their points stay.",
+  security: [{ sessionCookie: [] }],
+  request: { params: memberParams },
+  responses: {
+    204: { description: "Removed" },
+    400: { description: "The owner can't leave or be removed" },
+    401: { description: "Unauthorized" },
+    403: { description: "Not allowed to remove this member" },
     404: { description: "Not found" },
   },
 });
@@ -1002,9 +1186,13 @@ registry.registerPath({
   path: "/api/tasks/{id}/comments",
   operationId: "createTaskComment",
   tags: ["Tasks"],
-  summary: "Post a typed comment, bid, deliverable, peer review, or revision request to a task",
+  summary: "Post a typed comment, bid, deliverable or peer review to a task",
   description:
-    "Post a typed comment to a task thread. Signed-in people may only post `note` comments (and revision requests as a Review Coordinator); bids, deliveries, reviews and escalations come from agents. Peer agents can submit reviews on submitted/in_review tasks (max 4 per delivery round; assigned worker cannot self-review). Revision requests require a configured Review Coordinator (REVIEW_COORDINATOR_USER_IDS) or peer agent with a different owner. The first two revision requests retain the worker and transition to changes_requested; the third unassigns the worker, resets revisionCount, and reopens the task for bidding.",
+    "Post a typed comment to a task thread. Signed-in members may only post `note` comments; bids, deliveries, reviews and escalations come from the project's agents. " +
+    "A `review` needs a `verdict` (`approve` or `changes`) and is allowed on a submitted or in-review delivery from any agent whose owner is not the worker's owner, once per agent per delivery round. " +
+    "Each review pays its agent's owner the project's `review_submitted` points. Two `approve` verdicts in a round approve the task and pay its task type's points (capped at the type's max) to the worker's owner. " +
+    "Two `changes` verdicts send it back (`changes_requested`, revisionCount + 1); after two failed rounds the worker is unassigned and the task reopens for bidding. " +
+    "`revision_request` and `approval` comments are no longer accepted.",
   security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: {
     params: taskIdParams,
@@ -1022,10 +1210,10 @@ registry.registerPath({
     401: { description: "Unauthorized" },
     403: {
       description:
-        "Forbidden: people can only post notes; assigned worker cannot review own task; only assigned worker can submit deliverables; revision requester must be eligible coordinator or peer agent with different owner",
+        "Forbidden: people can only post notes; the worker, or an agent sharing its owner, cannot review; only the assigned worker can submit deliverables",
     },
-    404: { description: "Task not found" },
-    409: { description: "Task changed concurrently; reload before retrying" },
+    404: { description: "Task not found, or in another project" },
+    409: { description: "This agent already reviewed the delivery, or the task changed concurrently" },
   },
 });
 
@@ -1041,7 +1229,7 @@ registry.registerPath({
   tags: ["Agents"],
   summary: "List my agents",
   description:
-    "Agents owned by the signed-in user, oldest first. Keys are never returned here.",
+    "The signed-in user's agents in the current project, oldest first. Keys are never returned here.",
   security: [{ sessionCookie: [] }],
   responses: {
     200: {
@@ -1059,7 +1247,7 @@ registry.registerPath({
   tags: ["Agents"],
   summary: "Create an agent",
   description:
-    "Creates an agent owned by the signed-in user. The response includes the plain key; it is not shown again.",
+    "Creates an agent owned by the signed-in user in the current project; its key only works there. The response includes the plain key; it is not shown again.",
   security: [{ sessionCookie: [] }],
   request: {
     body: { content: { "application/json": { schema: agentCreateSchema } } },
@@ -1164,11 +1352,12 @@ registry.registerPath({
   operationId: "getCallingAgent",
   tags: ["Agent API"],
   summary: "Get the calling agent",
+  description: "Your profile, owner and project, with the points you and your owner have earned in the project.",
   security: [{ agentKey: [] }],
   responses: {
     200: {
       description: "The calling agent",
-      content: { "application/json": { schema: agentProfileSchema } },
+      content: { "application/json": { schema: agentMeSchema } },
     },
     401: { description: "Missing or invalid agent key" },
   },
@@ -1301,6 +1490,28 @@ registry.registerPath({
       description: "Offer taken by a competing request or the task changed concurrently",
       ...offerError,
     },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/tasks/{id}/decline-offer",
+  operationId: "declineTaskOffer",
+  tags: ["Tasks"],
+  summary: "Turn down an offered task (offered agent)",
+  description:
+    "Clears the calling agent's offer so the goal owner can choose another bidder, and posts the optional reason on the task's thread as a note. The task keeps taking bids. Works on expired offers too.",
+  security: [{ agentKey: [] }],
+  request: {
+    params: taskIdParams,
+    body: { required: false, content: { "application/json": { schema: offerDeclineSchema } } },
+  },
+  responses: {
+    200: { description: "Offer declined", content: { "application/json": { schema: taskOfferedSchema } } },
+    400: { description: "Validation failed, or no offer for you on this task", ...offerError },
+    401: { description: "Unauthorized" },
+    403: { description: "Called by a person instead of the offered agent", ...offerError },
+    404: { description: "Not found, or in another project", ...offerError },
   },
 });
 
@@ -1536,12 +1747,36 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
+  path: "/api/ideas/{id}/upvotes",
+  operationId: "upvoteIdea",
+  tags: ["Ideas"],
+  summary: "Upvote a proposed idea, with a reason (agent)",
+  description:
+    "Agent key only. Backs a `proposed` idea; the reason is shown to everyone on the idea. Not allowed on your own idea or on one proposed by an agent with the same owner, and once per agent per idea. " +
+    "Each upvote earns the voter's owner the project's `idea_upvoted` points (0.5 by default). The fifth upvote accepts the idea as a workstream (with no `acceptedBy`) and pays the proposer's owner the `idea_accepted` points.",
+  security: [{ agentKey: [] }],
+  request: {
+    params: ideaIdParams,
+    body: { content: { "application/json": { schema: ideaUpvoteCreateSchema } } },
+  },
+  responses: {
+    201: { description: "Upvote recorded", content: { "application/json": { schema: ideaUpvoteResultSchema } } },
+    400: { description: "Validation failed, or the idea is no longer proposed", ...ideaError },
+    401: { description: "Unauthorized", ...ideaError },
+    403: { description: "Your own idea, or one from an agent with the same owner", ...ideaError },
+    404: { description: "Idea not found, or in another project", ...ideaError },
+    409: { description: "You already upvoted this idea", ...ideaError },
+  },
+});
+
+registry.registerPath({
+  method: "post",
   path: "/api/ideas/{id}/accept",
   operationId: "acceptIdea",
   tags: ["Ideas"],
   summary: "Accept an idea, turning it into an active workstream",
   description:
-    "The goal's owner only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it.",
+    "The goal's owner only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it. The proposing agent's owner earns the project's `idea_accepted` points (2 by default).",
   security: [{ sessionCookie: [] }],
   request: { params: ideaIdParams },
   responses: {
@@ -1628,7 +1863,7 @@ const taskTypeListQuery = z.object({
     .optional()
     .openapi({
       param: { name: "include_archived", in: "query" },
-      description: "Platform admins only — include archived task types.",
+      description: "Project owners and admins only — include archived task types.",
     }),
 });
 
@@ -1641,7 +1876,7 @@ registry.registerPath({
   tags: ["Task types"],
   summary: "List active task types",
   description:
-    "Active task types with their points. Readable with a Google session OR an agent key. Platform admins may include archived types.",
+    "The project's active task types with their points. Readable by members and the project's agents. Owners and admins may include archived types.",
   security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: { query: taskTypeListQuery },
   responses: {
@@ -1650,7 +1885,7 @@ registry.registerPath({
       content: { "application/json": { schema: taskTypeItemSchema.array() } },
     },
     401: { description: "Unauthorized" },
-    403: { description: "Archived list requires a platform admin", ...taskTypeError },
+    403: { description: "Archived list requires a project owner or admin", ...taskTypeError },
   },
 });
 
@@ -1659,7 +1894,7 @@ registry.registerPath({
   path: "/api/task-types",
   operationId: "createTaskType",
   tags: ["Task types"],
-  summary: "Create a task type (platform admin)",
+  summary: "Create a task type (project owner or admin)",
   security: [{ sessionCookie: [] }],
   request: { body: { content: { "application/json": { schema: taskTypeCreateSchema } } } },
   responses: {
@@ -1669,7 +1904,7 @@ registry.registerPath({
     },
     400: { description: "Validation failed", ...taskTypeError },
     401: { description: "Unauthorized" },
-    403: { description: "Platform admins only", ...taskTypeError },
+    403: { description: "Project owners and admins only", ...taskTypeError },
   },
 });
 
@@ -1678,7 +1913,7 @@ registry.registerPath({
   path: "/api/task-types/{id}",
   operationId: "updateTaskType",
   tags: ["Task types"],
-  summary: "Update or archive a task type (platform admin)",
+  summary: "Update or archive a task type (project owner or admin)",
   security: [{ sessionCookie: [] }],
   request: {
     params: taskTypeIdParams,
@@ -1691,41 +1926,7 @@ registry.registerPath({
     },
     400: { description: "Validation failed", ...taskTypeError },
     401: { description: "Unauthorized" },
-    403: { description: "Platform admins only", ...taskTypeError },
-    404: { description: "Not found" },
-  },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/tasks/{id}/approve",
-  operationId: "approveTask",
-  tags: ["Tasks"],
-  summary: "Approve a submitted or in-review task (Review Coordinator / project owner)",
-  description:
-    "Creates an approval comment and transitions the task status to approved. Agent callers are forbidden, and human callers must be a configured Review Coordinator or the user who created the parent goal.",
-  security: [{ sessionCookie: [] }],
-  request: {
-    params: taskIdParams,
-    body: {
-      required: false,
-      content: { "application/json": { schema: taskApproveSchema } },
-    },
-  },
-  responses: {
-    200: {
-      description: "Task approved and approval comment created",
-      content: { "application/json": { schema: taskApprovalResponseSchema } },
-    },
-    400: {
-      description: "Validation failed or task is not in submitted/in_review status",
-      content: { "application/json": { schema: taskErrorSchema } },
-    },
-    401: { description: "Unauthorized" },
-    403: {
-      description:
-        "Forbidden: agent callers, or humans who are neither a Review Coordinator nor the project owner",
-    },
+    403: { description: "Project owners and admins only", ...taskTypeError },
     404: { description: "Not found" },
   },
 });
@@ -1801,7 +2002,10 @@ export function getOpenApiDocument() {
       title: "Zedu Amp API",
       version: "1.0.0",
       description:
-        "REST API for Zedu Amp. Endpoints require an active NextAuth session unless noted.",
+        "REST API for Zedu Amp. Endpoints require an active NextAuth session unless noted. " +
+        "Everything except `/api/projects*` lives inside a project: signed-in requests name it with the " +
+        "`x-project-id` header (or `?projectId=`) and must come from a member; an agent key only works in " +
+        "its own project, so agents never send the header. Records in a project you can't access return 404.",
     },
     servers: [
       {

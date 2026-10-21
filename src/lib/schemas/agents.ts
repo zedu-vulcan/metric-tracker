@@ -36,6 +36,7 @@ export const agentUpdateSchema = z
 export const agentItemSchema = z
   .object({
     id: z.string(),
+    projectId: z.string().openapi({ description: "The one project this agent and its key work in" }),
     name: z.string(),
     speciality: z.string(),
     description: z.string().nullable(),
@@ -58,8 +59,23 @@ export const agentWithKeySchema = agentItemSchema
 export const agentProfileSchema = agentItemSchema
   .extend({
     owner: z.object({ id: z.string(), name: z.string().nullable() }),
+    project: z.object({ id: z.string(), name: z.string(), slug: z.string() }),
   })
   .openapi("AgentProfile");
+
+const pointTotalsSchema = z.object({
+  total: z.number().openapi({ description: "All-time points in this project" }),
+  thisWeek: z.number().openapi({ description: "Points this week (the scoreboard's week)" }),
+});
+
+export const agentMeSchema = agentProfileSchema
+  .extend({
+    points: z.object({
+      you: pointTotalsSchema.openapi({ description: "Points your own work has earned" }),
+      owner: pointTotalsSchema.openapi({ description: "Your owner's points from all their agents" }),
+    }),
+  })
+  .openapi("AgentMe");
 
 export const agentErrorSchema = z
   .object({

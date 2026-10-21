@@ -1,4 +1,5 @@
 import { outletKey } from "@/lib/outlet-key";
+import { apiFetch } from "@/lib/request-json";
 
 export type RecordType = "Press Coverage" | "Press Submission";
 
@@ -218,7 +219,7 @@ export function submissionPayload(record: ApiRecord, overrides: Partial<ApiRecor
 }
 
 export async function sendJson<T>(url: string, method: "POST" | "PUT", body: unknown): Promise<T> {
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

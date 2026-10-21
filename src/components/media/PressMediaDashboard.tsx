@@ -60,6 +60,7 @@ import {
   type PressItem,
   type Stage,
 } from "./press-model";
+import { apiFetch } from "@/lib/request-json";
 
 type View = "outlets" | "featured" | "pipeline";
 type BadgeVariant = "success" | "info" | "warning" | "destructive" | "secondary";
@@ -136,8 +137,8 @@ export function PressMediaDashboard() {
     setLoadError("");
     try {
       const [mediaResponse, outletsResponse] = await Promise.all([
-        fetch("/api/media", { cache: "no-store" }),
-        fetch("/api/media/outlets", { cache: "no-store" }),
+        apiFetch("/api/media", { cache: "no-store" }),
+        apiFetch("/api/media/outlets", { cache: "no-store" }),
       ]);
       if (!mediaResponse.ok || !outletsResponse.ok) throw new Error();
       const data = (await mediaResponse.json()) as { records?: ApiRecord[] };
@@ -238,7 +239,7 @@ export function PressMediaDashboard() {
     try {
       const ids = [deleteTarget.coverage?.id, deleteTarget.submission?.id].filter(Boolean) as string[];
       for (const id of ids) {
-        const response = await fetch(`/api/media/${id}`, { method: "DELETE" });
+        const response = await apiFetch(`/api/media/${id}`, { method: "DELETE" });
         if (!response.ok && response.status !== 404) throw new Error();
       }
       setDeleteTarget(null);

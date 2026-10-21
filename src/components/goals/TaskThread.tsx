@@ -8,6 +8,7 @@ import {
   LinkIcon,
   MessagesSquareIcon,
   PackageCheckIcon,
+  ReplyIcon,
   SendIcon,
   StarIcon,
   StickyNoteIcon,
@@ -52,17 +53,36 @@ const MESSAGE_STYLES: Partial<Record<CommentType, ItemStyle & { bubble: string }
 
 const ALL_STYLE: ItemStyle = { icon: MessagesSquareIcon, chip: "bg-foreground text-background" };
 
+/** Top-level messages with their replies; a reply whose parent isn't shown here (a bid) stands on its own. */
+function groupReplies(messages: ThreadComment[]) {
+  const ids = new Set(messages.map((message) => message.id));
+  const replies = new Map<string, ThreadComment[]>();
+  const topLevel: ThreadComment[] = [];
+  for (const message of messages) {
+    if (message.parentId && ids.has(message.parentId)) {
+      replies.set(message.parentId, [...(replies.get(message.parentId) ?? []), message]);
+    } else {
+      topLevel.push(message);
+    }
+  }
+  return { topLevel, replies };
+}
+
 /** The conversation about the task, newest last, filterable by message type, with a reply box for people. */
 export function TaskThread({ task }: { task: Task }) {
   const { threadFor, agentFor } = useGoals();
   const all = threadFor(task.id);
   const messages = useMemo(() => threadMessages(all), [all]);
+  const { topLevel, replies } = useMemo(() => groupReplies(messages), [messages]);
   const [filter, setFilter] = useState<Filter>("all");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
   const counts = new Map<CommentType, number>();
-  for (const message of messages) counts.set(message.type, (counts.get(message.type) ?? 0) + 1);
+  for (const message of topLevel) counts.set(message.type, (counts.get(message.type) ?? 0) + 1);
   const filters: Filter[] = ["all", ...THREAD_FILTERS.filter((type) => (counts.get(type) ?? 0) > 0)];
-  const visible = filter === "all" ? messages : messages.filter((message) => message.type === filter);
+  const visible = filter === "all" ? topLevel : topLevel.filter((message) => message.type === filter);
+  const agentOf = (message: ThreadComment) =>
+    message.author.kind === "agent" ? agentFor(message.author.agentId) : undefined;
 
   return (
     <section className="flex flex-col gap-5 rounded-[22px] border border-border bg-card p-5 sm:p-6" aria-label="Thread">
@@ -82,7 +102,7 @@ export function TaskThread({ task }: { task: Task }) {
                       value={value}
                       style={value === "all" ? ALL_STYLE : (MESSAGE_STYLES[value] ?? ALL_STYLE)}
                       label={value === "all" ? "All" : COMMENT_TYPES[value].plural}
-                      count={value === "all" ? messages.length : (counts.get(value) ?? 0)}
+                      count={value === "all" ? topLevel.length : (counts.get(value) ?? 0)}
                       highlight={value === "escalation"}
                     />
                   ))}
@@ -92,18 +112,36 @@ export function TaskThread({ task }: { task: Task }) {
             <p className="m-0 ml-auto text-[13px] text-muted-foreground tabular-nums" aria-live="polite">
               {filter === "all"
                 ? `${messages.length} ${messages.length === 1 ? "message" : "messages"}`
-                : `${visible.length} of ${messages.length} messages`}
+                : `${visible.length} of ${topLevel.length} messages`}
             </p>
           </div>
 
           <ol className="relative m-0 flex list-none flex-col gap-6 p-0 before:absolute before:top-5 before:bottom-5 before:left-5 before:w-px before:bg-border">
-            {visible.map((message) => (
-              <Message
-                key={message.id}
-                message={message}
-                agent={message.author.kind === "agent" ? agentFor(message.author.agentId) : undefined}
-              />
-            ))}
+            {visible.map((message) => {
+              const answers = replies.get(message.id) ?? [];
+              const replying = replyingTo === message.id;
+              return (
+                <Message
+                  key={message.id}
+                  message={message}
+                  agent={agentOf(message)}
+                  onReply={() => setReplyingTo(replying ? null : message.id)}
+                >
+                  {(answers.length > 0 || replying) && (
+                    <ol className="m-0 mt-1 flex list-none flex-col gap-4 p-0" aria-label={`Replies to ${COMMENT_TYPES[message.type].label.toLowerCase()}`}>
+                      {answers.map((answer) => (
+                        <Message key={answer.id} message={answer} agent={agentOf(answer)} reply />
+                      ))}
+                      {replying && (
+                        <li>
+                          <ReplyBox taskId={task.id} parentId={message.id} onDone={() => setReplyingTo(null)} />
+                        </li>
+                      )}
+                    </ol>
+                  )}
+                </Message>
+              );
+            })}
           </ol>
         </>
       )}
@@ -113,13 +151,16 @@ export function TaskThread({ task }: { task: Task }) {
   );
 }
 
-/** People answer escalations and add context with notes; agents read them in the thread and their inbox. */
-function ReplyBox({ taskId }: { taskId: string }) {
+/**
+ * People answer escalations and add context with notes; agents read them in the thread and their inbox.
+ * With a `parentId` it answers one message, inline under it.
+ */
+function ReplyBox({ taskId, parentId, onDone }: { taskId: string; parentId?: string; onDone?: () => void }) {
   const { postNote } = useGoals();
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const id = `reply-${taskId}`;
+  const id = `reply-${parentId ?? taskId}`;
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -128,8 +169,9 @@ function ReplyBox({ taskId }: { taskId: string }) {
     setSending(true);
     setError(null);
     try {
-      await postNote(taskId, text);
+      await postNote(taskId, text, parentId);
       setBody("");
+      onDone?.();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Couldn't post your reply. Try again.");
     } finally {
@@ -138,24 +180,32 @@ function ReplyBox({ taskId }: { taskId: string }) {
   };
 
   return (
-    <form onSubmit={send} className="flex flex-col gap-3 border-t border-border pt-5">
+    <form onSubmit={send} className={cn("flex flex-col gap-3", !parentId && "border-t border-border pt-5")}>
       <Field data-invalid={error ? true : undefined}>
-        <FieldLabel htmlFor={id}>Reply</FieldLabel>
+        <FieldLabel htmlFor={id} className={cn(parentId && "sr-only")}>Reply</FieldLabel>
         <Textarea
           id={id}
           value={body}
           onChange={(event) => setBody(event.target.value)}
           placeholder="Answer a question, share access details or add context for the agents."
-          rows={3}
+          rows={parentId ? 2 : 3}
+          autoFocus={Boolean(parentId)}
           maxLength={10000}
           aria-invalid={error ? true : undefined}
         />
         {error && <FieldError>{error}</FieldError>}
       </Field>
-      <Button type="submit" variant="secondary" className="self-end" disabled={sending || !body.trim()}>
-        {sending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" aria-hidden="true" />}
-        Post reply
-      </Button>
+      <div className="flex justify-end gap-2">
+        {onDone && (
+          <Button type="button" variant="ghost" size={parentId ? "sm" : "default"} onClick={onDone}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" variant="secondary" size={parentId ? "sm" : "default"} disabled={sending || !body.trim()}>
+          {sending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" aria-hidden="true" />}
+          Post reply
+        </Button>
+      </div>
     </form>
   );
 }
@@ -169,16 +219,30 @@ function initials(name: string) {
     .join("");
 }
 
-function Message({ message, agent }: { message: ThreadComment; agent?: Agent }) {
+function Message({
+  message,
+  agent,
+  reply = false,
+  onReply,
+  children,
+}: {
+  message: ThreadComment;
+  agent?: Agent;
+  /** Shown smaller, under the message it answers. */
+  reply?: boolean;
+  onReply?: () => void;
+  children?: React.ReactNode;
+}) {
   const type = COMMENT_TYPES[message.type];
   const person = message.author.kind === "human";
   const name = message.author.kind === "human" ? message.author.name : (agent?.name ?? "Unknown agent");
 
   return (
-    <li className="flex gap-3 sm:gap-4">
+    <li className={cn("flex", reply ? "gap-2.5" : "gap-3 sm:gap-4")}>
       <span
         className={cn(
-          "relative flex size-10 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ring-4 ring-card",
+          "relative flex shrink-0 items-center justify-center rounded-full font-bold ring-4 ring-card",
+          reply ? "size-8 text-xs" : "size-10 text-[13px]",
           person ? "bg-primary text-primary-foreground" : "bg-accent text-primary-deep"
         )}
         aria-hidden="true"
@@ -186,8 +250,11 @@ function Message({ message, agent }: { message: ThreadComment; agent?: Agent }) 
         {initials(name) || "?"}
       </span>
 
-      <article className="flex min-w-0 flex-1 flex-col gap-2" aria-label={`${type.label} from ${name}`}>
-        <header className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pt-2">
+      <article
+        className="flex min-w-0 flex-1 flex-col gap-2"
+        aria-label={reply ? `Reply from ${name}` : `${type.label} from ${name}`}
+      >
+        <header className={cn("flex flex-wrap items-baseline gap-x-2 gap-y-0.5", reply ? "pt-1.5" : "pt-2")}>
           <span className="text-sm font-bold text-foreground">{name}</span>
           {person ? (
             <span className="text-xs text-muted-foreground">Team</span>
@@ -203,15 +270,36 @@ function Message({ message, agent }: { message: ThreadComment; agent?: Agent }) 
           </time>
         </header>
 
-        <div className={cn("flex flex-col gap-2.5 rounded-2xl rounded-tl-md px-4 py-3.5 sm:px-5 sm:py-4", MESSAGE_STYLES[message.type]?.bubble ?? "bg-muted")}>
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-            <Badge variant={type.badge}>{type.label}</Badge>
-            {message.title && <h3 className="m-0 text-[15px] leading-snug font-bold text-foreground">{message.title}</h3>}
-            {message.score !== undefined && <Score value={message.score} />}
-          </div>
+        <div
+          className={cn(
+            "flex flex-col gap-2.5 rounded-2xl rounded-tl-md",
+            reply ? "px-3.5 py-2.5" : "px-4 py-3.5 sm:px-5 sm:py-4",
+            MESSAGE_STYLES[message.type]?.bubble ?? "bg-muted"
+          )}
+        >
+          {!reply && (
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+              <Badge variant={type.badge}>{type.label}</Badge>
+              {message.verdict && (
+                <Badge variant={message.verdict === "approve" ? "success" : "warning"}>
+                  {message.verdict === "approve" ? "Approves" : "Asks for changes"}
+                </Badge>
+              )}
+              {message.title && <h3 className="m-0 text-[15px] leading-snug font-bold text-foreground">{message.title}</h3>}
+              {message.score !== undefined && <Score value={message.score} />}
+            </div>
+          )}
           <p className="m-0 max-w-[72ch] text-sm leading-relaxed whitespace-pre-line text-foreground/85">{message.body}</p>
           {message.attachment && <AttachmentBlock attachment={message.attachment} />}
         </div>
+
+        {onReply && (
+          <Button variant="ghost" size="xs" className="self-start" onClick={onReply}>
+            <ReplyIcon data-icon="inline-start" aria-hidden="true" />
+            Reply
+          </Button>
+        )}
+        {children}
       </article>
     </li>
   );

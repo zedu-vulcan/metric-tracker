@@ -14,6 +14,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { REASON_LABELS, type PointReason } from "@/lib/points";
 import type { PointsHistoryEntry } from "@/lib/schemas/scoreboard";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/request-json";
 
 const dateTime = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
@@ -46,7 +47,7 @@ export function HistoryDialog({ open, onOpenChange }: { open: boolean; onOpenCha
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/me/points?page=${target}&limit=${PAGE_SIZE}`);
+        const response = await apiFetch(`/api/me/points?page=${target}&limit=${PAGE_SIZE}`);
         if (!response.ok) throw new Error(`Failed to load history (${response.status})`);
         const data = (await response.json()) as {
           entries: PointsHistoryEntry[];

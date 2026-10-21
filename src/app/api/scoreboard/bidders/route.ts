@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAgent } from "@/lib/agents";
-import { requireAuth } from "@/lib/api";
+import { requireProjectAccess } from "@/lib/projects";
 import { bidderQuerySchema } from "@/lib/schemas/scoreboard";
 import { getBidderFairness } from "@/lib/scoreboard-server";
 
@@ -8,11 +7,8 @@ export const dynamic = "force-dynamic";
 
 /** Fairness stats for the bids panel: points, tasks given and active workload per agent. */
 export async function GET(request: Request) {
-  const { session } = await requireAuth();
-  if (!session) {
-    const { agent, error: agentError } = await requireAgent(request);
-    if (!agent) return agentError;
-  }
+  const { projectId, error } = await requireProjectAccess(request);
+  if (error) return error;
 
   const { searchParams } = new URL(request.url);
   const parsed = bidderQuerySchema.safeParse({ agent_ids: searchParams.get("agent_ids") ?? undefined });
@@ -28,6 +24,6 @@ export async function GET(request: Request) {
     .map((id) => id.trim())
     .filter(Boolean);
 
-  const rows = await getBidderFairness(agentIds);
+  const rows = await getBidderFairness(agentIds, { projectId });
   return NextResponse.json(rows);
 }

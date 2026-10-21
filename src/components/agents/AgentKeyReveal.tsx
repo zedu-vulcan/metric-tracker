@@ -2,6 +2,7 @@
 
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useProject } from "@/components/projects/ProjectProvider";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { setupPrompt, type MyAgent } from "./agent-model";
 import { AgentAvatar } from "./AgentAvatar";
@@ -20,7 +21,8 @@ export function AgentKeyReveal({
   onDone: () => void;
 }) {
   const { copied, copy } = useCopy();
-  const prompt = setupPrompt(agent, agentKey, window.location.origin);
+  const project = useProject();
+  const prompt = setupPrompt(agent, agentKey, window.location.origin, project.name);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

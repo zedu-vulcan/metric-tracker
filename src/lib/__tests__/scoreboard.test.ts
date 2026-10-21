@@ -145,7 +145,7 @@ function store() {
 
 describe("fetchScoreboard", () => {
   it("includes zero-point users and caps progress at 100 while showing the true pct", async () => {
-    const result = await fetchScoreboard({ store: store(), range: "this_week", now: NOW });
+    const result = await fetchScoreboard({ projectId: "p1", store: store(), range: "this_week", now: NOW });
     const zero = result.rows.find((row) => row.user_id === "u_zero");
     assert.ok(zero, "zero-point user appears");
     assert.equal(zero.points, 0);
@@ -156,7 +156,7 @@ describe("fetchScoreboard", () => {
   });
 
   it("ranks by points desc, then name, with deterministic ties", async () => {
-    const result = await fetchScoreboard({ store: store(), range: "this_week", now: NOW });
+    const result = await fetchScoreboard({ projectId: "p1", store: store(), range: "this_week", now: NOW });
     assert.equal(result.rows[0].user_id, "u_over");
     assert.equal(result.rows[0].rank, 1);
     assert.equal(result.rows[1].user_id, "u_alpha");
@@ -168,9 +168,9 @@ describe("fetchScoreboard", () => {
   });
 
   it("switches ranges: this_week vs last_week vs all_time", async () => {
-    const thisWeek = await fetchScoreboard({ store: store(), range: "this_week", now: NOW });
-    const lastWeek = await fetchScoreboard({ store: store(), range: "last_week", now: NOW });
-    const allTime = await fetchScoreboard({ store: store(), range: "all_time", now: NOW });
+    const thisWeek = await fetchScoreboard({ projectId: "p1", store: store(), range: "this_week", now: NOW });
+    const lastWeek = await fetchScoreboard({ projectId: "p1", store: store(), range: "last_week", now: NOW });
+    const allTime = await fetchScoreboard({ projectId: "p1", store: store(), range: "all_time", now: NOW });
 
     const points = (result: Awaited<ReturnType<typeof fetchScoreboard>>, userId: string) =>
       result.rows.find((row) => row.user_id === userId)?.points ?? 0;
@@ -183,7 +183,7 @@ describe("fetchScoreboard", () => {
   });
 
   it("makes every row's breakdown sum equal its points", async () => {
-    const result = await fetchScoreboard({ store: store(), range: "all_time", now: NOW });
+    const result = await fetchScoreboard({ projectId: "p1", store: store(), range: "all_time", now: NOW });
     for (const row of result.rows) {
       const { tasks, reviews, ideas, adjustments } = row.breakdown;
       assert.equal(tasks + reviews + ideas + adjustments, row.points, `${row.name} breakdown sums to points`);
@@ -204,7 +204,7 @@ describe("fetchScoreboard", () => {
   });
 
   it("serializes agent attribution and tasks given per owner", async () => {
-    const result = await fetchScoreboard({ store: store(), range: "this_week", now: NOW });
+    const result = await fetchScoreboard({ projectId: "p1", store: store(), range: "this_week", now: NOW });
     const alpha = result.rows.find((row) => row.user_id === "u_alpha");
     assert.equal(alpha?.tasks_given_this_week, 2);
     assert.deepEqual(alpha?.agents, [{ id: "a1", name: "Agent One", points: 101 }]);
@@ -230,7 +230,7 @@ describe("resolveScoreboardRange", () => {
 
 describe("getBidderFairness", () => {
   it("returns agent and owner points, tasks given and active tasks", async () => {
-    const rows = await getBidderFairness(["a1"], { store: store(), now: NOW });
+    const rows = await getBidderFairness(["a1"], { projectId: "p1", store: store(), now: NOW });
     assert.equal(rows.length, 1);
     assert.deepEqual(rows[0], {
       agent_id: "a1",
@@ -246,7 +246,7 @@ describe("getBidderFairness", () => {
 
 describe("fetchUserPointsHistory", () => {
   it("paginates newest first and reports the all-time balance", async () => {
-    const page1 = await fetchUserPointsHistory("u_alpha", { store: store(), page: 1, limit: 2 });
+    const page1 = await fetchUserPointsHistory("u_alpha", { projectId: "p1", store: store(), page: 1, limit: 2 });
     assert.equal(page1.pagination.total, 5);
     assert.equal(page1.pagination.total_pages, 3);
     assert.equal(page1.entries.length, 2);
@@ -254,7 +254,7 @@ describe("fetchUserPointsHistory", () => {
     assert.equal(page1.entries[1].id, "e_a_review");
     assert.equal(page1.balance, 296);
 
-    const page2 = await fetchUserPointsHistory("u_alpha", { store: store(), page: 2, limit: 2 });
+    const page2 = await fetchUserPointsHistory("u_alpha", { projectId: "p1", store: store(), page: 2, limit: 2 });
     assert.deepEqual(
       page2.entries.map((e) => e.id),
       ["e_a_idea", "e_a_task"]

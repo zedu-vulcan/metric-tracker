@@ -34,9 +34,6 @@ function inMemoryTaskTypesStore(seed: {
     async slugExists(slug, excludeId) {
       return rows.some((row) => row.slug === slug && row.id !== excludeId);
     },
-    async userIsPlatformAdmin(userId) {
-      return admins.has(userId);
-    },
     async create(input) {
       const record: TaskTypeRecord = {
         id: `tt_${input.slug}`,

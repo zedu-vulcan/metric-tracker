@@ -5,7 +5,6 @@ import {
   workstreamQuerySchema,
 } from "@/lib/schemas/workstreams";
 import {
-  extractAgentApiKey,
   serializeAutoAcceptResponse,
   serializeWorkstreamDetail,
   serializeWorkstreamItem,
@@ -58,20 +57,6 @@ describe("Workstreams Validation, Serialization & OpenAPI", () => {
     assert.equal(invalidType.success, false);
   });
 
-  it("extracts agent API key from X-Agent-Key or Authorization Bearer header", () => {
-    const reqWithCustomHeader = new Request("http://localhost:3000/api/workstreams", {
-      headers: { "x-agent-key": "agent-secret-1" },
-    });
-    assert.equal(extractAgentApiKey(reqWithCustomHeader), "agent-secret-1");
-
-    const reqWithBearer = new Request("http://localhost:3000/api/workstreams", {
-      headers: { Authorization: "Bearer agent-secret-2" },
-    });
-    assert.equal(extractAgentApiKey(reqWithBearer), "agent-secret-2");
-
-    const reqWithoutKey = new Request("http://localhost:3000/api/workstreams");
-    assert.equal(extractAgentApiKey(reqWithoutKey), null);
-  });
 
   it("serializes workstream item, detail, and auto-accept response accurately", () => {
     const now = new Date("2026-10-20T12:00:00.000Z");
@@ -110,6 +95,7 @@ describe("Workstreams Validation, Serialization & OpenAPI", () => {
       tasks: [
         {
           id: "task-101",
+          projectId: "p1",
           workstreamId: "ws-1",
           taskType: "seo",
           type: "Other" as const,

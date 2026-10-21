@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { getAuthContext, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { goalCreateSchema, goalFilterSchema, goalTypeValues, goalStatusValues } from "@/lib/schemas/goals";
 
 export const dynamic = "force-dynamic";
 
-/** Goals with workstream and task counts. Readable with a session or an agent key. */
+/** The project's goals with workstream and task counts. Readable with a session or an agent key. */
 export async function GET(request: Request) {
-  const { error } = await getAuthContext(request);
+  const { projectId, error } = await requireProjectAccess(request);
   if (error) return error;
 
   const { searchParams } = new URL(request.url);
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   }
 
   const { type, status } = queryValidation.data;
-  const where: Prisma.GoalWhereInput = {};
+  const where: Prisma.GoalWhereInput = { projectId };
 
   if (type && (goalTypeValues as readonly string[]).includes(type)) {
     where.type = type;
@@ -95,8 +95,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Only humans create top-level goals; requireUser blocks agent keys with 403.
-  const { user, error } = await requireUser(request);
+  // Only humans create top-level goals; agent keys get 403.
+  const { projectId, user, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   const userId = user?.id;
@@ -126,6 +126,7 @@ export async function POST(request: Request) {
 
   const goal = await prisma.goal.create({
     data: {
+      projectId,
       title,
       description: description ?? null,
       type,

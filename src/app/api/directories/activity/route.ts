@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
 import { serializeActivity } from "@/lib/directories";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { activityQuerySchema } from "@/lib/schemas/directories";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const { error } = await requireAuth();
+  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
   const { searchParams } = new URL(request.url);
@@ -17,6 +17,7 @@ export async function GET(request: Request) {
   }
 
   const activity = await prisma.directoryActivity.findMany({
+    where: { projectId },
     orderBy: { createdAt: "desc" },
     take: result.data.limit,
   });

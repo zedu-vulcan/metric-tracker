@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ChecklistItem, DirectoryActivity, DirectoryInput, DirectoryItem } from "@/types/directory";
+import { apiFetch } from "@/lib/request-json";
 
 interface DirectoryContextType {
   directories: DirectoryItem[];
@@ -25,7 +26,7 @@ interface DirectoryContextType {
 const DirectoryContext = createContext<DirectoryContextType | undefined>(undefined);
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     cache: "no-store",
     ...init,
     headers: init?.body ? { "Content-Type": "application/json" } : undefined,

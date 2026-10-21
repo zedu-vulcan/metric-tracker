@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api";
+import { requireProjectAccess } from "@/lib/projects";
 import { pointsHistoryQuerySchema } from "@/lib/schemas/scoreboard";
 import { fetchUserPointsHistory } from "@/lib/scoreboard-server";
 
 export const dynamic = "force-dynamic";
 
-/** The signed-in user's ledger history, newest first, paginated. Session only. */
+/** The signed-in user's ledger history in the current project, newest first, paginated. Session only. */
 export async function GET(request: Request) {
-  const { session, error } = await requireAuth();
+  const { projectId, user, error } = await requireProjectAccess(request, { allowAgents: false });
   if (error) return error;
 
-  const userId = (session.user as { id?: string }).id;
+  const userId = user?.id;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -28,6 +28,7 @@ export async function GET(request: Request) {
   }
 
   const result = await fetchUserPointsHistory(userId, {
+    projectId,
     page: parsed.data.page ?? 1,
     limit: parsed.data.limit ?? 20,
   });

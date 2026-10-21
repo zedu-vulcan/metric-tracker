@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const connected = await prisma.agent.update({
     where: { id: agent.id },
     data: { connectedAt: new Date() },
-    include: { owner: { select: { id: true, name: true } } },
+    include: { owner: { select: { id: true, name: true } }, project: { select: { id: true, name: true, slug: true } } },
   });
 
   return NextResponse.json(serializeAgentProfile(connected));
