@@ -3,8 +3,8 @@
 import { usePathname } from "next/navigation";
 import {
   BriefcaseBusinessIcon,
-  ListChecksIcon,
   ListTodoIcon,
+  TriangleAlertIcon,
   type LucideIcon,
 } from "lucide-react";
 import { useNotifications } from "@/components/profile/useNotifications";
@@ -84,7 +84,7 @@ export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean
         aria-current={current(yourMove)}
         href={yourMove}
         collapsed={collapsed}
-        icon={<ListChecksIcon aria-hidden="true" />}
+        icon={<TriangleAlertIcon aria-hidden="true" />}
         badge={actionCount > 0 ? (actionCount > 99 ? "99+" : actionCount) : undefined}
       >
         Escalations
