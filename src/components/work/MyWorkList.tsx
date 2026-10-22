@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { timeAgo } from "@/components/profile/NotificationParts";
+import { cn } from "@/lib/utils";
 import { getWorkItemTab, type UnifiedWorkItem, type WorkTab } from "@/lib/my-work";
 
 export type MyWorkStage = WorkTab;
@@ -108,6 +109,24 @@ export function MyWorkList({
   const allItems = items ?? tasks ?? [];
   const [stage, setStage] = useState<WorkTab>("applied");
 
+  // Compute the total number of tasks/items belonging to each status category dynamically
+  const counts = useMemo(() => {
+    const map: Record<WorkTab, number> = {
+      applied: 0,
+      offered: 0,
+      in_progress: 0,
+      in_review: 0,
+      changes_requested: 0,
+      approved: 0,
+      lost: 0,
+    };
+    for (const item of allItems) {
+      const tab = getWorkItemTab(item);
+      map[tab] = (map[tab] ?? 0) + 1;
+    }
+    return map;
+  }, [allItems]);
+
   // Strictly filter the unified work items array using the status mapping logic
   const visible = useMemo(
     () => allItems.filter((item) => getWorkItemTab(item) === stage),
@@ -118,11 +137,29 @@ export function MyWorkList({
     <div className="flex flex-col gap-4">
       <Tabs value={stage} onValueChange={(value) => setStage(value as WorkTab)}>
         <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-muted p-1 sm:w-fit">
-          {STAGES.map((item) => (
-            <TabsTrigger key={item.value} value={item.value} className="flex-none px-3 py-2">
-              {item.label}
-            </TabsTrigger>
-          ))}
+          {STAGES.map((item) => {
+            const count = counts[item.value] ?? 0;
+            const isActive = stage === item.value;
+            return (
+              <TabsTrigger
+                key={item.value}
+                value={item.value}
+                className="flex-none gap-1.5 px-3 py-2"
+              >
+                <span>{item.label}</span>
+                <span
+                  className={cn(
+                    "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium tabular-nums transition-colors",
+                    isActive
+                      ? "bg-muted text-foreground font-semibold"
+                      : "bg-muted-foreground/15 text-muted-foreground"
+                  )}
+                >
+                  {count}
+                </span>
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
       </Tabs>
       {visible.length ? (
