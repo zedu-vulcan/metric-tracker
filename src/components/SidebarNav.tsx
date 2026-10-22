@@ -87,7 +87,7 @@ export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean
         icon={<ListChecksIcon aria-hidden="true" />}
         badge={actionCount > 0 ? (actionCount > 99 ? "99+" : actionCount) : undefined}
       >
-        Awaiting You
+        Escalations
       </SidebarNavLink>
       <SidebarNavLink
         aria-current={current(projectPath("/work"))}

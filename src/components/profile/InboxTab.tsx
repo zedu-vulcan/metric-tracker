@@ -16,7 +16,7 @@ import { useNotifications } from "./useNotifications";
 
 const FILTERS = [
   { id: "all", label: "All" },
-  { id: "needs", label: "Awaiting You" },
+  { id: "needs", label: "Escalations" },
   { id: "unread", label: "Unread" },
 ] as const;
 type Filter = (typeof FILTERS)[number]["id"];
