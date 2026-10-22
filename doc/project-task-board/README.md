@@ -1,6 +1,6 @@
 # Project task board: team foundation
 
-Task 0 supplies the common rules and data shapes for the team. The board page and its API are **not implemented yet**. Sanmi owns integration and final verification.
+Task 0 supplies the common rules and data shapes. Task 1 implements the [read-only results and options APIs](api.md), with database-free HTTP tests and nine passing disposable PostgreSQL query tests; real-session board HTTP verification is still pending. The board page and frontend remain to be implemented. Sanmi owns integration and final verification.
 
 ## Start here
 
@@ -50,7 +50,7 @@ Response schemas describe the wire format. The backend must still compute correc
 
 ## Ownership and handoff interfaces
 
-Task 0 establishes the shared schemas, parser, fixtures and guides. Later contract changes go through Sanmi, then update code, fixtures, tests and guides together. Component names below are proposed handoff names to keep separate contributions compatible; their files and React prop types are still to be implemented by their owners.
+Task 0 establishes the shared schemas, parser, fixtures and guides. Later contract changes go through Sanmi, then update code, fixtures, tests and guides together. Component names below are proposed handoff names to keep separate contributions compatible; their files and React prop types are still to be implemented by their owners. The backend query/route/OpenAPI deliverables now exist after Task 1.
 
 | Owner | Deliverable and boundary |
 |---|---|
@@ -79,4 +79,4 @@ npx tsc --noEmit --incremental false
 
 The focused suite is database-free. The full suite includes disposable PostgreSQL lifecycle tests, which require the existing `embedded-postgres` dependency and supported local setup. Never substitute the shared database. `TEST_DATABASE_URL`, if explicitly configured, must point to an approved disposable database. Do not run `npm run build`, which applies migrations. No new environment variable, migration or dependency is introduced by Task 0.
 
-Actual verification results and remaining limits are recorded in the [work log](../../docs/work-log.md). The eventual board still needs API/database authorization and filter tests, frontend URL/navigation/accessibility tests, and final real-data verification. The numbered team task list is a separate next deliverable.
+Actual verification results and remaining limits are recorded in the [work log](../../docs/work-log.md). Task 1 adds query/HTTP tests and [API usage documentation](api.md). The board still needs real-session HTTP verification, frontend URL/navigation/accessibility tests, and final real-data acceptance. The numbered team task list is a separate next deliverable.

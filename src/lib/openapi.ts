@@ -3,6 +3,7 @@ import {
   OpenApiGeneratorV31,
 } from "@asteasolutions/zod-to-openapi";
 import { z } from "@/lib/zod";
+import { taskBoardQuerySchema, taskBoardResponseSchema, taskBoardOptionsSchema } from "@/lib/schemas/task-board";
 import {
   agentCreateSchema,
   agentErrorSchema,
@@ -1018,6 +1019,49 @@ registry.registerPath({
       description: "Unauthorized",
       content: { "application/json": { schema: overviewErrorSchema } },
     },
+  },
+});
+
+// ── Project task board ──
+const taskBoardHeaders = z.object({
+  "x-project-id": z.string().min(1).optional().openapi({
+    description: "Selected project ID. Send this header; the existing project helper also accepts its legacy projectId query fallback.",
+  }),
+});
+const taskBoardErrors = {
+  400: { description: "Invalid/duplicate filter, reversed points range, or missing project context", content: { "application/json": { schema: taskErrorSchema } } },
+  401: { description: "Human session required", content: { "application/json": { schema: taskErrorSchema } } },
+  403: { description: "Agent callers are not permitted", content: { "application/json": { schema: taskErrorSchema } } },
+  404: { description: "Project or selected goal/agent is missing or inaccessible", content: { "application/json": { schema: taskErrorSchema } } },
+};
+
+registry.registerPath({
+  method: "get",
+  path: "/api/tasks/board",
+  operationId: "listProjectTaskBoard",
+  tags: ["Task board"],
+  summary: "Find tasks across one project",
+  description: "Human project members only. Defaults to open_for_bids: open/bidding/reopened, no worker, accepted workstream, active project goal and no pending offer. Offers expiring exactly now are expired. No personal agent task-cap restriction. Search is a literal case-insensitive title/description substring. Points use stored values (including zero), then active type defaults, then null; numeric ranges exclude null. All filters precede count and 20-row pagination, ordered by createdAt DESC, id DESC. Explicit status=all includes legacy tasks with null hierarchy/detailsUrl. Reject duplicate recognized parameters; ignore unknown keys. Reading does not mutate offers or tasks.",
+  security: [{ sessionCookie: [] }],
+  request: { headers: taskBoardHeaders, query: taskBoardQuerySchema },
+  responses: {
+    200: { description: "Filtered tasks and matching pagination totals; zero matches is successful", content: { "application/json": { schema: taskBoardResponseSchema } } },
+    ...taskBoardErrors,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/tasks/board/options",
+  operationId: "getProjectTaskBoardOptions",
+  tags: ["Task board"],
+  summary: "Project-wide task filter choices",
+  description: "Human project members only. Independent of result filters/page. Includes configured and historical task types, all project goal statuses and minimal project-agent profiles with server-derived isMine. An unconfigured historical type has isActive=null. Any/My agents/Unassigned are UI choices, not API rows. No keys, email addresses or agent-control permissions are exposed.",
+  security: [{ sessionCookie: [] }],
+  request: { headers: taskBoardHeaders },
+  responses: {
+    200: { description: "Types, goals and assignment agents for the authorized project", content: { "application/json": { schema: taskBoardOptionsSchema } } },
+    ...taskBoardErrors,
   },
 });
 

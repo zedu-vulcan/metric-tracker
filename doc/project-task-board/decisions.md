@@ -2,7 +2,7 @@
 
 Prepared 22 October 2026 for the team lead and implementers.
 
-This is the v1 contract adopted for the team foundation. Use it consistently across contributions. Shared schemas, a URL parser and fictional fixtures are implemented in Task 0; the board API and UI described here remain work to build. See the [foundation handoff](README.md) for imports, interfaces and ownership. The numbered team task list will be written separately.
+This is the v1 contract adopted for the team foundation. Use it consistently across contributions. Shared schemas, a URL parser and fictional fixtures are implemented in Task 0. Task 1 implements the [board APIs](api.md); disposable PostgreSQL query tests pass, while real-session board HTTP verification remains pending. The UI remains work to build. See the [foundation handoff](README.md) for imports, interfaces and ownership. The numbered team task list will be written separately.
 
 ## 1. Purpose and scope
 
@@ -126,7 +126,7 @@ New human-dashboard endpoints:
 - **`GET /api/tasks/board`**: filtered, paginated results.
 - **`GET /api/tasks/board/options`**: filter choices for the entire authorized project, independent of current filters and pagination.
 
-These routes are new work, not existing verified endpoints. Keep `/api/tasks`, `/api/tasks/[id]`, and agent-facing discovery compatible. Put the static `board` route alongside the existing dynamic route; do not replace the dynamic handler.
+These routes are implemented by Task 1 with database-free query/HTTP tests. Nine disposable PostgreSQL query tests pass; real-session board HTTP behavior remains unverified; see [API documentation](api.md). Keep `/api/tasks`, `/api/tasks/[id]`, and agent-facing discovery compatible. Put the static `board` route alongside the existing dynamic route; do not replace the dynamic handler.
 
 Use `getProjectPage(slug)` for the page and `requireProjectAccess(request, { allowAgents: false })` for the APIs. Client calls use existing `apiFetch` from `src/lib/request-json.ts` so they carry `x-project-id`; all queries enforce that ID and membership on the server. The slug belongs in the browser path; the API receives the project ID through existing context. No project-selector query parameter is part of the share contract.
 
@@ -188,7 +188,7 @@ All related records returned must belong to the authorized project. Never expose
 
 These are boundaries for the later task list, not permission for every contributor to edit every shared file. The [foundation handoff](README.md) freezes initial schemas, component interfaces and fictional fixtures. Coordinate contract changes with Sanmi. Page/results takes tasks/pagination/loading/error state and callbacks; filter controls take typed values/options/errors and change/reset callbacks; URL integration owns the committed state and fetching. Coordinate changes to another owner's interface before editing it.
 
-Suggested locations: `src/lib/schemas/task-board.ts`, `src/lib/task-board-query.ts`, `src/lib/task-board-url.ts`, `src/components/task-board/`, and the new route folders. The schema exists after Task 0; API/UI paths remain planned. The existing `src/lib/task-board.ts` is already a shared helper; extend/reuse it only when compatible, rather than replacing it.
+Suggested locations: `src/lib/schemas/task-board.ts`, `src/lib/task-board-query.ts`, `src/lib/task-board-url.ts`, `src/components/task-board/`, and the new route folders. The schema exists after Task 0 and backend paths after Task 1; UI paths remain planned. The existing `src/lib/task-board.ts` is already a shared helper; extend/reuse it only when compatible, rather than replacing it.
 
 ## 9. Setup and verification
 
@@ -196,7 +196,7 @@ Reuse existing configuration and models; no new environment variable, dependency
 
 Every owner tests their own work. Run the relevant focused tests, `npm test`, and `npx tsc --noEmit`. Current tests use Node's test runner through tsx, not Jest/Vitest. The repository also has a lifecycle suite that creates disposable PostgreSQL; inspect its current setup and report platform/setup failures rather than falling back to the shared database. `TEST_DATABASE_URL`, if used, must designate an approved disposable database only.
 
-Do not run `npm run build`: it applies migrations. ESLint is not configured, so do not launch its interactive setup. Use `npx next build` only when required by repository rules for the eventual routing/config change and report its actual result. See the [work log](../../docs/work-log.md) for actual Task 0 checks. The API/UI workflow remains unimplemented and unverified.
+Do not run `npm run build`: it applies migrations. ESLint is not configured, so do not launch its interactive setup. Use `npx next build` only when required by repository rules for the eventual routing/config change and report its actual result. See the [work log](../../docs/work-log.md) for actual Task 0 checks. The APIs are implemented with database-free tests; disposable PostgreSQL query tests pass and real-session board HTTP behavior remains unverified and the UI remains unimplemented.
 
 Final acceptance checks: default availability (including pending/expired offers); exact statuses; combined filters; My agents; 0/unknown/fallback points and inclusive bounds; project isolation; options independent of current page; stable pagination; malformed and unavailable URL values; old-task display and navigation; refresh/share/Back/Forward; project switching and stale responses; mobile/keyboard/empty/error states. Record mocked versus database-backed evidence explicitly.
 
