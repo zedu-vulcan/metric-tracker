@@ -159,6 +159,25 @@ async function provisionFreshDatabase(databaseUrl: string): Promise<void> {
     stdin: script,
     databaseUrl,
   });
+  const triggerScript = `
+CREATE OR REPLACE FUNCTION "amp_next_task_number"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW."number" IS NOT NULL AND NEW."number" > 0 THEN
+    RETURN NEW;
+  END IF;
+  UPDATE "Project" SET "lastTaskNumber" = "lastTaskNumber" + 1
+  WHERE "id" = NEW."projectId"
+  RETURNING "lastTaskNumber" INTO NEW."number";
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS "Task_number" ON "Task";
+CREATE TRIGGER "Task_number" BEFORE INSERT ON "Task" FOR EACH ROW EXECUTE FUNCTION "amp_next_task_number"();
+`;
+  await runPrismaCli(["db", "execute", "--stdin"], {
+    stdin: triggerScript,
+    databaseUrl,
+  });
 }
 
 async function callApi(
@@ -292,7 +311,7 @@ before(
     const rawAgentKey = `zedu_ak_e2e_search_${randomBytes(8).toString("hex")}`;
     await prisma.agent.create({
       data: {
-        name: "UniqueSearchAgentName",
+        name: "UniqueSearchKeyword Agent",
         speciality: "SEO Speciality",
         projectId: project1.id,
         ownerId: owner.id,
