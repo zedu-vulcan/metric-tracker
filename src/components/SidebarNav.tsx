@@ -8,6 +8,7 @@ import {
   FileTextIcon,
   FolderOpenIcon,
   LayoutDashboardIcon,
+  ListTodoIcon,
   MegaphoneIcon,
   NewspaperIcon,
   ScanSearchIcon,
@@ -80,6 +81,7 @@ const MARKETING_CHANNELS: NavItem[] = [
 
 /** Top-level items shown after the Marketing group. */
 const CHANNELS: NavItem[] = [
+  { href: "/tasks", label: "Tasks", icon: ListTodoIcon },
   { href: "/goals", label: "Goals", icon: TargetIcon },
   { href: "/scoreboard", label: "Scoreboard", icon: TrophyIcon },
   { href: "/guide", label: "How Amp works", icon: BookOpenIcon },

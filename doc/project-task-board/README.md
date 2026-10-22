@@ -1,6 +1,6 @@
 # Project task board: team foundation
 
-Task 1 provides the [read-only board APIs](api.md). Task 2 supplies the results table and read-only legacy-task dialog; Task 3 supplies [controlled filters](filters.md). The `/p/[slug]/tasks` page and Tasks sidebar entry are temporarily removed because Task 4's `TaskBoardClient` does not exist yet. Task 4 must restore both when it connects URL state, API requests, filters and results. Sanmi owns integration and final verification.
+Task 1 provides the [read-only board APIs](api.md). Task 2 supplies the results table and read-only legacy-task dialog; Task 3 supplies [controlled filters](filters.md). Task 4 restores the Tasks page/sidebar and connects URL state, API requests, sharing, filters and results; see the [integration guide](integration.md). Sanmi owns integration and final verification.
 
 ## Start here
 
@@ -50,7 +50,7 @@ Response schemas describe the wire format. The backend must still compute correc
 
 ## Ownership and handoff interfaces
 
-Task 0 establishes the shared schemas, parser, fixtures and guides. Later contract changes go through Sanmi, then update code, fixtures, tests and guides together. Component names below are proposed handoff names to keep separate contributions compatible; Task 1 APIs, Task 2 results/dialog components and Task 3 filters now exist. Task 4 owns the remaining controller and restoring the page/navigation.
+Task 0 establishes the shared schemas, parser, fixtures and guides. Later contract changes go through Sanmi, then update code, fixtures, tests and guides together. Component names below are proposed handoff names to keep separate contributions compatible; Task 1 APIs, Task 2 results/dialog components and Task 3 filters now exist. Task 4 supplies the controller, project isolation and page/navigation integration.
 
 | Owner | Deliverable and boundary |
 |---|---|
@@ -81,8 +81,6 @@ The focused suite is database-free. The full suite includes disposable PostgreSQ
 
 Actual verification results and remaining limits are recorded in the [work log](../../docs/work-log.md). Task 1 adds query/HTTP tests and [API usage documentation](api.md). The board still needs real-session HTTP verification, frontend URL/navigation/accessibility tests, and final real-data acceptance. The numbered team task list is a separate next deliverable.
 
-## Temporary page removal and restoration
+## Task 4 integration
 
-The reviewed Task 2 commit `469c2c0` imported a missing `TaskBoardClient`. Its results table, read-only legacy dialog and tests are retained, but the route and sidebar entry are removed to keep the branch compilable. Until Task 4 integrates the controller, `/p/[slug]/tasks` has no page.
-
-Task 4 restores `src/app/p/[slug]/tasks/page.tsx` with `getProjectPage`, `PageHeader`, `PageContent` and the real project-keyed controller, then adds the relative `/tasks` item back to `SidebarNav`. Do not use fixtures as a production fallback. Connect both existing component interfaces, validate URL and API behavior, and rerun TypeScript and `npm test`. The standard test script now includes TSX tests using `tsconfig.test.json`; the 16 results/dialog tests must be discovered. Real-session and interactive integration checks still belong to Tasks 4/5.
+The page and navigation are restored with the real controller. See [usage and verification](integration.md) for URL state, independent retries, project switching, sharing and remaining acceptance checks. The earlier temporary removal is recorded in the work log.
