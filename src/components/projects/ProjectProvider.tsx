@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo } from "react";
 import type { ProjectRole } from "@prisma/client";
+import type { PointSettings } from "@/lib/points";
 import { projectHref } from "@/lib/project-paths";
 import { setActiveProject } from "@/lib/request-json";
 
@@ -12,12 +13,22 @@ type ProjectContextValue = CurrentProject & {
   href: (path?: string) => string;
   /** Owners and admins manage members, the invite link, task types and point rules. */
   canManage: boolean;
+  /** What the project pays for votes, reviews and approved tasks, and its fairness limits. */
+  pointSettings: PointSettings;
 };
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(undefined);
 
 /** The project the current page belongs to. Mounted by the `/p/[slug]` layout. */
-export function ProjectProvider({ project, children }: { project: CurrentProject; children: React.ReactNode }) {
+export function ProjectProvider({
+  project,
+  pointSettings,
+  children,
+}: {
+  project: CurrentProject;
+  pointSettings: PointSettings;
+  children: React.ReactNode;
+}) {
   // Set before children render, so their first requests already carry the project.
   if (typeof window !== "undefined") setActiveProject(project.id);
 
@@ -31,8 +42,9 @@ export function ProjectProvider({ project, children }: { project: CurrentProject
       ...project,
       href: (path = "") => projectHref(project.slug, path),
       canManage: project.role === "owner" || project.role === "admin",
+      pointSettings,
     }),
-    [project]
+    [project, pointSettings]
   );
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;

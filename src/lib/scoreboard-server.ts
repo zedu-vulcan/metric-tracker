@@ -17,14 +17,11 @@
  */
 import { Prisma } from "@prisma/client";
 import {
-  ACTIVE_TASK_LIMIT,
   DEFAULT_POINT_RULES,
-  MAX_PAID_REVIEWS_PER_TASK,
-  WEEKLY_TARGET,
-  WEEKLY_TARGET_RULE,
   buildScoreboard,
   getBidderFairness as computeBidderFairness,
   getWeekRange,
+  pointSettingsFromRules,
   type BidderFairness,
   type Breakdown,
   type LedgerEntry,
@@ -198,11 +195,6 @@ async function resolveStore(options: StoreOptions): Promise<ScoreboardStore> {
   return prismaScoreboardStore(prisma, options.projectId);
 }
 
-/** The project's weekly points target: its `weekly_target` rule, or the platform default. */
-export function weeklyTarget(rules: PointRule[]) {
-  return rules.find((rule) => rule.ruleKey === WEEKLY_TARGET_RULE)?.amount ?? WEEKLY_TARGET;
-}
-
 // ── Range ────────────────────────────────────────────────────────────────────
 
 export type ScoreboardRangeSelection = "this_week" | "last_week" | "all_time";
@@ -231,19 +223,22 @@ export type ProjectPointsRules = {
     points: number;
     max_points: number;
   }[];
-  review_points: number | null;
+  review_points: number;
   paid_reviews_per_task: number;
   task_proposal_accepted: number | null;
-  creator_share_pct: number | null;
+  creator_share_pct: number;
+  vote_points: number;
+  votes_to_decide: number;
   active_task_limit: number;
+  weekly_target: number;
 };
 
 /** The `rules` block for the scoreboard, `GET /project` and the onboarding prompt. */
 export function buildProjectPointsRules(
   taskTypes: TaskTypeConfig[],
-  rules: PointRule[] = DEFAULT_POINT_RULES,
-  activeTaskLimit = ACTIVE_TASK_LIMIT
+  rules: PointRule[] = DEFAULT_POINT_RULES
 ): ProjectPointsRules {
+  const settings = pointSettingsFromRules(rules);
   const enabledAmount = (ruleKey: string) => {
     const rule = rules.find((candidate) => candidate.ruleKey === ruleKey);
     return rule?.enabled ? rule.amount : null;
@@ -259,11 +254,14 @@ export function buildProjectPointsRules(
         points,
         max_points: maxPoints,
       })),
-    review_points: enabledAmount("review_submitted"),
-    paid_reviews_per_task: MAX_PAID_REVIEWS_PER_TASK,
+    review_points: settings.reviewPoints,
+    paid_reviews_per_task: settings.paidReviewsPerTask,
     task_proposal_accepted: enabledAmount("task_proposal_accepted"),
-    creator_share_pct: enabledAmount("goal_task_approved"),
-    active_task_limit: activeTaskLimit,
+    creator_share_pct: settings.creatorSharePct,
+    vote_points: settings.votePoints,
+    votes_to_decide: settings.votesToDecide,
+    active_task_limit: settings.activeTaskLimit,
+    weekly_target: settings.weeklyTarget,
   };
 }
 
@@ -350,6 +348,7 @@ export async function fetchScoreboard(options: StoreOptions & {
     if (count > 0) tasksGivenByUser[agent.ownerId] = (tasksGivenByUser[agent.ownerId] ?? 0) + count;
   }
 
+  const settings = pointSettingsFromRules(rules);
   const result = buildScoreboard({
     entries,
     users,
@@ -357,9 +356,9 @@ export async function fetchScoreboard(options: StoreOptions & {
     range: week,
     taskTypes,
     rules,
-    activeTaskLimit: ACTIVE_TASK_LIMIT,
+    activeTaskLimit: settings.activeTaskLimit,
     tasksGivenThisWeek: tasksGivenByUser,
-    target: weeklyTarget(rules),
+    target: settings.weeklyTarget,
   });
 
   return {

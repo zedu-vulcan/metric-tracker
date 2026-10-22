@@ -2,7 +2,7 @@ import { randomBytes, randomInt } from "node:crypto";
 import type { Prisma, ProjectRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/api";
-import { DEFAULT_POINT_RULES, DEFAULT_TASK_TYPES, WEEKLY_TARGET, WEEKLY_TARGET_RULE } from "@/lib/points";
+import { DEFAULT_POINT_RULES, DEFAULT_TASK_TYPES } from "@/lib/points";
 import { prisma } from "@/lib/prisma";
 import { serializeProjectBrief, type ProjectBriefRecord } from "@/lib/project-brief";
 
@@ -82,10 +82,7 @@ export async function createProject(
       data: DEFAULT_TASK_TYPES.map((type) => ({ ...type, projectId: project.id, updatedBy: userId })),
     });
     await tx.pointRule.createMany({
-      data: [
-        ...DEFAULT_POINT_RULES.map((rule) => ({ ...rule, projectId: project.id })),
-        { projectId: project.id, ruleKey: WEEKLY_TARGET_RULE, amount: WEEKLY_TARGET, enabled: true, weeklyCap: null },
-      ],
+      data: DEFAULT_POINT_RULES.map((rule) => ({ ...rule, projectId: project.id })),
     });
     return project;
   });
@@ -130,7 +127,7 @@ export async function callerInProject(
   return (await getMembership(caller.userId, projectId)) !== null;
 }
 
-type ProjectAccess =
+export type ProjectAccess =
   | {
       error: null;
       projectId: string;

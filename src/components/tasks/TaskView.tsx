@@ -1,5 +1,6 @@
 "use client";
 
+import { useAgents } from "@/components/agents/AgentsProvider";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDownIcon, ClockIcon, HandIcon, ListTodoIcon, MessageSquareIcon } from "lucide-react";
@@ -13,7 +14,6 @@ import { requestJson } from "@/lib/request-json";
 import { cn } from "@/lib/utils";
 import { CopyRef } from "./CopyRef";
 import {
-  ACTIVE_TASK_LIMIT,
   TASK_STAGES,
   shortDateTime,
   taskProgressLine,
@@ -40,6 +40,7 @@ import {
 } from "./TaskParts";
 import { useTasks } from "./TasksProvider";
 import { OfferDialog } from "./OfferDialog";
+import { OfferResponse } from "./OfferResponse";
 import { VotingPanel } from "./TaskVotes";
 import { TaskThread, threadMessages } from "./TaskThread";
 
@@ -108,7 +109,8 @@ export function TaskView({ taskId }: { taskId: string }) {
     sendOffer,
     withdrawOffer,
   } = useTasks();
-  const { href, canManage } = useProject();
+  const { href, canManage, pointSettings } = useProject();
+  const { agents: myAgents } = useAgents();
   const [offering, setOffering] = useState<Agent | null>(null);
 
   useEffect(() => loadTask(taskId), [taskId, loadTask]);
@@ -137,7 +139,7 @@ export function TaskView({ taskId }: { taskId: string }) {
     return (
       <NotFoundState
         title="Task not found"
-        description="This task doesn't exist in this project, or it couldn't be loaded. A proposed task is removed once 5 agents downvote it."
+        description="This task doesn't exist in this project, or it couldn't be loaded. A proposed task is removed once enough votes go against it."
         icon={ListTodoIcon}
         backHref={tasksHref}
         backLabel="Back to tasks"
@@ -150,6 +152,7 @@ export function TaskView({ taskId }: { taskId: string }) {
   const thread = threadStatus(task.id);
   const worker = task.assignedAgentId ? agentFor(task.assignedAgentId) : undefined;
   const offeredTo = task.offer ? agentFor(task.offer.agentId) : undefined;
+  const myOfferedAgent = task.offer ? myAgents.find((agent) => agent.id === task.offer?.agentId) : undefined;
   const bidding = BIDDABLE.includes(task.status);
   const takingBids = bidding && !task.offer;
   const bidCount = thread === "ready" ? bids.length : task.bidCount;
@@ -182,7 +185,7 @@ export function TaskView({ taskId }: { taskId: string }) {
               <StageIcon className="size-3.5" aria-hidden="true" />
             </span>
             <span className="font-semibold text-foreground">{stage.label}</span>·
-            <span>{taskProgressLine(task, { worker, offeredTo })}</span>
+            <span>{taskProgressLine(task, { worker, offeredTo, votesToDecide: pointSettings.votesToDecide })}</span>
           </p>
           <p className="m-0 flex items-baseline gap-2">
             {task.points !== null && (
@@ -217,11 +220,23 @@ export function TaskView({ taskId }: { taskId: string }) {
                 agent={offeredTo}
                 canWithdraw={canOffer}
                 onWithdraw={() => withdrawOffer(task.id)}
+                respond={
+                  myOfferedAgent && (
+                    <OfferResponse
+                      taskId={task.id}
+                      agentName={myOfferedAgent.name}
+                      onDone={() => {
+                        loadTask(task.id);
+                        loadThread(task.id);
+                      }}
+                    />
+                  )
+                }
               />
             )}
             <p className="m-0 text-[13px] text-muted-foreground">
               {task.status === "proposed"
-                ? "Bidding opens once 5 agents upvote this task."
+                ? `Bidding opens once ${pointSettings.votesToDecide} upvotes are in.`
                 : !bidding
                 ? `Bidding is closed${worker ? `. ${worker.name} took this task` : ""}.`
                 : canOffer
@@ -338,7 +353,8 @@ function BidCard({
   canOffer: boolean;
   onOffer: (agent: Agent) => void;
 }) {
-  const atLimit = (stats?.activeTasks ?? 0) >= ACTIVE_TASK_LIMIT;
+  const { activeTaskLimit } = useProject().pointSettings;
+  const atLimit = (stats?.activeTasks ?? 0) >= activeTaskLimit;
   const name = agent?.name ?? "Unknown agent";
 
   return (
@@ -376,7 +392,7 @@ function BidCard({
             <Button variant="secondary" disabled={atLimit} onClick={() => onOffer(agent)}>
               Send offer
             </Button>
-            {atLimit && <span className="text-xs text-muted-foreground">At the {ACTIVE_TASK_LIMIT}-task limit</span>}
+            {atLimit && <span className="text-xs text-muted-foreground">At the {activeTaskLimit}-task limit</span>}
           </div>
         )
       )}
@@ -389,11 +405,14 @@ function OfferStatus({
   agent,
   canWithdraw,
   onWithdraw,
+  respond,
 }: {
   task: Task;
   agent?: Agent;
   canWithdraw: boolean;
   onWithdraw: () => Promise<void>;
+  /** Accept / decline, when the offered agent is yours. */
+  respond?: React.ReactNode;
 }) {
   const [withdrawing, setWithdrawing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -428,7 +447,8 @@ function OfferStatus({
             </p>
           </div>
         </div>
-        {canWithdraw && (
+        {respond}
+        {canWithdraw && !respond && (
           <Button
             variant="outline"
             size="sm"

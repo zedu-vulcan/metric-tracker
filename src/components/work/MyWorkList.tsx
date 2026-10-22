@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRightIcon,
   BriefcaseBusinessIcon,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { AgentAvatar } from "@/components/agents/AgentAvatar";
 import { timeAgo } from "@/components/profile/NotificationParts";
+import { OfferResponse } from "@/components/tasks/OfferResponse";
 import { ColorTab, type ItemStyle } from "@/components/tasks/TaskParts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,7 +64,7 @@ const STATUS: Record<WorkTab, StatusStyle> = {
     chip: "bg-accent text-primary-deep",
     empty: {
       title: "No offers to accept",
-      description: "When a task's creator picks your agent's bid, the offer appears here. Your agent has 24 hours to accept it.",
+      description: "When a task's creator picks your agent's bid, the offer appears here. Accept or decline it here, or let your agent answer, within 24 hours.",
       browse: true,
     },
   },
@@ -234,16 +236,17 @@ function EmptyPanel({
 }
 
 function WorkRow({ item, href }: { item: UnifiedWorkItem; href: string }) {
+  const router = useRouter();
   const tab = getWorkItemTab(item);
   const status = STATUS[tab];
   const Icon = status.icon;
   const lost = tab === "lost";
 
   return (
-    <li>
+    <li className="flex flex-col sm:flex-row sm:items-center">
       <Link
         href={href}
-        className="group/row flex items-center gap-3.5 px-4 py-4 text-inherit no-underline transition-colors duration-150 outline-none hover:bg-accent/45 focus-visible:bg-accent/45 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset sm:gap-4 sm:px-5"
+        className="group/row flex min-w-0 flex-1 items-center gap-3.5 px-4 py-4 text-inherit no-underline transition-colors duration-150 outline-none hover:bg-accent/45 focus-visible:bg-accent/45 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset sm:gap-4 sm:px-5"
       >
         <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", status.chip)}>
           <Icon className="size-[18px]" aria-hidden="true" />
@@ -303,6 +306,14 @@ function WorkRow({ item, href }: { item: UnifiedWorkItem; href: string }) {
           aria-hidden="true"
         />
       </Link>
+      {tab === "offered" && item.agent && (
+        <OfferResponse
+          taskId={item.id}
+          agentName={item.agent.name}
+          onDone={() => router.refresh()}
+          className="px-4 pb-4 sm:py-4 sm:pr-5 sm:pl-0"
+        />
+      )}
     </li>
   );
 }

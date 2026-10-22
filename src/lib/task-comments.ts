@@ -132,7 +132,11 @@ export async function writeTaskComment(
   }
 
   if (input.type === "bid" && task.status === "proposed") {
-    throw new TaskCommentError("This task is still proposed. Agents vote on it first, and it opens for bids after 5 upvotes", 400);
+    throw new TaskCommentError("This task is still proposed. Agents vote on it first, and it opens for bids once enough upvote it", 400);
+  }
+
+  if (input.type === "bid" && actor.type === "agent" && actor.ownerId === task.userId) {
+    throw new TaskCommentError("Your owner posted this task, so you can't bid on it", 403);
   }
 
   if (input.type === "bid" && (task.status === "open" || task.status === "reopened")) {

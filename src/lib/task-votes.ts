@@ -1,5 +1,5 @@
-import type { Agent, TaskVoteValue } from "@prisma/client";
-import { TASK_VOTES_TO_DECIDE, TASK_VOTE_POINTS } from "@/lib/points";
+import type { TaskVoteValue } from "@prisma/client";
+import { getPointSettings } from "@/lib/point-settings";
 import { awardPoints } from "@/lib/points-server";
 import { prisma } from "@/lib/prisma";
 import { commentAuthorAgentSelect, serializeAgentRef } from "@/lib/task-board";
@@ -10,20 +10,30 @@ export class TaskVoteError extends Error {
   }
 }
 
-const voteInclude = { agent: { select: commentAuthorAgentSelect } } as const;
+/** Who casts a vote: one of the project's agents, or a person in the project. */
+export type Voter =
+  | { kind: "agent"; agentId: string; ownerId: string; projectId: string }
+  | { kind: "user"; userId: string; projectId: string };
+
+const voteInclude = {
+  agent: { select: commentAuthorAgentSelect },
+  user: { select: { id: true, name: true, image: true } },
+} as const;
 
 function serializeVote(vote: {
   id: string;
   value: TaskVoteValue;
   reason: string;
   createdAt: Date;
-  agent: Parameters<typeof serializeAgentRef>[0];
+  agent: Parameters<typeof serializeAgentRef>[0] | null;
+  user: { id: string; name: string | null; image: string | null } | null;
 }) {
   return {
     id: vote.id,
     vote: vote.value,
     reason: vote.reason,
-    agent: serializeAgentRef(vote.agent),
+    agent: vote.agent ? serializeAgentRef(vote.agent) : null,
+    user: vote.user,
     createdAt: vote.createdAt.toISOString(),
   };
 }
@@ -41,42 +51,50 @@ export async function listTaskVotes(projectId: string, taskId: string) {
 }
 
 /**
- * An agent votes on a proposed task, with its reason, and its owner earns the vote points.
+ * An agent or a person votes on a proposed task, with a reason, and earns the vote points (an agent's go to its owner).
  * The vote that reaches the threshold decides the task: enough upvotes open it for bids,
  * enough downvotes delete it.
  */
-export async function castTaskVote(agent: Agent, taskId: string, value: TaskVoteValue, reason: string) {
+export async function castTaskVote(voter: Voter, taskId: string, value: TaskVoteValue, reason: string) {
+  const earnerId = voter.kind === "agent" ? voter.ownerId : voter.userId;
   return prisma.$transaction(async (tx) => {
     // One vote at a time per task, so two agents can't both cast the deciding vote.
     await tx.$queryRaw`SELECT id FROM "Task" WHERE id = ${taskId} FOR UPDATE`;
     const task = await tx.task.findFirst({
-      where: { id: taskId, projectId: agent.projectId },
+      where: { id: taskId, projectId: voter.projectId },
       select: { id: true, status: true, userId: true },
     });
     if (!task) throw new TaskVoteError("Not found", 404);
     if (task.status !== "proposed") {
       throw new TaskVoteError("Voting is closed: only proposed tasks take votes", 409);
     }
-    if (task.userId === agent.ownerId) {
-      throw new TaskVoteError("Your owner posted this task, so you can't vote on it", 403);
+    if (task.userId === earnerId) {
+      throw new TaskVoteError(
+        voter.kind === "agent" ? "Your owner posted this task, so you can't vote on it" : "You posted this task, so you can't vote on it",
+        403
+      );
     }
-    const existing = await tx.taskVote.findUnique({
-      where: { taskId_agentId: { taskId, agentId: agent.id } },
-      select: { id: true },
-    });
+    const by = voter.kind === "agent" ? { agentId: voter.agentId } : { userId: voter.userId };
+    const existing = await tx.taskVote.findFirst({ where: { taskId, ...by }, select: { id: true } });
     if (existing) throw new TaskVoteError("You already voted on this task", 409);
 
     const vote = await tx.taskVote.create({
-      data: { taskId, agentId: agent.id, value, reason },
+      data: { taskId, ...by, value, reason },
       include: voteInclude,
     });
 
+    const settings = await getPointSettings(voter.projectId, tx);
     const award = await awardPoints(
-      agent.projectId,
-      agent.ownerId,
-      TASK_VOTE_POINTS,
+      voter.projectId,
+      earnerId,
+      settings.votePoints,
       "task_voted",
-      { agentId: agent.id, sourceType: "vote", sourceId: vote.id, idempotencyKey: `task-vote:${vote.id}` },
+      {
+        agentId: voter.kind === "agent" ? voter.agentId : undefined,
+        sourceType: "vote",
+        sourceId: vote.id,
+        idempotencyKey: `task-vote:${vote.id}`,
+      },
       { tx }
     );
 
@@ -86,10 +104,10 @@ export async function castTaskVote(agent: Agent, taskId: string, value: TaskVote
     ]);
 
     let outcome: "pending" | "opened" | "removed" = "pending";
-    if (upvotes >= TASK_VOTES_TO_DECIDE) {
+    if (upvotes >= settings.votesToDecide) {
       await tx.task.update({ where: { id: taskId }, data: { status: "open" } });
       outcome = "opened";
-    } else if (downvotes >= TASK_VOTES_TO_DECIDE) {
+    } else if (downvotes >= settings.votesToDecide) {
       // Points already paid stay on the ledger; it doesn't reference the task.
       await tx.task.delete({ where: { id: taskId } });
       outcome = "removed";
@@ -100,7 +118,7 @@ export async function castTaskVote(agent: Agent, taskId: string, value: TaskVote
       upvotes,
       downvotes,
       outcome,
-      pointsAwarded: award.awarded ? TASK_VOTE_POINTS : 0,
+      pointsAwarded: award.awarded ? settings.votePoints : 0,
     };
   });
 }

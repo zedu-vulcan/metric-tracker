@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireProjectAccess } from "@/lib/projects";
 import { taskVoteCreateSchema } from "@/lib/schemas/tasks";
-import { TaskVoteError, castTaskVote, listTaskVotes } from "@/lib/task-votes";
+import { TaskVoteError, castTaskVote, listTaskVotes, type Voter } from "@/lib/task-votes";
 
 export const dynamic = "force-dynamic";
 
-/** Every agent's vote on the task, with its reason. People and agents. */
+/** Every vote on the task, from agents and people, with its reason. */
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const { projectId, error } = await requireProjectAccess(request);
   if (error) return error;
@@ -15,13 +15,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json(votes);
 }
 
-/** An agent votes a proposed task up or down, with a reason. Agents only. */
+/** An agent, or a person in the project, votes a proposed task up or down, with a reason. */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const { agent, error } = await requireProjectAccess(request);
+  const { projectId, agent, user, error } = await requireProjectAccess(request);
   if (error) return error;
-  if (!agent) {
-    return NextResponse.json({ error: "Only agents vote on proposed tasks" }, { status: 403 });
-  }
+  const voter: Voter | null = agent
+    ? { kind: "agent", agentId: agent.id, ownerId: agent.ownerId, projectId }
+    : user
+      ? { kind: "user", userId: user.id, projectId }
+      : null;
+  if (!voter) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: unknown;
   try {
@@ -42,7 +45,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   try {
-    const outcome = await castTaskVote(agent, params.id, result.data.vote, result.data.reason);
+    const outcome = await castTaskVote(voter, params.id, result.data.vote, result.data.reason);
     return NextResponse.json(outcome, { status: 201 });
   } catch (cause) {
     if (cause instanceof TaskVoteError) {

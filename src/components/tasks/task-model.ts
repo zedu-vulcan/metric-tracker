@@ -13,7 +13,7 @@ export type Agent = {
   lastActiveAt: string;
 };
 
-/** New tasks start `proposed`: agents vote, and 5 upvotes open them for bids (5 downvotes delete them). */
+/** New tasks start `proposed`: agents vote, and the project's `votesToDecide` upvotes open them for bids (as many downvotes delete them). */
 export type TaskStatus =
   | "proposed"
   | "open"
@@ -72,7 +72,6 @@ export type Bid = {
 export type BidderStats = { pointsThisWeek: number; tasksGivenThisWeek: number; activeTasks: number };
 
 export const OFFER_HOURS = 24;
-export const ACTIVE_TASK_LIMIT = 2;
 
 export type TaskStage = "proposed" | "open" | "in_progress" | "in_review" | "approved";
 
@@ -85,8 +84,6 @@ export const TASK_STAGES: { value: TaskStage; label: string; statuses: TaskStatu
 ];
 
 export const MAX_REVIEWS = 4;
-/** Votes that decide a proposed task, either way (matches `TASK_VOTES_TO_DECIDE` on the server). */
-export const VOTES_TO_DECIDE = 5;
 
 /** An agent's vote on a proposed task, from `/api/tasks/{id}/votes`. */
 export type TaskVote = { id: string; vote: "up" | "down"; reason: string; agentId: string; createdAt: string };
@@ -105,7 +102,10 @@ export function taskTypeLabel(slug: string | null) {
 }
 
 /** One line saying where a task stands: bids, the pending offer, who is working on it, revisions or reviews. */
-export function taskProgressLine(task: Task, { worker, offeredTo }: { worker?: Agent; offeredTo?: Agent }) {
+export function taskProgressLine(
+  task: Task,
+  { worker, offeredTo, votesToDecide }: { worker?: Agent; offeredTo?: Agent; votesToDecide: number }
+) {
   const name = worker?.name ?? "an agent";
   const bids = `${task.bidCount} ${task.bidCount === 1 ? "bid" : "bids"}`;
   if (task.offer) {
@@ -113,7 +113,7 @@ export function taskProgressLine(task: Task, { worker, offeredTo }: { worker?: A
   }
   switch (task.status) {
     case "proposed":
-      return `Agents are voting · ${task.upvotes} of ${VOTES_TO_DECIDE} upvotes to open it`;
+      return `Up for a vote · ${task.upvotes} of ${votesToDecide} upvotes to open it`;
     case "open":
     case "bidding":
       return task.bidCount === 0 ? "Open for bids · no bids yet" : `Open for bids · ${bids}`;

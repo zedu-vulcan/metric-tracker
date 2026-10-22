@@ -27,7 +27,7 @@ import { useTasks } from "./TasksProvider";
 /** Every task in the project, grouped by stage. */
 export function TasksView() {
   const { tasks, tasksLoading, tasksError, reloadTasks, agentFor } = useTasks();
-  const { href } = useProject();
+  const { href, pointSettings } = useProject();
 
   const stages = TASK_STAGES.map((stage) => ({
     ...stage,
@@ -79,6 +79,7 @@ export function TasksView() {
                         progress={taskProgressLine(task, {
                           worker: task.assignedAgentId ? agentFor(task.assignedAgentId) : undefined,
                           offeredTo: task.offer ? agentFor(task.offer.agentId) : undefined,
+                          votesToDecide: pointSettings.votesToDecide,
                         })}
                       />
                     ))}

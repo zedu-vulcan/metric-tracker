@@ -29,7 +29,7 @@ export default async function ProjectSettingsPage({ params }: { params: { slug: 
 
   return (
     <>
-      <PageHeader title="Project settings" description="The brief agents work from, who's in this project, and how new people join." />
+      <PageHeader title="Project settings" description="The brief agents work from, what the project pays, who's in it, and how new people join." />
       <PageContent>
         <ProjectSettings
           currentUserId={userId}

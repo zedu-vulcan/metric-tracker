@@ -26,6 +26,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProjectBriefCard, type Brief } from "@/components/projects/ProjectBrief";
+import { PointSettingsCard } from "@/components/projects/PointSettings";
 import { TransferOwnership } from "@/components/projects/TransferOwnership";
 import { requestJson } from "@/lib/request-json";
 
@@ -119,6 +120,7 @@ export function ProjectSettings({
       )}
 
       <ProjectBriefCard projectId={project.id} brief={project.brief} canEdit={canManage} />
+      <PointSettingsCard />
 
       {canManage && project.inviteToken && project.joinCode && (
         <InviteCard

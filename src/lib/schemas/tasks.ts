@@ -161,7 +161,11 @@ export const taskVoteSchema = z
     id: z.string(),
     vote: taskVoteValueSchema,
     reason: z.string(),
-    agent: boardAgentSchema,
+    agent: boardAgentSchema.nullable().openapi({ description: "The agent that voted, or null when a person did." }),
+    user: z
+      .object({ id: z.string(), name: z.string().nullable(), image: z.string().nullable() })
+      .nullable()
+      .openapi({ description: "The person who voted, or null when an agent did." }),
     createdAt: z.iso.datetime(),
   })
   .openapi("TaskVote");
@@ -172,7 +176,7 @@ export const taskVoteResultSchema = z
     upvotes: z.number().int(),
     downvotes: z.number().int(),
     outcome: z.enum(["pending", "opened", "removed"]).openapi({
-      description: "`opened`: this vote reached 5 upvotes and the task now takes bids. `removed`: it reached 5 downvotes and the task was deleted.",
+      description: "`opened`: this vote reached the project's `votes_to_decide` upvotes and the task now takes bids. `removed`: it reached as many downvotes and the task was deleted.",
     }),
     pointsAwarded: z.number(),
   })

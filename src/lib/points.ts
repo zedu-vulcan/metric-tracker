@@ -16,14 +16,58 @@ export const POINTS_TIMEZONE = "Africa/Lagos";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
 
-export const WEEKLY_TARGET = 500;
-/** Fairness limit: how many tasks an agent may hold at once. */
-export const ACTIVE_TASK_LIMIT = 2;
+// ── Point settings ───────────────────────────────────────────────────────────
 
-/** Votes that decide a proposed task: this many upvotes open it for bids, this many downvotes delete it. */
-export const TASK_VOTES_TO_DECIDE = 5;
-/** Paid to the voting agent's owner for each vote, up or down. */
-export const TASK_VOTE_POINTS = 5;
+/**
+ * Everything a project's owners and admins tune about points. Each value is stored as a `point_rules`
+ * row (`amount`), keyed below; a project without a row uses the default.
+ */
+export type PointSettings = {
+  /** Paid to the voting agent's owner for each vote on a proposed task, up or down. */
+  votePoints: number;
+  /** This many upvotes open a proposed task for bids; this many downvotes delete it. */
+  votesToDecide: number;
+  /** Paid to the reviewing agent's owner for each review. */
+  reviewPoints: number;
+  /** Only the first reviews on a task pay, so review pay can't outgrow the task. */
+  paidReviewsPerTask: number;
+  /** Percentage of the worker's points paid to the person who posted the task when it's approved. */
+  creatorSharePct: number;
+  /** Fairness limit: how many tasks an agent may hold at once. */
+  activeTaskLimit: number;
+  /** The weekly points target on the scoreboard. */
+  weeklyTarget: number;
+};
+
+export const POINT_SETTING_RULES: Record<keyof PointSettings, string> = {
+  votePoints: "task_voted",
+  votesToDecide: "task_votes_to_decide",
+  reviewPoints: "review_submitted",
+  paidReviewsPerTask: "paid_reviews_per_task",
+  creatorSharePct: "goal_task_approved",
+  activeTaskLimit: "active_task_limit",
+  weeklyTarget: "weekly_target",
+};
+
+export const DEFAULT_POINT_SETTINGS: PointSettings = {
+  votePoints: 5,
+  votesToDecide: 5,
+  reviewPoints: 6,
+  paidReviewsPerTask: 4,
+  creatorSharePct: 20,
+  activeTaskLimit: 2,
+  weeklyTarget: 500,
+};
+
+/** Settings from a project's `point_rules` rows. A disabled rule pays nothing; a missing one uses the default. */
+export function pointSettingsFromRules(rules: Pick<PointRule, "ruleKey" | "amount" | "enabled">[]): PointSettings {
+  const settings = { ...DEFAULT_POINT_SETTINGS };
+  for (const key of Object.keys(POINT_SETTING_RULES) as (keyof PointSettings)[]) {
+    const rule = rules.find((candidate) => candidate.ruleKey === POINT_SETTING_RULES[key]);
+    if (rule) settings[key] = rule.enabled ? Number(rule.amount) : 0;
+  }
+  return settings;
+}
 
 // ── Reasons ──────────────────────────────────────────────────────────────────
 
@@ -119,16 +163,16 @@ export type PointRule = {
   weeklyCap: number | null;
 };
 
-/** Award rules every new project starts with. Each review pays 5 (decision 20 Oct 2026). */
+/** Rules every new project starts with: one row per point setting, at its default. */
 export const DEFAULT_POINT_RULES: PointRule[] = [
-  { ruleKey: "review_submitted", amount: 6, enabled: true, weeklyCap: null },
+  ...(Object.keys(POINT_SETTING_RULES) as (keyof PointSettings)[]).map((key) => ({
+    ruleKey: POINT_SETTING_RULES[key],
+    amount: DEFAULT_POINT_SETTINGS[key],
+    enabled: true,
+    weeklyCap: null,
+  })),
   { ruleKey: "task_proposal_accepted", amount: 5, enabled: false, weeklyCap: null },
-  // A percentage of the approved task's points, paid to the person who posted the task.
-  { ruleKey: "goal_task_approved", amount: 5, enabled: true, weeklyCap: null },
 ];
-
-/** Stored as a `point_rules` row so each project can set its own; `amount` is the target. */
-export const WEEKLY_TARGET_RULE = "weekly_target";
 
 // ── Task types ───────────────────────────────────────────────────────────────
 
@@ -179,9 +223,6 @@ export function validateTaskType(input: { points: number; maxPoints: number }): 
   }
   return errors;
 }
-
-/** Only the first reviews on a task pay their reviewers, so review pay can't outgrow the task. */
-export const MAX_PAID_REVIEWS_PER_TASK = 4;
 
 /** A percentage share of a task's points, rounded to the ledger's one decimal place. */
 export function shareOfTaskPoints(points: number, percent: number): number {
@@ -301,9 +342,9 @@ export function buildScoreboard(input: {
   currentUserId?: string;
   target?: number;
 }): ScoreboardResult {
-  const target = input.target ?? WEEKLY_TARGET;
+  const target = input.target ?? DEFAULT_POINT_SETTINGS.weeklyTarget;
   const rules = input.rules ?? DEFAULT_POINT_RULES;
-  const activeTaskLimit = input.activeTaskLimit ?? ACTIVE_TASK_LIMIT;
+  const activeTaskLimit = input.activeTaskLimit ?? DEFAULT_POINT_SETTINGS.activeTaskLimit;
   const tasksGiven = input.tasksGivenThisWeek ?? {};
 
   const rows: ScoreboardRow[] = input.users.map((user) => {
@@ -362,7 +403,7 @@ export function buildScoreboard(input: {
 export function buildRulesBlock(
   taskTypes: TaskTypeConfig[],
   rules: PointRule[] = DEFAULT_POINT_RULES,
-  activeTaskLimit = ACTIVE_TASK_LIMIT
+  activeTaskLimit = DEFAULT_POINT_SETTINGS.activeTaskLimit
 ): RulesBlock {
   const enabledAmount = (ruleKey: string) => {
     const rule = rules.find((candidate) => candidate.ruleKey === ruleKey);

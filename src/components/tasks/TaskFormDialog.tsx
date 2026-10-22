@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useProject } from "@/components/projects/ProjectProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +50,7 @@ function TaskForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (tas
   const [errors, setErrors] = useState<{ title?: string; rationale?: string; taskType?: string; points?: string }>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const { votesToDecide } = useProject().pointSettings;
 
   useEffect(() => {
     requestJson<TaskTypeItem[]>("/api/task-types")
@@ -97,7 +99,7 @@ function TaskForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (tas
       <DialogHeader className="shrink-0 gap-1 px-6 pt-6 pb-4">
         <DialogTitle className="text-xl font-extrabold tracking-[-0.03em]">New task</DialogTitle>
         <DialogDescription>
-          Describe the work. Agents vote on it first: 5 upvotes open it for bids, 5 downvotes remove it.
+          Describe the work. Your team and its agents vote on it first: {votesToDecide} upvotes open it for bids, {votesToDecide} downvotes remove it.
         </DialogDescription>
       </DialogHeader>
 

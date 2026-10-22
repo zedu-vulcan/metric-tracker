@@ -1,53 +1,34 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { getAuthContext } from "@/lib/api";
+import { getPointSettings } from "@/lib/point-settings";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess } from "@/lib/projects";
 import { taskOfferedSchema } from "@/lib/schemas/tasks";
+import { findOfferForCaller } from "@/lib/task-offers";
 import { serializeTaskOffered } from "@/lib/tasks";
 
 export const dynamic = "force-dynamic";
 
-/** An agent may hold at most this many concurrently in-progress tasks. */
-const MAX_ACTIVE_TASKS = 2;
+/** The offered agent, or its owner from the dashboard, takes the task on. */
+export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const access = await requireProjectAccess(request);
+  if (access.error) return access.error;
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
-  const auth = await getAuthContext(_request);
-  if (auth.type === null) {
-    return auth.error;
-  }
-  if (auth.type !== "agent") {
-    return NextResponse.json({ error: "Agent authentication required" }, { status: 401 });
-  }
+  const found = await findOfferForCaller(access, params.id);
+  if ("response" in found) return found.response;
+  const { task, agent } = found;
 
-  const existing = await prisma.task.findUnique({
-    where: { id: params.id },
-    select: {
-      id: true,
-      status: true,
-      offeredToAgentId: true,
-      offerExpiresAt: true,
-      project: { select: { slug: true } },
-    },
-  });
-
-  if (!existing) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  if (!existing.offeredToAgentId || existing.offeredToAgentId !== auth.agent.id) {
-    return NextResponse.json({ error: "No offer for this agent" }, { status: 400 });
-  }
-
-  if (!existing.offerExpiresAt || new Date() >= existing.offerExpiresAt) {
+  if (!task.offerExpiresAt || new Date() >= task.offerExpiresAt) {
     return NextResponse.json({ error: "Offer has expired" }, { status: 400 });
   }
 
-  const existingActive = await prisma.task.count({
-    where: { assignedAgentId: auth.agent.id, status: "in_progress" },
-  });
-  if (existingActive >= MAX_ACTIVE_TASKS) {
+  const [existingActive, { activeTaskLimit }] = await Promise.all([
+    prisma.task.count({ where: { assignedAgentId: agent.id, status: "in_progress" } }),
+    getPointSettings(access.projectId),
+  ]);
+  if (existingActive >= activeTaskLimit) {
     return NextResponse.json(
-      { error: "Agent already has 2 active in-progress tasks" },
+      { error: `${agent.name} already has ${activeTaskLimit} active in-progress tasks` },
       { status: 400 }
     );
   }
@@ -57,22 +38,22 @@ export async function POST(_request: Request, { params }: { params: { id: string
   // both succeed or push the agent past the cap.
   const updated = await prisma.$transaction(async (tx) => {
     const activeCount = await tx.task.count({
-      where: { assignedAgentId: auth.agent.id, status: "in_progress" },
+      where: { assignedAgentId: agent.id, status: "in_progress" },
     });
 
-    if (activeCount >= MAX_ACTIVE_TASKS) {
+    if (activeCount >= activeTaskLimit) {
       return null;
     }
 
     const result = await tx.task.updateMany({
       where: {
-        id: params.id,
+        id: task.id,
         status: "bidding",
-        offeredToAgentId: auth.agent.id,
+        offeredToAgentId: agent.id,
         offerExpiresAt: { gt: new Date() },
       },
       data: {
-        assignedAgentId: auth.agent.id,
+        assignedAgentId: agent.id,
         offeredToAgentId: null,
         offeredAt: null,
         offerExpiresAt: null,
@@ -82,7 +63,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
     if (result.count === 0) return null;
 
-    return tx.task.findUnique({ where: { id: params.id } });
+    return tx.task.findUnique({ where: { id: task.id } });
   });
 
   if (!updated) {
@@ -93,8 +74,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
     );
   }
 
-  if (existing.project?.slug) {
-    revalidatePath(`/p/${existing.project.slug}/work`);
+  if (task.project?.slug) {
+    revalidatePath(`/p/${task.project.slug}/work`);
   }
 
   return NextResponse.json(taskOfferedSchema.parse(serializeTaskOffered(updated)));

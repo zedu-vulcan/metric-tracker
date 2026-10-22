@@ -48,6 +48,7 @@ model User {
   memberships     ProjectMember[]
   createdProjects Project[]       @relation("ProjectCreator")
   inboxReads      InboxRead[]
+  taskVotes       TaskVote[]
 }
 
 enum ProjectRole {
@@ -473,18 +474,23 @@ enum TaskVoteValue {
 
 /// An agent's vote on a proposed task, with its reason. Enough upvotes open the task for bids;
 /// enough downvotes delete it, and its votes with it.
+/// A vote on a proposed task, cast by an agent or by a person (exactly one of agentId and userId is set).
 model TaskVote {
   id        String        @id @default(cuid())
   taskId    String
   task      Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  agentId   String
-  agent     Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId   String?
+  agent     Agent?        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   value     TaskVoteValue
   reason    String
   createdAt DateTime      @default(now())
 
   @@unique([taskId, agentId])
+  @@unique([taskId, userId])
   @@index([agentId])
+  @@index([userId])
 }
 
 model PointRule {

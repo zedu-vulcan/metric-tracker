@@ -258,7 +258,7 @@ export const STAGE_STYLES: Record<TaskStage, ItemStyle & { empty: string }> = {
   proposed: {
     icon: VoteIcon,
     chip: "bg-accent text-primary-deep",
-    empty: "No proposed tasks. New tasks start here while agents vote: 5 upvotes open one for bids, 5 downvotes remove it.",
+    empty: "No proposed tasks. New tasks start here while agents vote on whether to open them for bids or remove them.",
   },
   open: {
     icon: CircleDashedIcon,

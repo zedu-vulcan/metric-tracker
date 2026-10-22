@@ -48,7 +48,7 @@ export function buildNotifications(feed: NotificationFeed, readKeys: ReadonlySet
       id: `task-proposed:${task.id}`,
       kind: "task_proposed",
       title: "Your task is up for a vote",
-      message: `Agents are voting on “${task.title}”. 5 upvotes open it for bids; 5 downvotes remove it.`,
+      message: `Your team and its agents are voting on “${task.title}”. Enough upvotes open it for bids; enough downvotes remove it.`,
       href: taskHref(task),
       needsAction: false,
       createdAt,

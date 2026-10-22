@@ -1,5 +1,6 @@
 import type { Agent, Prisma, TaskStatus } from "@prisma/client";
-import { ACTIVE_TASK_LIMIT } from "@/lib/points";
+import { getPointSettings } from "@/lib/point-settings";
+import type { PointSettings } from "@/lib/points";
 import { prisma } from "@/lib/prisma";
 import { formatRef, parseRef } from "@/lib/refs";
 import { prismaTaskTypesStore } from "@/lib/task-types-server";
@@ -42,7 +43,13 @@ function activeTaskCount(agentId: string) {
  * What this agent may do with a task right now, and why not when it can't.
  * Mirrors the rules enforced when the comment is posted, so agents don't waste calls.
  */
-function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number>, activeTasks: number) {
+function describeTask(
+  agent: Agent,
+  task: LoadedTask,
+  points: Map<string, number>,
+  activeTasks: number,
+  settings: PointSettings
+) {
   const now = Date.now();
   const deliveries = task.comments.filter((comment) => comment.type === "delivery");
   const lastDelivery = deliveries.at(-1);
@@ -77,14 +84,16 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
         : null;
 
   const bidBlocker = task.status === "proposed"
-    ? "The task is still proposed; it opens for bids after 5 upvotes."
+    ? `The task is still proposed; it opens for bids after ${settings.votesToDecide} upvotes.`
     : !BIDDABLE.includes(task.status)
     ? "The task isn't taking bids."
-    : offerPending
-      ? "An offer is pending with another agent."
-      : activeTasks >= ACTIVE_TASK_LIMIT
-        ? `You already hold ${ACTIVE_TASK_LIMIT} active tasks.`
-        : null;
+    : task.userId === agent.ownerId
+      ? "Your owner posted this task."
+      : offerPending
+        ? "An offer is pending with another agent."
+        : activeTasks >= settings.activeTaskLimit
+          ? `You already hold ${settings.activeTaskLimit} active tasks.`
+          : null;
 
   const reviewBlocker = !REVIEWABLE.includes(task.status)
     ? "The task has no delivery waiting for review."
@@ -155,7 +164,7 @@ export type AgentTaskView = ReturnType<typeof describeTask>;
 export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) {
   const statuses =
     action === "vote" ? VOTABLE : action === "bid" ? BIDDABLE : action === "review" ? REVIEWABLE : [...VOTABLE, ...BIDDABLE, ...REVIEWABLE];
-  const [tasks, points, activeTasks] = await Promise.all([
+  const [tasks, points, activeTasks, settings] = await Promise.all([
     prisma.task.findMany({
       where: {
         projectId: agent.projectId,
@@ -166,10 +175,11 @@ export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) 
     }),
     pointsBySlug(agent.projectId),
     activeTaskCount(agent.id),
+    getPointSettings(agent.projectId),
   ]);
 
   const workable = tasks
-    .map((task) => describeTask(agent, task, points, activeTasks))
+    .map((task) => describeTask(agent, task, points, activeTasks, settings))
     .flatMap((task) => {
       const actions: AgentTaskAction[] = [];
       if (task.canVote && (!action || action === "vote")) actions.push("vote");
@@ -178,7 +188,7 @@ export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) 
       return actions.map((next) => ({ ...task, action: next }));
     });
 
-  return { activeTasks, activeTaskLimit: ACTIVE_TASK_LIMIT, tasks: workable };
+  return { activeTasks, activeTaskLimit: settings.activeTaskLimit, tasks: workable };
 }
 
 /**
@@ -189,11 +199,12 @@ export async function getAgentTask(agent: Agent, taskIdOrRef: string) {
   const ref = parseRef(taskIdOrRef);
   const where =
     ref ? { projectId: agent.projectId, number: ref.number } : { id: taskIdOrRef, projectId: agent.projectId };
-  const [task, points, activeTasks] = await Promise.all([
+  const [task, points, activeTasks, settings] = await Promise.all([
     prisma.task.findFirst({ where, include: taskInclude }),
     pointsBySlug(agent.projectId),
     activeTaskCount(agent.id),
+    getPointSettings(agent.projectId),
   ]);
   if (!task) return null;
-  return describeTask(agent, task, points, activeTasks);
+  return describeTask(agent, task, points, activeTasks, settings);
 }
