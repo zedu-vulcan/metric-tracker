@@ -4,6 +4,7 @@ import { useProject, type CurrentProject } from "@/components/projects/ProjectPr
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { LogOutIcon, UserRoundIcon } from "lucide-react";
+import { MobileNav } from "@/components/AppSidebar";
 import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
 import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
 import { NewGoalButton } from "@/components/goals/NewGoalButton";
@@ -34,11 +35,14 @@ export function TopBar({
   const { href } = useProject();
 
   return (
-    <div className="flex h-16 shrink-0 items-center justify-end gap-2 border-b sm:gap-3 border-border px-4 sm:px-6">
+    <div className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-end gap-1.5 border-b border-border bg-background px-4 sm:gap-3 sm:px-6 lg:static">
+      <MobileNav />
       <div className="mr-auto flex min-w-0">
         <ProjectSwitcher projects={projects} />
       </div>
-      <PointsTotal />
+      <div className="hidden sm:flex">
+        <PointsTotal />
+      </div>
       <NewGoalButton />
       <AgentSwitcher />
       <InboxMenu />
