@@ -94,7 +94,7 @@ Missing status means Open for bids; missing other filters means unrestricted. Em
 
 Reject page numbers above 107,374,183 to keep the database offset within a signed 32-bit integer. Use fixed 20-row pages ordered by `createdAt DESC, id DESC`. Filters are applied before count/offset/limit. Out-of-range pages return empty results with the correct filtered total and an action to return to page 1. A filter change resets pagination. URL is committed state; temporary input drafts are allowed. Use replace for debounced typing and push for discrete selections/pages; Back/Forward must restore selections and results. Cancel/ignore stale responses and reset project-specific state on project changes.
 
-Endpoints to build:
+Endpoints implemented in Task 1 (see [API guide](api.md); disposable PostgreSQL query tests pass; real-session board HTTP verification is pending):
 
 - `GET /api/tasks/board`: results and pagination.
 - `GET /api/tasks/board/options`: project-wide types, goals, and agent choices, independent of active filters and current page.
@@ -146,13 +146,13 @@ V1 excludes cards/density toggles, a sort selector, Create task, new row menus, 
 
 ## Coordination and owned files
 
-- Task 0 lead: initial shared schemas/parser, fictional fixtures, interfaces and guides. Backend owner: API service/routes/OpenAPI and coordinated contract maintenance. Existing schema: `src/lib/schemas/task-board.ts`; planned service: `src/lib/task-board-query.ts`.
+- Task 0 lead: initial shared schemas/parser, fictional fixtures, interfaces and guides. Backend owner: API service/routes/OpenAPI and coordinated contract maintenance. Existing schema: `src/lib/schemas/task-board.ts`; implemented service: `src/lib/task-board-query.ts`.
 - Page/results owner: page entry, table/states, read-only legacy dialog, minimal sidebar entry. Components live under `src/components/task-board/`.
 - Filter-controls owner: controls/chips/reset, consuming shared typed values/options and callbacks.
 - URL/integration owner: committed state, parse/serialize usage, navigation, fetching/cancellation, Share view. Planned pure helper: `src/lib/task-board-url.ts`.
 - Verification owner: cross-feature tests/fixtures/documentation, coordinated by the lead.
 
-Shared schemas, parser and fixtures exist after Task 0; remaining API/UI paths are planned. Use the exact component handoff interfaces in the [foundation guide](README.md). Inspect before creating. The actual numbered assignment will define each contributor's files and component interfaces. Do not edit another owner's files, create competing versions of their components/schemas, or overwrite an existing implementation without coordinating the dependency. If you need a missing interface, provide a precise request/example to the human; use agreed mocks within your own boundary while waiting. Do not report mock integration as real API integration.
+Shared schemas, parser and fixtures exist after Task 0; backend query/routes/OpenAPI exist after Task 1; UI paths are still planned. Inspect the implementation before adding or replacing files. Use the exact component handoff interfaces in the [foundation guide](README.md). Inspect before creating. The actual numbered assignment will define each contributor's files and component interfaces. Do not edit another owner's files, create competing versions of their components/schemas, or overwrite an existing implementation without coordinating the dependency. If you need a missing interface, provide a precise request/example to the human; use agreed mocks within your own boundary while waiting. Do not report mock integration as real API integration.
 
 Before substantial edits, explain the current behavior, your approach, files, and checks in plain language. Prefer local feature helpers and shared types over new dependencies. No migration or environment variable is planned. If a genuine schema/index/config change becomes necessary, explain the need and get the required approval rather than quietly adding it.
 

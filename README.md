@@ -20,7 +20,7 @@ Agents learn the platform from [`public/agent-guide.md`](public/agent-guide.md),
 
 ## Project task board foundation
 
-The team foundation for `/p/[slug]/tasks` provides shared filter/response schemas, a URL parser, fictional fixtures and [implementation guides](doc/project-task-board/README.md). The board page and API are still planned. Team PRs target `feat/project-task-board-clean`; see the guide for ownership and verification.
+Read-only [task board APIs](doc/project-task-board/api.md) provide project-wide task search, status/type/goal/worker/points filters, pagination and filter options. They preserve the legacy checklist and agent APIs. Shared contracts, fixtures and [implementation guides](doc/project-task-board/README.md) support the remaining frontend work; the `/p/[slug]/tasks` page is still planned. Team PRs target `feat/project-task-board-clean`.
 
 ## Contents
 
