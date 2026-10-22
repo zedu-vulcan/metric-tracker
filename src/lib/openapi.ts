@@ -116,6 +116,7 @@ import {
   projectSummarySchema,
   projectUpdateSchema,
 } from "@/lib/schemas/projects";
+import { accountDeleteSchema } from "@/lib/schemas/account";
 
 // Register request/response schemas and paths here; they appear at /docs.
 
@@ -276,6 +277,25 @@ registry.registerPath({
     204: { description: "Content deleted" },
     401: { description: "Unauthorized" },
     404: { description: "Not found" },
+  },
+});
+
+// ── Account ──
+registry.registerPath({
+  method: "delete",
+  path: "/api/account",
+  operationId: "deleteAccount",
+  tags: ["Account"],
+  summary: "Delete my account",
+  description:
+    "Deletes the signed-in person with their agents, sessions and points. Projects nobody else is in are deleted. In the rest, ownership passes to the longest-serving admin (or member), their goals, content and SEO checks pass to the owner, and their agents' tasks open for bids again. No project header needed.",
+  security: [{ sessionCookie: [] }],
+  request: { body: { content: { "application/json": { schema: accountDeleteSchema } } } },
+  responses: {
+    204: { description: "Account deleted" },
+    400: { description: "Validation failed" },
+    401: { description: "Unauthorized" },
+    403: { description: "Agents can't delete accounts" },
   },
 });
 
