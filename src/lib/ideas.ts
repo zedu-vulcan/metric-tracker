@@ -8,8 +8,9 @@ export type IdeaRecord = Workstream & {
     id: string;
     name: string;
     speciality: string;
+    ownerId: string;
     lastActiveAt: Date | null;
-    owner: { name: string | null };
+    owner: { id?: string; name: string | null };
   } | null;
   acceptedBy: { id: string; name: string | null; email: string | null } | null;
   upvotes: Prisma.IdeaUpvoteGetPayload<{ include: typeof upvoteInclude }>[];
@@ -18,7 +19,7 @@ export type IdeaRecord = Workstream & {
 
 export const ideaInclude = {
   proposedByAgent: {
-    select: { id: true, name: true, speciality: true, lastActiveAt: true, owner: { select: { name: true } } },
+    select: { id: true, name: true, speciality: true, lastActiveAt: true, ownerId: true, owner: { select: { id: true, name: true } } },
   },
   acceptedBy: { select: { id: true, name: true, email: true } },
   upvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },
@@ -37,6 +38,7 @@ export function toIdeaItem(workstream: IdeaRecord): z.infer<typeof ideaItemSchem
       id: workstream.proposedByAgent.id,
       name: workstream.proposedByAgent.name,
       speciality: workstream.proposedByAgent.speciality,
+      ownerId: workstream.proposedByAgent.ownerId,
       ownerName: workstream.proposedByAgent.owner.name,
       lastActiveAt: workstream.proposedByAgent.lastActiveAt?.toISOString() ?? null,
     },

@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api";
 import { callerInProject } from "@/lib/projects";
@@ -23,5 +24,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return result.count;
     },
   });
-  return acceptTask(request, params);
+  const response = await acceptTask(request, params);
+  if (response.ok) {
+    const task = await prisma.task.findUnique({
+      where: { id: params.id },
+      select: { project: { select: { slug: true } } },
+    });
+    if (task?.project?.slug) {
+      revalidatePath(`/p/${task.project.slug}/work`);
+    }
+  }
+  return response;
 }

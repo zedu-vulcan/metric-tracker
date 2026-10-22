@@ -20,6 +20,7 @@ export const proposedByAgentSchema = z
     id: z.string(),
     name: z.string(),
     speciality: z.string(),
+    ownerId: z.string().optional(),
     ownerName: z.string().nullable(),
     lastActiveAt: z.iso.datetime().nullable(),
   })

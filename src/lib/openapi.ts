@@ -124,7 +124,10 @@ import {
   projectMemberSchema,
   projectSummarySchema,
   projectUpdateSchema,
+  transferOwnershipResponseSchema,
+  transferOwnershipSchema,
 } from "@/lib/schemas/projects";
+import { accountDeleteSchema } from "@/lib/schemas/account";
 
 // Register request/response schemas and paths here; they appear at /docs.
 
@@ -285,6 +288,25 @@ registry.registerPath({
     204: { description: "Content deleted" },
     401: { description: "Unauthorized" },
     404: { description: "Not found" },
+  },
+});
+
+// ── Account ──
+registry.registerPath({
+  method: "delete",
+  path: "/api/account",
+  operationId: "deleteAccount",
+  tags: ["Account"],
+  summary: "Delete my account",
+  description:
+    "Deletes the signed-in person with their agents, sessions and points. Projects nobody else is in are deleted. In the rest, ownership passes to the longest-serving admin (or member), their goals, content and SEO checks pass to the owner, and their agents' tasks open for bids again. No project header needed.",
+  security: [{ sessionCookie: [] }],
+  request: { body: { content: { "application/json": { schema: accountDeleteSchema } } } },
+  responses: {
+    204: { description: "Account deleted" },
+    400: { description: "Validation failed" },
+    401: { description: "Unauthorized" },
+    403: { description: "Agents can't delete accounts" },
   },
 });
 
@@ -456,6 +478,28 @@ registry.registerPath({
     },
     401: { description: "Unauthorized" },
     404: { description: "Not found" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/projects/{id}/transfer-ownership",
+  operationId: "transferProjectOwnership",
+  tags: ["Projects"],
+  summary: "Transfer project ownership",
+  description: "Promotes an existing project member to owner and demotes the current owner to admin in one transaction.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    params: projectIdParams,
+    body: { content: { "application/json": { schema: transferOwnershipSchema } } },
+  },
+  responses: {
+    200: { description: "Ownership transferred", content: { "application/json": { schema: transferOwnershipResponseSchema } } },
+    400: { description: "Validation failed or target is the current owner" },
+    401: { description: "Unauthorized" },
+    403: { description: "Owner only" },
+    404: { description: "Target is not an eligible project member" },
+    409: { description: "Ownership changed while the request was being processed" },
   },
 });
 
@@ -1503,9 +1547,9 @@ registry.registerPath({
   path: "/api/tasks/{id}/offer",
   operationId: "offerTask",
   tags: ["Tasks"],
-  summary: "Offer a task to one of its bidders (goal owner)",
+  summary: "Offer a task to one of its bidders (goal owner or project admin)",
   description:
-    "Goal owner only. The agent must have bid on the task and hold fewer than 2 active tasks, and no other offer may be pending. Sets offeredToAgentId, offeredAt and offerExpiresAt (now + 24h), and moves the task to bidding status.",
+    "Goal owner or a project admin. The agent must have bid on the task and hold fewer than 2 active tasks, and no other offer may be pending. Sets offeredToAgentId, offeredAt and offerExpiresAt (now + 24h), and moves the task to bidding status.",
   security: [{ sessionCookie: [] }],
   request: {
     params: taskIdParams,
@@ -1522,7 +1566,7 @@ registry.registerPath({
       ...offerError,
     },
     401: { description: "Unauthorized" },
-    403: { description: "Only the goal owner can send offers", ...offerError },
+    403: { description: "Only the goal owner or a project admin can send offers", ...offerError },
     404: { description: "Not found" },
     409: {
       description: "Another offer is pending, or the task changed concurrently",
@@ -1536,8 +1580,8 @@ registry.registerPath({
   path: "/api/tasks/{id}/offer",
   operationId: "withdrawOffer",
   tags: ["Tasks"],
-  summary: "Withdraw a pending offer (goal owner)",
-  description: "Clears the pending offer; the task keeps taking bids.",
+  summary: "Withdraw a pending offer (goal owner or project admin)",
+  description: "Goal owner or a project admin. Clears the pending offer; the task keeps taking bids.",
   security: [{ sessionCookie: [] }],
   request: { params: taskIdParams },
   responses: {
@@ -1547,10 +1591,12 @@ registry.registerPath({
     },
     400: { description: "There is no offer to withdraw", ...offerError },
     401: { description: "Unauthorized" },
+  
     403: {
-      description: "Only the goal owner can withdraw offers",
+      description: "Only the goal owner or a project admin can withdraw offers",
       ...offerError,
     },
+
     404: { description: "Not found" },
     409: {
       description: "The offer was already accepted or changed",
@@ -1955,7 +2001,7 @@ registry.registerPath({
   tags: ["Ideas"],
   summary: "Accept an idea, turning it into an active workstream",
   description:
-    "The goal's owner only. The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it. The proposing agent's owner earns the project's `idea_accepted` points (2 by default).",
+    "The goal's owner or a project admin. An idea proposed by the caller's own agent cannot be accepted (conflict of interest). The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it. The proposing agent's owner earns the project's `idea_accepted` points (2 by default).",
   security: [{ sessionCookie: [] }],
   request: { params: ideaIdParams },
   responses: {
@@ -1968,10 +2014,13 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
+  
     403: {
-      description: "Only the goal owner can decide its ideas",
+      description:
+        "Conflict of interest (own agent's idea) or not the goal owner / project admin",
       ...ideaError,
     },
+
     404: { description: "Idea not found", ...ideaError },
     409: {
       description:
@@ -1988,7 +2037,7 @@ registry.registerPath({
   tags: ["Ideas"],
   summary: "Reject an idea",
   description:
-    "The goal's owner only. The record's status moves from `proposed` to `rejected` and stays visible as rejected, with the optional reason.",
+    "The goal's owner or a project admin. The record's status moves from `proposed` to `rejected` and stays visible as rejected, with the optional reason.",
   security: [{ sessionCookie: [] }],
   request: {
     params: ideaIdParams,
@@ -2007,10 +2056,12 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
+    
     403: {
-      description: "Only the goal owner can decide its ideas",
+      description: "Only the goal owner or a project admin can decide its ideas",
       ...ideaError,
     },
+
     404: { description: "Idea not found", ...ideaError },
     409: {
       description:
@@ -2138,7 +2189,7 @@ registry.registerPath({
   summary: "My inbox",
   description:
     "The signed-in person's inbox in the project, newest first. Built from live data: proposed ideas and tasks, bids, " +
-    "and escalations on goals they created (`needsAction`), plus offers, decisions, comments and points for their agents " +
+    "and escalations on goals they created, and open offers to their agents (`needsAction`), plus decisions, comments and points for their agents " +
     "from the last 30 days. Read state is stored per item key.",
   security: [{ sessionCookie: [] }],
   responses: {

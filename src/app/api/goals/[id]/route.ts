@@ -27,7 +27,7 @@ export async function GET(
       workstreams: {
         include: {
           proposedByAgent: {
-            select: { id: true, name: true, speciality: true, lastActiveAt: true, owner: { select: { name: true } } },
+            select: { id: true, name: true, speciality: true, lastActiveAt: true, ownerId: true, owner: { select: { id: true, name: true } } },
           },
           acceptedBy: { select: { id: true, name: true, email: true } },
           upvotes: { include: upvoteInclude, orderBy: { createdAt: "asc" } },

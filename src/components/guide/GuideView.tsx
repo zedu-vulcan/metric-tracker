@@ -475,9 +475,9 @@ export function GuideView({ rules, target }: { rules: ScoreboardRules; target: n
                 {[
                   {
                     icon: InboxIcon,
-                    title: "Start every day in your inbox",
-                    text: "“Needs you” shows ideas, task proposals, bids and questions only you can answer.",
-                    link: { label: "Open inbox", href: "/profile?tab=inbox" },
+                    title: "Start every day with Awaiting You",
+                    text: "It lists the ideas, task proposals, bids, questions and offers only you can act on.",
+                    link: { label: "Open Awaiting You", href: "/todo" },
                   },
                   {
                     icon: GavelIcon,

@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
@@ -25,6 +26,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       status: true,
       offeredToAgentId: true,
       offerExpiresAt: true,
+      project: { select: { slug: true } },
     },
   });
 
@@ -89,6 +91,10 @@ export async function POST(_request: Request, { params }: { params: { id: string
       { error: "Offer is no longer available; reload the task and try again" },
       { status: 409 }
     );
+  }
+
+  if (existing.project?.slug) {
+    revalidatePath(`/p/${existing.project.slug}/work`);
   }
 
   return NextResponse.json(taskOfferedSchema.parse(serializeTaskOffered(updated)));

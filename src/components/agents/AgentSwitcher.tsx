@@ -64,21 +64,25 @@ export function AgentSwitcher() {
 
   const promptCopied = copied === selected.id;
 
+  const copyPrompt = () => void copy(selected.id, setupPrompt(selected, undefined, window.location.origin, project.name));
+
   return (
     <>
-      {createButton}
+      {/* On phones these live in the agent menu, so the top bar fits. */}
+      <div className="hidden sm:contents">{createButton}</div>
       {dialogs}
       <div className="flex h-10 items-center rounded-full border border-border bg-card">
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label={`Agent: ${selected.name}. Switch agent`}
-            className="flex h-full min-w-0 items-center gap-2 rounded-l-full pr-2.5 pl-1.5 text-sm font-semibold text-foreground transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="flex h-full min-w-0 items-center gap-2 rounded-full pr-2.5 pl-1.5 sm:rounded-r-none text-sm font-semibold text-foreground transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <span className="relative flex shrink-0">
               <AgentAvatar avatar={selected.avatar} className="size-7" />
               <StatusDot connected={selected.status === "connected"} />
             </span>
-            <span className="max-w-[96px] truncate sm:max-w-[160px]">{selected.name}</span>
+            <span className="hidden max-w-[160px] truncate sm:inline">{selected.name}</span>
+            {promptCopied && <CheckIcon className="size-4 shrink-0 text-success sm:hidden" aria-hidden="true" />}
             <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-72">
@@ -103,18 +107,31 @@ export function AgentSwitcher() {
                 Points by agent
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={copyPrompt}>
+              <CopyIcon aria-hidden="true" />
+              Copy setup prompt
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setRenewing(true)}>
+              <KeyRoundIcon aria-hidden="true" />
+              New key
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setCreating(true)}>
+              <PlusIcon aria-hidden="true" />
+              Create agent
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <span aria-hidden="true" className="h-5 w-px bg-border" />
+        <span aria-hidden="true" className="hidden h-5 w-px bg-border sm:block" />
 
         <button
           type="button"
-          onClick={() => void copy(selected.id, setupPrompt(selected, undefined, window.location.origin, project.name))}
+          onClick={copyPrompt}
           aria-label={`Copy setup prompt for ${selected.name}`}
           title="Copies the setup prompt without the key. Give your agent the key when it asks, or use New key."
           className={cn(
-            "flex h-full items-center gap-1.5 px-2.5 text-[13px] font-medium transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50",
+            "hidden h-full items-center gap-1.5 px-2.5 sm:flex text-[13px] font-medium transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50",
             promptCopied ? "text-success" : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -126,14 +143,14 @@ export function AgentSwitcher() {
           <span className="hidden sm:inline">{promptCopied ? "Copied" : "Copy prompt"}</span>
         </button>
 
-        <span aria-hidden="true" className="h-5 w-px bg-border" />
+        <span aria-hidden="true" className="hidden h-5 w-px bg-border sm:block" />
 
         <button
           type="button"
           onClick={() => setRenewing(true)}
           aria-label={`Get a new key and setup prompt for ${selected.name}`}
           title={`Current key: ${selected.keyHint}`}
-          className="flex h-full items-center gap-1.5 rounded-r-full pr-3.5 pl-2.5 text-[13px] font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="hidden h-full items-center gap-1.5 rounded-r-full pr-3.5 pl-2.5 sm:flex text-[13px] font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <KeyRoundIcon className="size-4" aria-hidden="true" />
           <span className="hidden sm:inline">New key</span>
