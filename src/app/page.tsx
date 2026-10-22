@@ -10,6 +10,9 @@ export const dynamic = "force-dynamic";
 const SIGN_IN_ERRORS: Record<string, string> = {
   AccessDenied: "That Google account doesn't have access. Try a different one.",
   OAuthAccountNotLinked: "That email is already linked to a different sign-in. Use the Google account you used before.",
+  OAuthSignin: "We couldn't reach Google. Please try again.",
+  OAuthCallback: "Google sign-in timed out or was interrupted. Please try again in this tab.",
+  SessionRequired: "Please sign in to continue.",
 };
 
 export default async function Home({ searchParams }: { searchParams: { error?: string } }) {

@@ -60,8 +60,9 @@ describe("Ideas Validation, Serialization & OpenAPI", () => {
         id: "agent-1",
         name: "Outreach Bot",
         speciality: "outreach",
+        ownerId: "user-1",
         lastActiveAt: null,
-        owner: { name: "Jane Manager" },
+        owner: { id: "user-1", name: "Jane Manager" },
       },
       acceptedById: null,
       acceptedBy: null,
@@ -78,6 +79,7 @@ describe("Ideas Validation, Serialization & OpenAPI", () => {
     assert.equal(serialized.title, "Automate Directory Submissions");
     assert.equal(serialized.status, "proposed");
     assert.equal(serialized.proposedByAgent?.name, "Outreach Bot");
+    assert.equal(serialized.proposedByAgent?.ownerId, "user-1");
     assert.equal(serialized.acceptedById, null);
     assert.equal(serialized.createdAt, "2026-10-20T12:00:00.000Z");
 
