@@ -2,12 +2,9 @@
 
 import { usePathname } from "next/navigation";
 import {
-  BookOpenIcon,
   BriefcaseBusinessIcon,
   ListChecksIcon,
   ListTodoIcon,
-  SettingsIcon,
-  TrophyIcon,
   type LucideIcon,
 } from "lucide-react";
 import { useNotifications } from "@/components/profile/useNotifications";
@@ -62,11 +59,7 @@ export function SidebarNavLink({ icon, badge, collapsed = false, children, class
 type NavItem = { href: string; label: string; icon: LucideIcon };
 
 /** Top-level items shown after the divider. */
-const CHANNELS: NavItem[] = [
-  { href: "/scoreboard", label: "Scoreboard", icon: TrophyIcon },
-  { href: "/guide", label: "How Amp works", icon: BookOpenIcon },
-  { href: "/settings", label: "Project settings", icon: SettingsIcon },
-];
+const CHANNELS: NavItem[] = [];
 
 export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
@@ -104,7 +97,7 @@ export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean
       >
         My Work
       </SidebarNavLink>
-      <span aria-hidden="true" className="mx-3 my-1.5 h-px shrink-0 bg-sidebar-border" />
+      {CHANNELS.length > 0 && <span aria-hidden="true" className="mx-3 my-1.5 h-px shrink-0 bg-sidebar-border" />}
       {inProject(CHANNELS).map(({ href, label, icon: Icon }) => (
         <SidebarNavLink
           key={href}

@@ -11,7 +11,6 @@ import { POINTS_TIMEZONE } from "@/lib/points";
 import { apiFetch } from "@/lib/request-json";
 import type { ScoreboardResponse } from "@/lib/schemas/scoreboard";
 import { cn } from "@/lib/utils";
-import { EarnPanel } from "./EarnPanel";
 import { HistoryDialog } from "./HistoryDialog";
 import { PointsTable } from "./PointsTable";
 
@@ -97,59 +96,51 @@ export function ScoreboardView({ currentUser }: { currentUser: { id: string; nam
           </Alert>
         )}
 
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
-          <Card>
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex flex-col gap-1">
-                <CardTitle>Leaderboard</CardTitle>
-                <CardDescription>
-                  {selected
-                    ? `${selected.rows.length} ${selected.rows.length === 1 ? "person" : "people"} · ${rangeLabel.toLowerCase()}`
-                    : "Loading…"}
-                </CardDescription>
-              </div>
-              <div role="group" aria-label="Period" className="flex shrink-0 rounded-full bg-muted p-1">
-                {RANGES.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-pressed={range === option.value}
-                    onClick={() => changeRange(option.value)}
-                    className={cn(
-                      "h-8 rounded-full px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                      range === option.value
-                        ? "bg-card text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {option.label}
-                  </button>
+        <Card>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-1">
+              <CardTitle>Leaderboard</CardTitle>
+              <CardDescription>
+                {selected
+                  ? `${selected.rows.length} ${selected.rows.length === 1 ? "person" : "people"} · ${rangeLabel.toLowerCase()}`
+                  : "Loading…"}
+              </CardDescription>
+            </div>
+            <div role="group" aria-label="Period" className="flex shrink-0 rounded-full bg-muted p-1">
+              {RANGES.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={range === option.value}
+                  onClick={() => changeRange(option.value)}
+                  className={cn(
+                    "h-8 rounded-full px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    range === option.value
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {selected ? (
+              <PointsTable
+                rows={selected.rows}
+                target={range === "all_time" ? null : selected.target}
+                currentUserId={currentUser.id}
+              />
+            ) : (
+              <div className="flex flex-col gap-2" aria-busy="true">
+                {Array.from({ length: 5 }, (_, index) => (
+                  <Skeleton key={index} className="h-14 w-full rounded-xl" />
                 ))}
               </div>
-            </CardHeader>
-            <CardContent>
-              {selected ? (
-                <PointsTable
-                  rows={selected.rows}
-                  target={range === "all_time" ? null : selected.target}
-                  currentUserId={currentUser.id}
-                />
-              ) : (
-                <div className="flex flex-col gap-2" aria-busy="true">
-                  {Array.from({ length: 5 }, (_, index) => (
-                    <Skeleton key={index} className="h-14 w-full rounded-xl" />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {selected ?? thisWeek ? (
-            <EarnPanel rules={(selected ?? thisWeek)!.rules} />
-          ) : (
-            <Skeleton className="h-[420px] rounded-[22px]" aria-label="Loading ways to earn" />
-          )}
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </PageContent>
 
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />

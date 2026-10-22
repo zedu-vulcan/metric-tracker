@@ -17,11 +17,11 @@ export function NewTaskButton() {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)} className="hidden sm:inline-flex">
+      <Button onClick={() => setOpen(true)} className="hidden sm:inline-flex">
         <PlusIcon data-icon="inline-start" aria-hidden="true" />
         New task
       </Button>
-      <Button variant="outline" size="icon" onClick={() => setOpen(true)} aria-label="New task" className="sm:hidden">
+      <Button size="icon" onClick={() => setOpen(true)} aria-label="New task" className="sm:hidden">
         <ListPlusIcon aria-hidden="true" />
       </Button>
       <TaskFormDialog

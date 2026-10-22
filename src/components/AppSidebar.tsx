@@ -109,7 +109,7 @@ export function MobileNav() {
           href={href("/scoreboard")}
           className="mt-4 flex shrink-0 items-center justify-between gap-3 rounded-2xl bg-sidebar-accent py-2 pr-2 pl-4 text-sm font-semibold text-sidebar-foreground outline-none hover:bg-sidebar-border focus-visible:ring-2 focus-visible:ring-sidebar-ring sm:hidden"
         >
-          Your points
+          Scoreboard
           <PointsTotal />
         </a>
       </SheetContent>

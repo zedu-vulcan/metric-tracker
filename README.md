@@ -158,7 +158,7 @@ src/
       layout.tsx           # Membership check + sidebar shell for every page in a project
       page.tsx             # Redirects to the project's Tasks page
       settings/page.tsx    # Members, roles, invite link and code
-      <feature>/page.tsx   # One folder per feature: tasks, todo, work, scoreboard, guide…
+      <feature>/page.tsx   # One folder per feature: tasks, todo, work, scoreboard, settings…
     api/
       auth/[...nextauth]/  # NextAuth (don't change without discussing)
       health/              # GET /api/health

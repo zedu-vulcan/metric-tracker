@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { SkillsBanner } from "@/components/SkillsResource";
 import { CopyRef } from "./CopyRef";
 import { TASK_STAGES, taskProgressLine, taskStageText, taskTypeLabel, type Task } from "./task-model";
 import {
@@ -45,7 +44,6 @@ export function TasksView() {
       />
 
       <PageContent>
-        <SkillsBanner />
         {tasksError && tasks.length === 0 ? (
           <LoadError onRetry={reloadTasks}>Couldn&rsquo;t load tasks.</LoadError>
         ) : tasksLoading ? (

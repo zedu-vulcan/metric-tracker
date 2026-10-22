@@ -5,8 +5,8 @@ import { TrophyIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requestJson } from "@/lib/request-json";
 
-/** The signed-in user's all-time points balance, from the points ledger. */
-export function PointsTotal() {
+/** The signed-in user's all-time points balance, from the points ledger. `null` until it loads. */
+export function usePointsBalance() {
   const [balance, setBalance] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -25,6 +25,12 @@ export function PointsTotal() {
     window.addEventListener("focus", load);
     return () => window.removeEventListener("focus", load);
   }, [load]);
+
+  return { balance, failed };
+}
+
+export function PointsTotal() {
+  const { balance, failed } = usePointsBalance();
 
   if (balance === null && !failed) return <Skeleton className="h-10 w-20 rounded-full" aria-label="Loading points" />;
 
