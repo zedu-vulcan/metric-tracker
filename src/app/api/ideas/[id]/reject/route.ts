@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api";
@@ -25,7 +26,7 @@ export async function POST(
 
   const idea = await prisma.workstream.findUnique({
     where: { id },
-    include: { goal: { select: { createdById: true, projectId: true } } },
+    include: { goal: { select: { createdById: true, projectId: true, project: { select: { slug: true } } } } },
   });
   if (!idea) {
     return NextResponse.json({ error: "Idea not found" }, { status: 404 });
@@ -88,6 +89,10 @@ export async function POST(
       { error: "Idea has already been accepted and cannot be rejected" },
       { status: 409 }
     );
+  }
+
+  if (idea.goal.project?.slug) {
+    revalidatePath(`/p/${idea.goal.project.slug}/work`);
   }
 
   const rejected = await prisma.workstream.findUnique({

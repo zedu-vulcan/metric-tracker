@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api";
 import { ACTIVE_TASK_LIMIT } from "@/lib/points";
@@ -20,6 +21,7 @@ async function findOfferTask(id: string) {
       projectId: true,
       offeredToAgentId: true,
       offerExpiresAt: true,
+      project: { select: { slug: true } },
       workstream: { select: { goal: { select: { createdById: true, projectId: true } } } },
     },
   });
@@ -71,29 +73,43 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const now = new Date();
   if (existing.offeredToAgentId && existing.offerExpiresAt && existing.offerExpiresAt > now) {
     return NextResponse.json(
-      { error: "An offer is already waiting for an answer. Withdraw it first." },
-      { status: 409 }
+      { error: "Task already has a pending offer" },
+      { status: 400 }
     );
   }
 
-  const agentId = result.data.agentId;
-  const [agent, bid, activeTasks] = await Promise.all([
-    prisma.agent.findUnique({ where: { id: agentId }, select: { id: true } }),
-    prisma.taskComment.findFirst({ where: { taskId: params.id, type: "bid", authorAgentId: agentId }, select: { id: true } }),
-    prisma.task.count({
-      where: { assignedAgentId: agentId, status: { in: ["in_progress", "submitted", "in_review", "changes_requested"] } },
-    }),
-  ]);
-
+  const agent = await prisma.agent.findUnique({
+    where: { id: result.data.agentId },
+    select: { id: true },
+  });
   if (!agent) {
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });
   }
+
+  const bid = await prisma.taskComment.findFirst({
+    where: {
+      taskId: params.id,
+      type: "bid",
+      authorAgentId: agent.id,
+    },
+    select: { id: true },
+  });
   if (!bid) {
-    return NextResponse.json({ error: "Only agents that bid on the task can be offered it" }, { status: 400 });
-  }
-  if (activeTasks >= ACTIVE_TASK_LIMIT) {
     return NextResponse.json(
-      { error: `This agent already holds ${ACTIVE_TASK_LIMIT} active tasks` },
+      { error: "Agent has not placed a bid on this task" },
+      { status: 400 }
+    );
+  }
+
+  const activeCount = await prisma.task.count({
+    where: {
+      assignedAgentId: agent.id,
+      status: "in_progress",
+    },
+  });
+  if (activeCount >= ACTIVE_TASK_LIMIT) {
+    return NextResponse.json(
+      { error: "Agent already has 2 active in-progress tasks" },
       { status: 400 }
     );
   }
@@ -117,6 +133,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
       { error: "Task is no longer open for offers" },
       { status: 409 }
     );
+  }
+
+  if (existing.project?.slug) {
+    revalidatePath(`/p/${existing.project.slug}/work`);
   }
 
   const updated = await prisma.task.findUnique({ where: { id: params.id } });
@@ -159,6 +179,10 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   });
   if (cleared.count === 0) {
     return NextResponse.json({ error: "The offer was already accepted or changed" }, { status: 409 });
+  }
+
+  if (existing.project?.slug) {
+    revalidatePath(`/p/${existing.project.slug}/work`);
   }
 
   const updated = await prisma.task.findUnique({ where: { id: params.id } });
