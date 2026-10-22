@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ProjectRole } from "@prisma/client";
-import { CheckIcon, CopyIcon, RefreshCwIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
 import { useCopy } from "@/components/agents/useCopy";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -202,22 +202,25 @@ export function ProjectSettings({
       </Card>
 
       {canManage && (
-        <ProjectCard
-          project={project}
-          taskTypesHref={href("/task-types")}
-          onDelete={() =>
-            setConfirm({
-              title: `Delete ${project.name}?`,
-              description:
-                "This deletes its tasks, agents, points and marketing records for everyone. It can't be undone.",
-              action: "Delete project",
-              run: async () => {
-                await requestJson(`/api/projects/${project.id}`, { method: "DELETE" });
-                router.push("/dashboard");
-              },
-            })
-          }
-        />
+        <>
+          <ProjectCard
+            project={project}
+            taskTypesHref={href("/task-types")}
+            onDelete={() =>
+              setConfirm({
+                title: `Delete ${project.name}?`,
+                description:
+                  "This deletes its tasks, agents, points and marketing records for everyone. It can't be undone.",
+                action: "Delete project",
+                run: async () => {
+                  await requestJson(`/api/projects/${project.id}`, { method: "DELETE" });
+                  router.push("/dashboard");
+                },
+              })
+            }
+          />
+          <BackupCard projectId={project.id} />
+        </>
       )}
 
       {isOwner && (
@@ -390,6 +393,87 @@ function ProjectCard({
             )}
           </FieldGroup>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BackupCard({ projectId }: { projectId: string }) {
+  const [downloadingFormat, setDownloadingFormat] = useState<"xlsx" | "json" | null>(null);
+
+  const handleDownload = async (format: "xlsx" | "json") => {
+    if (downloadingFormat) return;
+    setDownloadingFormat(format);
+    try {
+      const res = await fetch(`/api/admin/export?projectId=${projectId}&format=${format}`);
+      if (!res.ok) {
+        throw new Error(`Failed to export data: ${res.statusText}`);
+      }
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get("Content-Disposition");
+      let filename = `backup-${projectId}-${new Date().toISOString().slice(0, 10)}.${format}`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match?.[1]) filename = match[1];
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      window.location.href = `/api/admin/export?projectId=${projectId}&format=${format}`;
+    } finally {
+      setDownloadingFormat(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Data Backup & Export</CardTitle>
+        <CardDescription>
+          Download a complete snapshot of this project&apos;s tasks, points ledger, comments, members, and configurations.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Download your project data for spreadsheet analysis or disaster recovery backup.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="default"
+              disabled={downloadingFormat !== null}
+              onClick={() => handleDownload("xlsx")}
+            >
+              {downloadingFormat === "xlsx" ? (
+                <Spinner className="mr-2" />
+              ) : (
+                <DownloadIcon data-icon="inline-start" aria-hidden="true" />
+              )}
+              {downloadingFormat === "xlsx" ? "Generating .xlsx..." : "Spreadsheet (.xlsx)"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={downloadingFormat !== null}
+              onClick={() => handleDownload("json")}
+            >
+              {downloadingFormat === "json" ? (
+                <Spinner className="mr-2" />
+              ) : (
+                <DownloadIcon data-icon="inline-start" aria-hidden="true" />
+              )}
+              {downloadingFormat === "json" ? "Generating JSON..." : "JSON backup"}
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

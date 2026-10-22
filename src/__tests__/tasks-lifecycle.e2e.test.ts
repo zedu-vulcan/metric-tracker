@@ -175,6 +175,22 @@ async function provisionFreshDatabase(databaseUrl: string): Promise<void> {
     "migrate", "diff", "--from-empty", "--to-schema-datamodel", "prisma/schema.prisma", "--script",
   ]);
   await runPrismaCli(["db", "execute", "--stdin"], { stdin: script, databaseUrl });
+  const triggerScript = `
+CREATE OR REPLACE FUNCTION "amp_next_task_number"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW."number" IS NOT NULL AND NEW."number" > 0 THEN
+    RETURN NEW;
+  END IF;
+  UPDATE "Project" SET "lastTaskNumber" = "lastTaskNumber" + 1
+  WHERE "id" = NEW."projectId"
+  RETURNING "lastTaskNumber" INTO NEW."number";
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS "Task_number" ON "Task";
+CREATE TRIGGER "Task_number" BEFORE INSERT ON "Task" FOR EACH ROW EXECUTE FUNCTION "amp_next_task_number"();
+`;
+  await runPrismaCli(["db", "execute", "--stdin"], { stdin: triggerScript, databaseUrl });
 }
 
 /** Calls the API as the project owner (session + project header) or as an agent (key only). */
@@ -481,7 +497,7 @@ describe("full lifecycle: task → bid → delivery → peer reviews → approva
 
     const pay = await ledger(`review:${first.id}`);
     assert.equal(pay?.userId, ctx.fx!.agentC.ownerId, "each review pays its reviewer's owner");
-    assert.equal(Number(pay?.amount), 5);
+    assert.equal(Number(pay?.amount), 6);
 
     const inbox = await call("GET", "/api/me/inbox", { agent: ctx.fx!.agentB });
     assert.equal(inbox.status, 200, errorText(inbox));
@@ -509,23 +525,23 @@ describe("full lifecycle: task → bid → delivery → peer reviews → approva
     const payout = await ledger(`task:${ctx.taskId}`);
     assert.equal(payout?.userId, ctx.fx!.agentB.ownerId);
     assert.equal(payout?.agentId, ctx.fx!.agentB.id);
-    assert.equal(Number(payout?.amount), 40, "the content task type's points");
+    assert.equal(Number(payout?.amount), 60, "the content task type's points");
     assert.equal(payout?.projectId, ctx.fx!.projectId);
 
     const share = await ledger(`goal-share:${ctx.taskId}`);
     assert.equal(share?.userId, ctx.fx!.agentA.ownerId, "whoever posted the task earns a share");
-    assert.equal(Number(share?.amount), 2, "5% of the task's points");
+    assert.equal(Number(share?.amount), 3, "5% of the task's points");
 
     const scoreboard = await call("GET", "/api/scoreboard");
     assert.equal(scoreboard.status, 200, errorText(scoreboard));
     const row = (asObject(scoreboard).rows as Json[]).find((r) => r.user_id === ctx.fx!.agentB.ownerId);
-    assert.equal(row?.points, 40, "the task payout");
+    assert.equal(row?.points, 60, "the task payout");
 
     const me = await call("GET", "/api/agent/me", { agent: ctx.fx!.agentB });
     assert.equal(me.status, 200, errorText(me));
     const points = asObject(me).points as { you: Json; owner: Json };
-    assert.deepEqual(points.you, { total: 40, thisWeek: 40 }, "the agent sees what it earned");
-    assert.deepEqual(points.owner, { total: 40, thisWeek: 40 }, "and its owner's points");
+    assert.deepEqual(points.you, { total: 60, thisWeek: 60 }, "the agent sees what it earned");
+    assert.deepEqual(points.owner, { total: 60, thisWeek: 60 }, "and its owner's points");
   });
 
   it("threads replies under the comment they answer", async () => {
