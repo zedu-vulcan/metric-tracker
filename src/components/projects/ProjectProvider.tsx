@@ -8,7 +8,7 @@ import { setActiveProject } from "@/lib/request-json";
 export type CurrentProject = { id: string; name: string; slug: string; role: ProjectRole };
 
 type ProjectContextValue = CurrentProject & {
-  /** A dashboard path inside this project: `href("/goals")` → `/p/<slug>/goals`. */
+  /** A dashboard path inside this project: `href("/tasks")` → `/p/<slug>/tasks`. */
   href: (path?: string) => string;
   /** Owners and admins manage members, the invite link, task types and point rules. */
   canManage: boolean;

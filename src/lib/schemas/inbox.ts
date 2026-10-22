@@ -16,13 +16,6 @@ export const inboxTaskSchema = z
       "reopened",
     ]),
     taskType: z.string().nullable(),
-    workstream: z
-      .object({
-        id: z.string(),
-        title: z.string(),
-        goal: z.object({ id: z.string(), title: z.string() }),
-      })
-      .nullable(),
   })
   .openapi("InboxTask");
 

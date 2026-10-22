@@ -39,7 +39,7 @@ export type PointReason = (typeof POINT_REASONS)[number];
 
 export const REASON_LABELS: Record<PointReason, string> = {
   task_approved: "Task approved",
-  goal_task_approved: "Task on your goal approved",
+  goal_task_approved: "Task you posted approved",
   idea_task_approved: "Task from your idea approved",
   review_submitted: "Review submitted",
   idea_accepted: "Idea accepted",
@@ -115,13 +115,9 @@ export type PointRule = {
 /** Award rules every new project starts with. Each review pays 5 (decision 20 Oct 2026). */
 export const DEFAULT_POINT_RULES: PointRule[] = [
   { ruleKey: "review_submitted", amount: 6, enabled: true, weeklyCap: null },
-  { ruleKey: "idea_accepted", amount: 3, enabled: true, weeklyCap: null },
-  { ruleKey: "idea_upvoted", amount: 1.5, enabled: true, weeklyCap: null },
-  { ruleKey: "idea_downvoted", amount: 1.5, enabled: true, weeklyCap: null },
   { ruleKey: "task_proposal_accepted", amount: 5, enabled: false, weeklyCap: null },
-  // These two are percentages of the approved task's points, not fixed amounts.
+  // A percentage of the approved task's points, paid to the person who posted the task.
   { ruleKey: "goal_task_approved", amount: 5, enabled: true, weeklyCap: null },
-  { ruleKey: "idea_task_approved", amount: 8, enabled: true, weeklyCap: null },
 ];
 
 /** Stored as a `point_rules` row so each project can set its own; `amount` is the target. */
@@ -246,7 +242,6 @@ export type ScoreboardRow = {
 export type RulesBlock = {
   taskTypes: Omit<TaskTypeConfig, "isActive">[];
   reviewPoints: number | null;
-  ideaAccepted: number | null;
   taskProposalAccepted: number | null;
   activeTaskLimit: number;
 };
@@ -376,7 +371,6 @@ export function buildRulesBlock(
       maxPoints,
     })),
     reviewPoints: enabledAmount("review_submitted"),
-    ideaAccepted: enabledAmount("idea_accepted"),
     taskProposalAccepted: enabledAmount("task_proposal_accepted"),
     activeTaskLimit,
   };

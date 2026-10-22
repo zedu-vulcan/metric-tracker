@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
-
-export type WorkItemType = "idea" | "task";
+import { formatRef } from "@/lib/refs";
 
 export type WorkTab =
   | "applied"
@@ -13,19 +12,12 @@ export type WorkTab =
 
 export interface UnifiedWorkItem {
   id: string;
+  /** Short reference, e.g. T-341. */
+  ref: string;
   title: string;
-  type: WorkItemType;
-  status: string; // e.g. "PROPOSED", "BID_PLACED", "IN_PROGRESS", "APPROVED", "ACCEPTED", etc.
+  status: string; // e.g. "BID_PLACED", "IN_PROGRESS", "APPROVED", etc.
   points: number | null;
   updatedAt: string; // ISO 8601 string
-  breadcrumbs: {
-    goalTitle: string;
-    workstreamTitle?: string;
-  };
-  goalId: string;
-  workstreamId?: string;
-  goalTitle: string;
-  workstreamTitle?: string;
   agent?: {
     id: string;
     name: string;
@@ -35,26 +27,18 @@ export interface UnifiedWorkItem {
 }
 
 /**
- * Maps raw database statuses across Ideas and Tasks to specific UI tabs:
+ * Maps raw task statuses to specific UI tabs:
  * - PROPOSED / BID_PLACED -> Applied
- * - ACCEPTED (ideas) / APPROVED (tasks) -> Approved
+ * - APPROVED -> Approved
  * - IN_PROGRESS -> In progress
  * - OFFERED -> Offered
  * - SUBMITTED / IN_REVIEW -> In review
  * - CHANGES_REQUESTED -> Changes requested
  * - REJECTED / DECLINED / LOST -> Lost / declined
  */
-export function mapStatusToTab(rawStatus: string, type?: WorkItemType): WorkTab {
+export function mapStatusToTab(rawStatus: string): WorkTab {
   const s = rawStatus.toLowerCase().trim();
 
-  // Ideas-specific mappings
-  if (type === "idea") {
-    if (s === "proposed") return "applied";
-    if (s === "accepted") return "approved";
-    if (s === "rejected") return "lost";
-  }
-
-  // Tasks and general mappings
   switch (s) {
     case "proposed":
     case "bid_placed":
@@ -93,36 +77,17 @@ export function mapStatusToTab(rawStatus: string, type?: WorkItemType): WorkTab 
 /**
  * Helper to get the active UI tab for any unified work item.
  */
-export function getWorkItemTab(item: Pick<UnifiedWorkItem, "status" | "type">): WorkTab {
-  return mapStatusToTab(item.status, item.type);
+export function getWorkItemTab(item: Pick<UnifiedWorkItem, "status">): WorkTab {
+  return mapStatusToTab(item.status);
 }
-
-export type RawIdeaRecord = {
-  id: string;
-  title: string;
-  status: string;
-  goalId: string;
-  updatedAt: Date | string;
-  goal?: { id: string; title: string } | null;
-  proposedByAgent?: {
-    id: string;
-    name: string;
-    avatarStyle: string;
-    avatarSeed: string;
-  } | null;
-};
 
 export type RawTaskRecord = {
   id: string;
+  number: number;
   title: string;
   status: string;
   points: number | null;
   updatedAt: Date | string;
-  workstream?: {
-    id: string;
-    title: string;
-    goal?: { id: string; title: string } | null;
-  } | null;
   assignedAgent?: {
     id: string;
     ownerId?: string | null;
@@ -151,39 +116,9 @@ export type RawTaskRecord = {
 };
 
 /**
- * Normalizes raw Idea and Task records into a sorted, flat UnifiedWorkItem array.
+ * Normalizes raw task records into a sorted, flat UnifiedWorkItem array, one entry per agent of yours involved.
  */
-export function normalizeWorkItems(
-  ideas: RawIdeaRecord[],
-  tasks: RawTaskRecord[],
-  userId: string
-): UnifiedWorkItem[] {
-  const ideaItems: UnifiedWorkItem[] = ideas.map((idea) => {
-    const goalTitle = idea.goal?.title ?? "Goal unavailable";
-    const updatedAtIso = typeof idea.updatedAt === "string" ? idea.updatedAt : idea.updatedAt.toISOString();
-    return {
-      id: idea.id,
-      title: idea.title,
-      type: "idea",
-      status: idea.status.toUpperCase(),
-      points: idea.status.toLowerCase() === "accepted" ? 3 : null,
-      updatedAt: updatedAtIso,
-      breadcrumbs: {
-        goalTitle,
-      },
-      goalId: idea.goalId,
-      goalTitle,
-      agent: idea.proposedByAgent
-        ? {
-            id: idea.proposedByAgent.id,
-            name: idea.proposedByAgent.name,
-            avatarStyle: idea.proposedByAgent.avatarStyle,
-            avatarSeed: idea.proposedByAgent.avatarSeed,
-          }
-        : null,
-    };
-  });
-
+export function normalizeWorkItems(tasks: RawTaskRecord[], userId: string): UnifiedWorkItem[] {
   const taskItems: UnifiedWorkItem[] = tasks.flatMap((task) => {
     const agents = new Map<string, { id: string; name: string; avatarStyle: string; avatarSeed: string }>();
 
@@ -199,8 +134,6 @@ export function normalizeWorkItems(
       agents.set(task.offeredToAgent.id, task.offeredToAgent);
     }
 
-    const goalTitle = task.workstream?.goal?.title ?? "Goal unavailable";
-    const workstreamTitle = task.workstream?.title ?? "Workstream unavailable";
     const updatedAtIso = typeof task.updatedAt === "string" ? task.updatedAt : task.updatedAt.toISOString();
 
     return [...agents.values()].flatMap((agent) => {
@@ -231,19 +164,11 @@ export function normalizeWorkItems(
       return [
         {
           id: task.id,
+          ref: formatRef(task.number),
           title: task.title,
-          type: "task" as const,
           status: rawStatus,
           points: task.points,
           updatedAt: updatedAtIso,
-          breadcrumbs: {
-            goalTitle,
-            workstreamTitle,
-          },
-          goalId: task.workstream?.goal?.id ?? "",
-          workstreamId: task.workstream?.id ?? "",
-          goalTitle,
-          workstreamTitle,
           agent: {
             id: agent.id,
             name: agent.name,
@@ -255,47 +180,17 @@ export function normalizeWorkItems(
     });
   });
 
-  return [...ideaItems, ...taskItems].sort(
+  return taskItems.sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
 }
 
 /**
  * Server-side data fetching function that queries the Prisma database for ALL
- * work items (Ideas/Workstreams and Tasks/Bids) tied to the current logged-in user's agents.
+ * tasks tied to the current logged-in user's agents.
  */
 export async function getUnifiedWorkItems(projectId: string, userId: string): Promise<UnifiedWorkItem[]> {
-  // Query 1: Ideas / Approaches proposed by user's agents
-  const ideas = await prisma.workstream.findMany({
-    where: {
-      proposedByAgent: {
-        ownerId: userId,
-        projectId,
-      },
-      goal: {
-        projectId,
-      },
-    },
-    include: {
-      goal: {
-        select: {
-          id: true,
-          title: true,
-        },
-      },
-      proposedByAgent: {
-        select: {
-          id: true,
-          name: true,
-          avatarStyle: true,
-          avatarSeed: true,
-        },
-      },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
-
-  // Query 2: Tasks where user's agents are assigned, offered, or have placed bids/comments
+  // Tasks where the user's agents are assigned, offered, or have placed bids/comments
   const tasks = await prisma.task.findMany({
     where: {
       projectId,
@@ -316,11 +211,6 @@ export async function getUnifiedWorkItems(projectId: string, userId: string): Pr
       ],
     },
     include: {
-      workstream: {
-        include: {
-          goal: { select: { id: true, title: true } },
-        },
-      },
       assignedAgent: {
         select: { id: true, ownerId: true, name: true, avatarStyle: true, avatarSeed: true },
       },
@@ -348,6 +238,6 @@ export async function getUnifiedWorkItems(projectId: string, userId: string): Pr
     orderBy: { updatedAt: "desc" },
   });
 
-  return normalizeWorkItems(ideas, tasks, userId);
+  return normalizeWorkItems(tasks, userId);
 }
 

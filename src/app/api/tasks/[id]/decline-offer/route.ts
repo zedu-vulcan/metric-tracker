@@ -8,7 +8,7 @@ import { serializeTaskOffered } from "@/lib/tasks";
 export const dynamic = "force-dynamic";
 
 /**
- * The offered agent turns the offer down, so the goal owner can pick another bidder now instead of
+ * The offered agent turns the offer down, so the task's creator can pick another bidder now instead of
  * waiting for it to expire. The task keeps taking bids, and the reason is posted on its thread.
  */
 export async function POST(request: Request, { params }: { params: { id: string } }) {

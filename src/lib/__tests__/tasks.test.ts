@@ -6,15 +6,14 @@ import {
   offerAcceptSchema,
   offerCreateSchema,
   taskOfferedSchema,
-  goalTaskCreateSchema,
 } from "@/lib/schemas/tasks";
 import { commentCreateSchema } from "@/lib/schemas/comments";
 import { serializeTask, serializeTaskOffered } from "@/lib/tasks";
 import { getOpenApiDocument } from "@/lib/openapi";
 
-describe("goalTaskCreateSchema", () => {
+describe("taskCreateSchema", () => {
   it("validates valid task creation payload", () => {
-    const result = goalTaskCreateSchema.safeParse({
+    const result = taskCreateSchema.safeParse({
       title: "Write blog post",
       description: "SEO optimized content",
       taskType: "content",
@@ -23,14 +22,14 @@ describe("goalTaskCreateSchema", () => {
   });
 
   it("rejects missing title", () => {
-    const result = goalTaskCreateSchema.safeParse({
+    const result = taskCreateSchema.safeParse({
       taskType: "research",
     });
     assert.equal(result.success, false);
   });
 
   it("rejects a taskType that isn't a slug", () => {
-    const result = goalTaskCreateSchema.safeParse({
+    const result = taskCreateSchema.safeParse({
       title: "Invalid type task",
       taskType: "Not A Slug",
     });
@@ -39,58 +38,16 @@ describe("goalTaskCreateSchema", () => {
 });
 
 describe("OpenAPI Documentation", () => {
-  it("includes POST /api/workstreams/{id}/tasks route", () => {
+  it("documents posting and listing tasks for people and agents", () => {
     const doc = getOpenApiDocument();
     assert.ok(doc.paths);
-    assert.ok(doc.paths["/api/workstreams/{id}/tasks"]);
-    assert.ok(doc.paths["/api/workstreams/{id}/tasks"].post);
+    assert.ok(doc.paths["/api/tasks"]?.post);
+    assert.ok(doc.paths["/api/tasks"]?.get);
+    assert.ok(doc.paths["/api/workstreams/{id}/tasks"] === undefined);
   });
 });
 
 describe("Tasks Validation & Serialization", () => {
-  it("validates valid task creation payload with defaults", () => {
-    const input = {
-      title: "Write documentation",
-      dueAt: "2026-10-25T14:00:00.000Z",
-    };
-    const parsed = taskCreateSchema.safeParse(input);
-    assert.equal(parsed.success, true);
-    if (parsed.success) {
-      assert.equal(parsed.data.title, "Write documentation");
-      assert.equal(parsed.data.type, "Other");
-      assert.equal(parsed.data.assignToMe, true);
-    }
-  });
-
-  it("handles explicit assignToMe: false", () => {
-    const input = {
-      title: "Team meeting",
-      type: "Meeting",
-      dueAt: "2026-10-25T14:00:00.000Z",
-      assignToMe: false,
-    };
-    const parsed = taskCreateSchema.safeParse(input);
-    assert.equal(parsed.success, true);
-    if (parsed.success) {
-      assert.equal(parsed.data.assignToMe, false);
-      assert.equal(parsed.data.type, "Meeting");
-    }
-  });
-
-  it("rejects task creation with missing title or invalid dueAt", () => {
-    const emptyTitle = taskCreateSchema.safeParse({
-      title: "   ",
-      dueAt: "2026-10-25T14:00:00.000Z",
-    });
-    assert.equal(emptyTitle.success, false);
-
-    const invalidDate = taskCreateSchema.safeParse({
-      title: "Task with bad date",
-      dueAt: "not-a-date",
-    });
-    assert.equal(invalidDate.success, false);
-  });
-
   it("validates task updates and rejects empty updates", () => {
     const validUpdate = taskUpdateSchema.safeParse({ done: true });
     assert.equal(validUpdate.success, true);
@@ -101,9 +58,9 @@ describe("Tasks Validation & Serialization", () => {
 
   it("serializes task correctly with ISO dates and relations", () => {
     const dummyTask = {
+      number: 1,
       id: "task-1",
       projectId: "p1",
-      workstreamId: null,
       taskType: null,
       points: null,
       title: "Follow up with client",

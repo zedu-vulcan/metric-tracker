@@ -5,16 +5,14 @@ import type { Notification } from "@/lib/schemas/notifications";
 export const NOTIFICATION_WINDOW_DAYS = 30;
 export const NOTIFICATION_LIMIT = 60;
 
-type TaskRef = { id: string; title: string; goalId: string | null; workstreamId: string | null };
+type TaskRef = { id: string; title: string };
 
 /** The raw rows the inbox is built from, already scoped to one person in one project. */
 export type NotificationFeed = {
-  proposedIdeas: { id: string; title: string; goalId: string; goalTitle: string; agentName: string | null; upvotes: number; createdAt: Date }[];
-  proposedTasks: { task: TaskRef; workstreamTitle: string | null; createdAt: Date }[];
+  proposedTasks: { task: TaskRef; createdAt: Date }[];
   biddingTasks: { task: TaskRef; bidCount: number; lastBidAt: Date }[];
   escalations: { id: string; task: TaskRef; authorName: string; body: string; createdAt: Date }[];
   offers: { task: TaskRef; agentName: string; offeredAt: Date }[];
-  decidedIdeas: { id: string; title: string; goalId: string; status: "accepted" | "rejected"; agentName: string; reason: string | null; updatedAt: Date }[];
   decidedTasks: { task: TaskRef; status: "approved" | "changes_requested"; agentName: string; revisionCount: number; updatedAt: Date }[];
   comments: { id: string; task: TaskRef; type: "note" | "review"; isReply: boolean; authorName: string; agentName: string; body: string; verdict: "approve" | "changes" | null; score: number | null; createdAt: Date }[];
   points: { id: string; amount: number; reason: string; note: string | null; agentName: string | null; createdAt: Date }[];
@@ -35,9 +33,7 @@ const formatPoints = (amount: number) => {
 };
 
 export function taskHref(task: TaskRef) {
-  if (!task.goalId) return "/goals";
-  if (!task.workstreamId) return `/goals/${task.goalId}`;
-  return `/goals/${task.goalId}/workstreams/${task.workstreamId}/tasks/${task.id}`;
+  return `/tasks/${task.id}`;
 }
 
 /**
@@ -47,27 +43,12 @@ export function taskHref(task: TaskRef) {
 export function buildNotifications(feed: NotificationFeed, readKeys: ReadonlySet<string>, limit = NOTIFICATION_LIMIT): Notification[] {
   const items: Item[] = [];
 
-  for (const idea of feed.proposedIdeas) {
-    const backing = idea.upvotes > 0 ? ` · ${plural(idea.upvotes, "upvote")}` : "";
-    items.push({
-      id: `idea:${idea.id}`,
-      kind: "idea_proposed",
-      title: "New idea to review",
-      message: `${idea.agentName ?? "Someone"} suggested “${idea.title}” for “${idea.goalTitle}”${backing}.`,
-      href: `/goals/${idea.goalId}`,
-      needsAction: true,
-      createdAt: idea.createdAt,
-    });
-  }
-
-  for (const { task, workstreamTitle, createdAt } of feed.proposedTasks) {
+  for (const { task, createdAt } of feed.proposedTasks) {
     items.push({
       id: `task-proposed:${task.id}`,
       kind: "task_proposed",
       title: "New task to review",
-      message: workstreamTitle
-        ? `“${task.title}” was suggested under “${workstreamTitle}”. Accept it to open it for bids.`
-        : `“${task.title}” was suggested. Accept it to open it for bids.`,
+      message: `“${task.title}” was suggested. Accept it to open it for bids.`,
       href: taskHref(task),
       needsAction: true,
       createdAt,
@@ -107,21 +88,6 @@ export function buildNotifications(feed: NotificationFeed, readKeys: ReadonlySet
       href: taskHref(task),
       needsAction: true,
       createdAt: offeredAt,
-    });
-  }
-
-  for (const idea of feed.decidedIdeas) {
-    const accepted = idea.status === "accepted";
-    items.push({
-      id: `idea-${idea.status}:${idea.id}`,
-      kind: accepted ? "idea_accepted" : "idea_rejected",
-      title: accepted ? "Idea accepted" : "Idea turned down",
-      message: accepted
-        ? `${idea.agentName}'s idea “${idea.title}” is now a workstream.`
-        : `${idea.agentName}'s idea “${idea.title}” wasn't taken up${idea.reason ? `: ${excerpt(idea.reason)}` : "."}`,
-      href: `/goals/${idea.goalId}`,
-      needsAction: false,
-      createdAt: idea.updatedAt,
     });
   }
 

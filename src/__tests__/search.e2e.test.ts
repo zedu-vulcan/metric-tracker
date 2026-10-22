@@ -301,73 +301,13 @@ before(
       },
     });
 
-    // Seed 1 row of each of the 9 types in project 1 and matching text in project 2
+    // Seed a task in each project (the agent above is in project 1 only)
     const seedData = async (pId: string) => {
-      const goal = await prisma.goal.create({
-        data: {
-          projectId: pId,
-          title: "UniqueSearchKeyword Goal",
-          type: "seo",
-          createdById: owner.id,
-        },
-      });
-      const ws = await prisma.workstream.create({
-        data: { goalId: goal.id, title: "UniqueSearchKeyword Workstream" },
-      });
       await prisma.task.create({
         data: {
           projectId: pId,
-          workstreamId: ws.id,
           title: "UniqueSearchKeyword Task",
           type: "Call",
-        },
-      });
-      // Legacy task with no workstream
-      await prisma.task.create({
-        data: {
-          projectId: pId,
-          workstreamId: null,
-          title: "UniqueSearchKeyword LegacyTask",
-          type: "Call",
-        },
-      });
-
-      await prisma.directory.create({
-        data: {
-          projectId: pId,
-          name: "",
-          website: "https://uniquesearchkeyword-dir.test",
-        },
-      });
-      await prisma.contentItem.create({
-        data: {
-          projectId: pId,
-          title: "UniqueSearchKeyword Content",
-          platform: "Blog",
-          userId: owner.id,
-          status: "Draft",
-          createdDate: new Date(),
-        },
-      });
-      await prisma.pressOutlet.create({
-        data: {
-          projectId: pId,
-          name: "UniqueSearchKeyword Outlet",
-          key: `outlet-${randomBytes(4).toString("hex")}`,
-        },
-      });
-      await prisma.pressCoverage.create({
-        data: {
-          projectId: pId,
-          title: "UniqueSearchKeyword Coverage",
-          outlet: "Outlet",
-        },
-      });
-      await prisma.pressSubmission.create({
-        data: {
-          projectId: pId,
-          title: "UniqueSearchKeyword Submission",
-          outlet: "Outlet",
         },
       });
     };
@@ -480,7 +420,7 @@ describe("Global Search E2E Tests", () => {
     assert.equal(res.status, 400);
   });
 
-  it("finds all 9 types and respects project isolation", async () => {
+  it("finds tasks and agents and respects project isolation", async () => {
     const res = await callApi("/api/search?q=UniqueSearchKeyword", {
       sessionToken: ctx.fx!.owner.sessionToken,
       projectId: ctx.fx!.projectId1,
@@ -492,37 +432,20 @@ describe("Global Search E2E Tests", () => {
     };
     assert.equal(body.query, "UniqueSearchKeyword");
 
-    // Ensure all 9 types are found in project 1
+    // Ensure both types are found in project 1
     const typesFound = new Set(body.results.map((r) => r.type));
     const expectedTypes = [
-      "goal",
-      "workstream",
       "task",
       "agent",
-      "directory",
-      "content",
-      "press_outlet",
-      "press_coverage",
-      "press_submission",
     ];
     for (const t of expectedTypes) {
       assert.ok(typesFound.has(t), `expected type ${t} to be found`);
     }
 
-    // Ensure legacy task fallback title and href work correctly
-    const legacyTask = body.results.find(
-      (r) => r.type === "task" && r.href === "/goals",
-    );
-    assert.ok(
-      legacyTask,
-      "legacy task with no workstream found and mapped to /goals",
-    );
-
-    // Ensure empty-name directory falls back to website domain/url as title
-    const dirResult = body.results.find((r) => r.type === "directory");
-    assert.ok(
-      dirResult && dirResult.title.includes("uniquesearchkeyword-dir.test"),
-    );
+    // Tasks link to their own page
+    const task = body.results.find((r) => r.type === "task");
+    assert.ok(task?.href.startsWith("/tasks/"), "task links to /tasks/<id>");
+    assert.equal(body.results.filter((r) => r.type === "task").length, 1, "only this project's task");
   });
 
   it("does not match everything on a wildcard query like %", async () => {

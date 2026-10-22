@@ -7,6 +7,8 @@ const agentRefSelect = {
   id: true,
   name: true,
   speciality: true,
+  avatarStyle: true,
+  avatarSeed: true,
   lastActiveAt: true,
   createdAt: true,
   owner: { select: { name: true } },
@@ -16,6 +18,8 @@ type AgentRefRecord = {
   id: string;
   name: string;
   speciality: string;
+  avatarStyle: string;
+  avatarSeed: string;
   lastActiveAt: Date | null;
   createdAt: Date;
   owner: { name: string | null };
@@ -26,6 +30,8 @@ export function serializeAgentRef(agent: AgentRefRecord) {
     id: agent.id,
     name: agent.name,
     speciality: agent.speciality,
+    avatarStyle: agent.avatarStyle,
+    avatarSeed: agent.avatarSeed,
     ownerName: agent.owner.name,
     lastActiveAt: (agent.lastActiveAt ?? agent.createdAt).toISOString(),
   };

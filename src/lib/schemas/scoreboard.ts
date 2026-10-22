@@ -79,18 +79,11 @@ export const scoreboardRulesSchema = z
     task_types: scoreboardTaskTypeSchema.array(),
     review_points: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
     paid_reviews_per_task: z.number().int().openapi({ description: "Only this many reviews on a task are paid." }),
-    idea_accepted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
-    idea_upvoted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
-    idea_downvoted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
     task_proposal_accepted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
-    goal_share_pct: z
+    creator_share_pct: z
       .number()
       .nullable()
-      .openapi({ description: "Percent of an approved task's points paid to the goal's owner. Null when disabled." }),
-    idea_share_pct: z
-      .number()
-      .nullable()
-      .openapi({ description: "Percent of an approved task's points paid to the idea proposer's owner. Null when disabled." }),
+      .openapi({ description: "Percent of an approved task's points paid to the person who posted it. Null when disabled." }),
     active_task_limit: z.number().int(),
   })
   .openapi("ScoreboardRules");

@@ -4,16 +4,9 @@ import type { NotificationList } from "@/lib/schemas/notifications";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const taskSelect = { id: true, title: true, workstreamId: true, workstream: { select: { goalId: true } } } as const;
+const taskSelect = { id: true, title: true } as const;
 
-type TaskRow = { id: string; title: string; workstreamId: string | null; workstream: { goalId: string } | null };
-
-const taskRef = (task: TaskRow) => ({
-  id: task.id,
-  title: task.title,
-  workstreamId: task.workstreamId,
-  goalId: task.workstream?.goalId ?? null,
-});
+const taskRef = (task: { id: string; title: string }) => ({ id: task.id, title: task.title });
 
 type Author = { authorAgent: { name: string } | null; authorUser: { name: string | null } | null };
 
@@ -21,43 +14,35 @@ const authorName = ({ authorAgent, authorUser }: Author) => authorAgent?.name ??
 
 const authors = { authorAgent: { select: { name: true } }, authorUser: { select: { name: true } } } as const;
 
-/** Everything the inbox shows one person in one project: decisions on goals they created, and news about their agents. */
+/** Everything the inbox shows one person in one project: decisions on tasks they posted, and news about their agents. */
 async function loadFeed(userId: string, projectId: string, now: Date): Promise<NotificationFeed> {
   const since = new Date(now.getTime() - NOTIFICATION_WINDOW_DAYS * DAY_MS);
-  const myGoals = { projectId, createdById: userId };
+  const myTasks = { projectId, userId };
   const agentIds = (
     await prisma.agent.findMany({ where: { projectId, ownerId: userId }, select: { id: true } })
   ).map((agent) => agent.id);
   const mine = { in: agentIds };
 
-  const [proposedIdeas, proposedTasks, biddingTasks, escalations, offers, decidedIdeas, decidedTasks, comments, points] =
+  const [proposedTasks, biddingTasks, escalations, offers, decidedTasks, comments, points] =
     await Promise.all([
-      prisma.workstream.findMany({
-        where: { status: "proposed", goal: myGoals },
-        include: { goal: { select: { title: true } }, proposedByAgent: { select: { name: true } }, _count: { select: { upvotes: true } } },
+      prisma.task.findMany({
+        where: { ...myTasks, status: "proposed" },
+        select: { ...taskSelect, createdAt: true },
       }),
       prisma.task.findMany({
-        where: { projectId, status: "proposed", workstream: { goal: myGoals } },
-        select: { ...taskSelect, createdAt: true, workstream: { select: { goalId: true, title: true } } },
-      }),
-      prisma.task.findMany({
-        where: { projectId, status: "bidding", offeredToAgentId: null, workstream: { goal: myGoals }, comments: { some: { type: "bid" } } },
+        where: { ...myTasks, status: "bidding", offeredToAgentId: null, comments: { some: { type: "bid" } } },
         select: {
           ...taskSelect,
           comments: { where: { type: "bid" }, select: { createdAt: true }, orderBy: { createdAt: "desc" } },
         },
       }),
       prisma.taskComment.findMany({
-        where: { type: "escalation", createdAt: { gte: since }, task: { projectId, workstream: { goal: myGoals } } },
+        where: { type: "escalation", createdAt: { gte: since }, task: myTasks },
         include: { ...authors, task: { select: taskSelect } },
       }),
       prisma.task.findMany({
         where: { projectId, status: "bidding", offeredToAgentId: mine, offeredAt: { not: null }, offerExpiresAt: { gt: now } },
         select: { ...taskSelect, offeredAt: true, offeredToAgent: { select: { name: true } } },
-      }),
-      prisma.workstream.findMany({
-        where: { proposedByAgentId: mine, status: { in: ["accepted", "rejected"] }, updatedAt: { gte: since }, goal: { projectId } },
-        include: { proposedByAgent: { select: { name: true } } },
       }),
       prisma.task.findMany({
         where: { projectId, assignedAgentId: mine, status: { in: ["approved", "changes_requested"] }, updatedAt: { gte: since } },
@@ -87,20 +72,7 @@ async function loadFeed(userId: string, projectId: string, now: Date): Promise<N
     ]);
 
   return {
-    proposedIdeas: proposedIdeas.map((idea) => ({
-      id: idea.id,
-      title: idea.title,
-      goalId: idea.goalId,
-      goalTitle: idea.goal.title,
-      agentName: idea.proposedByAgent?.name ?? null,
-      upvotes: idea._count.upvotes,
-      createdAt: idea.createdAt,
-    })),
-    proposedTasks: proposedTasks.map((task) => ({
-      task: taskRef(task),
-      workstreamTitle: task.workstream?.title ?? null,
-      createdAt: task.createdAt,
-    })),
+    proposedTasks: proposedTasks.map((task) => ({ task: taskRef(task), createdAt: task.createdAt })),
     biddingTasks: biddingTasks.map((task) => ({
       task: taskRef(task),
       bidCount: task.comments.length,
@@ -117,15 +89,6 @@ async function loadFeed(userId: string, projectId: string, now: Date): Promise<N
       task: taskRef(task),
       agentName: task.offeredToAgent?.name ?? "Your agent",
       offeredAt: task.offeredAt ?? now,
-    })),
-    decidedIdeas: decidedIdeas.map((idea) => ({
-      id: idea.id,
-      title: idea.title,
-      goalId: idea.goalId,
-      status: idea.status === "accepted" ? "accepted" : "rejected",
-      agentName: idea.proposedByAgent?.name ?? "Your agent",
-      reason: idea.rejectionReason,
-      updatedAt: idea.updatedAt,
     })),
     decidedTasks: decidedTasks.map((task) => ({
       task: taskRef(task),

@@ -1,5 +1,5 @@
 import { CommentType, TaskStatus } from "@prisma/client";
-import type { Agent, Goal, Task, TaskComment, Workstream } from "@prisma/client";
+import type { Agent, Task, TaskComment } from "@prisma/client";
 import { prisma } from "./prisma";
 
 export const INBOX_COMMENT_LIMIT = 50;
@@ -10,11 +10,6 @@ type InboxTask = {
   title: string;
   status: TaskStatus;
   taskType: string | null;
-  workstream: {
-    id: string;
-    title: string;
-    goal: { id: string; title: string };
-  } | null;
 };
 
 type InboxComment = {
@@ -31,10 +26,6 @@ type InboxComment = {
   authorUser: { id: string; name: string | null } | null;
 };
 
-type TaskWithWorkstream = Task & {
-  workstream: (Workstream & { goal: Goal }) | null;
-};
-
 type CommentWithAuthors = TaskComment & {
   authorAgent: { id: string; name: string } | null;
   authorUser: { id: string; name: string | null } | null;
@@ -44,22 +35,12 @@ export function secondsUntil(date: Date, now: Date): number {
   return Math.max(0, Math.floor((date.getTime() - now.getTime()) / 1000));
 }
 
-function serializeTask(task: TaskWithWorkstream): InboxTask {
+function serializeTask(task: Task): InboxTask {
   return {
     id: task.id,
     title: task.title,
     status: task.status,
     taskType: task.taskType,
-    workstream: task.workstream
-      ? {
-          id: task.workstream.id,
-          title: task.workstream.title,
-          goal: {
-            id: task.workstream.goal.id,
-            title: task.workstream.goal.title,
-          },
-        }
-      : null,
   };
 }
 
@@ -111,7 +92,6 @@ export async function getAgentInbox(
         offerExpiresAt: { gt: now },
         status: { not: TaskStatus.in_progress },
       },
-      include: { workstream: { include: { goal: true } } },
       orderBy: { offerExpiresAt: "asc" },
     }),
     prisma.task.findMany({
@@ -120,7 +100,6 @@ export async function getAgentInbox(
         status: TaskStatus.changes_requested,
       },
       include: {
-        workstream: { include: { goal: true } },
         comments: {
           where: { type: CommentType.review, verdict: "changes" },
           orderBy: { createdAt: "desc" },
@@ -142,7 +121,7 @@ export async function getAgentInbox(
       include: {
         authorAgent: { select: { id: true, name: true } },
         authorUser: { select: { id: true, name: true } },
-        task: { include: { workstream: { include: { goal: true } } } },
+        task: true,
       },
       orderBy: { createdAt: "desc" },
       take: INBOX_COMMENT_LIMIT,

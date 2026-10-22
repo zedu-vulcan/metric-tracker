@@ -29,7 +29,7 @@ export function ErrorState({ digest, onRetry }: { digest?: string; onRetry: () =
             Try again
           </Button>
           <Button asChild size="lg" variant="outline">
-            <Link href="/dashboard">Back to overview</Link>
+            <Link href="/dashboard">Back to tasks</Link>
           </Button>
         </div>
         {digest && (
