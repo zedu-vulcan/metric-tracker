@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PillSelect, SearchPill, Toolbar, ToolbarGroup } from "@/components/Toolbar";
 import {
   ArrowUpRightIcon,
@@ -162,7 +163,16 @@ export function DirectoryTable({
 } = {}) {
   const { directories, isLoading, loadError, deleteDirectory, selectedDirectoryId, setSelectedDirectoryId, reportError } =
     useDirectories();
-  const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const initialQuery = (searchParams.get("q") ?? "").trim().slice(0, 100);
+  const [search, setSearch] = useState(initialQuery);
+
+  useEffect(() => {
+    const q = (searchParams.get("q") ?? "").trim().slice(0, 100);
+    if (q) {
+      setSearch(q);
+    }
+  }, [searchParams]);
   const [internalStatusFilter, setInternalStatusFilter] = useState("all");
   const statusFilter = controlledStatusFilter ?? internalStatusFilter;
   const setStatusFilter = onStatusFilterChange ?? setInternalStatusFilter;
