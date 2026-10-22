@@ -19,7 +19,7 @@ export const STAGES: {
   label: string;
   badge: "info" | "warning" | "success" | "destructive" | "secondary";
 }[] = [
-  { value: "applied", label: "Applied", badge: "info" },
+  { value: "applied", label: "Bids", badge: "info" },
   { value: "offered", label: "Offered", badge: "info" },
   { value: "in_progress", label: "In progress", badge: "warning" },
   { value: "in_review", label: "In review", badge: "info" },
