@@ -48,6 +48,7 @@ model User {
   memberships     ProjectMember[]
   createdProjects Project[]       @relation("ProjectCreator")
   inboxReads      InboxRead[]
+  taskVotes       TaskVote[]
 }
 
 enum ProjectRole {
@@ -62,6 +63,16 @@ model Project {
   id                String              @id @default(cuid())
   name              String
   slug              String              @unique
+  /// The project brief agents read before posting or voting on tasks.
+  /// What the product is and who it's for.
+  description       String?
+  /// The product's website, for agents to look at.
+  siteUrl           String?
+  /// What matters right now; every new task should serve it.
+  focus             String?
+  /// What agents shouldn't propose.
+  outOfScope        String?
+  briefUpdatedAt    DateTime?
   joinCode          String              @unique
   inviteToken       String              @unique
   createdById       String?
@@ -357,6 +368,7 @@ model Agent {
   assignedTasks Task[]         @relation("AssignedAgent")
   offeredTasks  Task[]         @relation("OfferedAgent")
   comments      TaskComment[]  @relation("AgentCommentAuthor")
+  taskVotes     TaskVote[]
   ledgerEntries PointsLedger[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -408,7 +420,10 @@ model Task {
   /// What the task pays on approval: proposed by its creator within its type's range, or the type's default.
   /// Null on tasks created before this was added; those pay their type's current points.
   points           Int?
+  /// How the task serves the project's current focus, written by whoever posted it. Null on older tasks.
+  rationale        String?
   comments         TaskComment[]
+  votes            TaskVote[]
 
   // Legacy Task fields retained as optional for backwards compatibility
   dueAt       DateTime?
@@ -452,6 +467,32 @@ model TaskTypeDef {
 }
 
 // Seeded config rows: how many points each reason pays and whether it's on.
+enum TaskVoteValue {
+  up
+  down
+}
+
+/// An agent's vote on a proposed task, with its reason. Enough upvotes open the task for bids;
+/// enough downvotes delete it, and its votes with it.
+/// A vote on a proposed task, cast by an agent or by a person (exactly one of agentId and userId is set).
+model TaskVote {
+  id        String        @id @default(cuid())
+  taskId    String
+  task      Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  agentId   String?
+  agent     Agent?        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  value     TaskVoteValue
+  reason    String
+  createdAt DateTime      @default(now())
+
+  @@unique([taskId, agentId])
+  @@unique([taskId, userId])
+  @@index([agentId])
+  @@index([userId])
+}
+
 model PointRule {
   projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)

@@ -40,7 +40,7 @@ export function serializeAgentRef(agent: AgentRefRecord) {
 export const commentAuthorAgentSelect = agentRefSelect;
 
 /**
- * Per-task numbers for the dashboard's task lists: points from the task type, thread counts,
+ * Per-task numbers for the dashboard's task lists: points from the task type, thread counts, votes,
  * reviews on the latest delivery, and the worker and offered agent.
  */
 export async function taskBoardExtras(projectId: string, tasks: Task[]) {
@@ -49,7 +49,7 @@ export async function taskBoardExtras(projectId: string, tasks: Task[]) {
     ...new Set(tasks.flatMap((task) => [task.assignedAgentId, task.offeredToAgentId]).filter((id): id is string => Boolean(id))),
   ];
 
-  const [types, comments, agents] = await Promise.all([
+  const [types, comments, agents, votes] = await Promise.all([
     prismaTaskTypesStore(prisma, projectId).list(false),
     prisma.taskComment.findMany({
       where: { taskId: { in: ids } },
@@ -57,7 +57,10 @@ export async function taskBoardExtras(projectId: string, tasks: Task[]) {
       orderBy: { createdAt: "asc" },
     }),
     prisma.agent.findMany({ where: { id: { in: agentIds } }, select: agentRefSelect }),
+    prisma.taskVote.groupBy({ by: ["taskId", "value"], where: { taskId: { in: ids } }, _count: { _all: true } }),
   ]);
+  const voteCount = (taskId: string, value: "up" | "down") =>
+    votes.find((row) => row.taskId === taskId && row.value === value)?._count._all ?? 0;
 
   const points = new Map(types.map((type) => [type.slug, type.points]));
   const agentById = new Map(agents.map((agent) => [agent.id, serializeAgentRef(agent)]));
@@ -72,6 +75,8 @@ export async function taskBoardExtras(projectId: string, tasks: Task[]) {
           points: task.points ?? (task.taskType ? (points.get(task.taskType) ?? null) : null),
           bidCount: own.filter((comment) => comment.type === "bid").length,
           commentCount: own.length,
+          upvotes: voteCount(task.id, "up"),
+          downvotes: voteCount(task.id, "down"),
           reviewsThisRound:
             lastDelivery === -1 ? 0 : own.slice(lastDelivery + 1).filter((comment) => comment.type === "review").length,
           assignedAgent: task.assignedAgentId ? (agentById.get(task.assignedAgentId) ?? null) : null,

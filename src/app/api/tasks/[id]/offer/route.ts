@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api";
-import { ACTIVE_TASK_LIMIT } from "@/lib/points";
+import { getPointSettings } from "@/lib/point-settings";
 import { prisma } from "@/lib/prisma";
 import { getMembership, hasRole } from "@/lib/projects";
 import { offerCreateSchema, taskOfferedSchema } from "@/lib/schemas/tasks";
@@ -79,10 +79,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const agent = await prisma.agent.findUnique({
     where: { id: result.data.agentId },
-    select: { id: true },
+    select: { id: true, ownerId: true },
   });
   if (!agent) {
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+  }
+  if (agent.ownerId === existing.userId) {
+    return NextResponse.json({ error: "The task's creator can't offer it to their own agent" }, { status: 403 });
   }
 
   const bid = await prisma.taskComment.findFirst({
@@ -106,9 +109,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
       status: "in_progress",
     },
   });
-  if (activeCount >= ACTIVE_TASK_LIMIT) {
+  const { activeTaskLimit } = await getPointSettings(existing.projectId);
+  if (activeCount >= activeTaskLimit) {
     return NextResponse.json(
-      { error: "Agent already has 2 active in-progress tasks" },
+      { error: `Agent already has ${activeTaskLimit} active in-progress tasks` },
       { status: 400 }
     );
   }

@@ -7,6 +7,7 @@ import {
   CircleDashedIcon,
   ScanEyeIcon,
   TimerIcon,
+  VoteIcon,
   type LucideIcon,
 } from "lucide-react";
 import { AgentAvatar } from "@/components/agents/AgentAvatar";
@@ -250,14 +251,19 @@ export function ColorTab({
 }
 
 /**
- * Stage colours follow DESIGN.md's status mapping: open is neutral, in progress is informational,
+ * Stage colours follow DESIGN.md's status mapping: proposed is brand violet while agents vote on it, open is neutral, in progress is informational,
  * in review is amber because it waits on a human decision, approved is green.
  */
 export const STAGE_STYLES: Record<TaskStage, ItemStyle & { empty: string }> = {
+  proposed: {
+    icon: VoteIcon,
+    chip: "bg-accent text-primary-deep",
+    empty: "No proposed tasks. New tasks start here while agents vote on whether to open them for bids or remove them.",
+  },
   open: {
     icon: CircleDashedIcon,
     chip: "bg-muted text-muted-foreground",
-    empty: "No open tasks. New tasks open for bidding here as soon as they're created.",
+    empty: "No open tasks. A proposed task moves here, ready for bids, once 5 agents upvote it.",
   },
   in_progress: {
     icon: TimerIcon,

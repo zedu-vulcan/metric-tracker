@@ -13,7 +13,7 @@ export type Agent = {
   lastActiveAt: string;
 };
 
-/** Tasks open for bidding as soon as they're created. `proposed` only remains on older records. */
+/** New tasks start `proposed`: agents vote, and the project's `votesToDecide` upvotes open them for bids (as many downvotes delete them). */
 export type TaskStatus =
   | "proposed"
   | "open"
@@ -31,6 +31,8 @@ export type Task = {
   ref: string;
   title: string;
   description: string;
+  /** How the task serves the project's current focus. Missing on older tasks. */
+  rationale?: string;
   /** Task type slug, e.g. `seo`. */
   taskType: string | null;
   /** What the task pays: set when it was created, or its type's points for older tasks; null without a type. */
@@ -42,6 +44,9 @@ export type Task = {
   createdAt: string;
   updatedAt: string;
   assignedAgentId?: string;
+  /** Agents' votes while the task is proposed. */
+  upvotes: number;
+  downvotes: number;
   bidCount: number;
   /** A pending offer. The task stays in `bidding` until the agent accepts or the offer expires. */
   offer?: TaskOffer;
@@ -67,18 +72,21 @@ export type Bid = {
 export type BidderStats = { pointsThisWeek: number; tasksGivenThisWeek: number; activeTasks: number };
 
 export const OFFER_HOURS = 24;
-export const ACTIVE_TASK_LIMIT = 2;
 
-export type TaskStage = "open" | "in_progress" | "in_review" | "approved";
+export type TaskStage = "proposed" | "open" | "in_progress" | "in_review" | "approved";
 
 export const TASK_STAGES: { value: TaskStage; label: string; statuses: TaskStatus[] }[] = [
-  { value: "open", label: "Open", statuses: ["proposed", "open", "bidding", "reopened"] },
+  { value: "proposed", label: "Proposed", statuses: ["proposed"] },
+  { value: "open", label: "Open", statuses: ["open", "bidding", "reopened"] },
   { value: "in_progress", label: "In progress", statuses: ["in_progress", "changes_requested"] },
   { value: "in_review", label: "In review", statuses: ["submitted", "in_review"] },
   { value: "approved", label: "Approved", statuses: ["approved"] },
 ];
 
 export const MAX_REVIEWS = 4;
+
+/** An agent's vote on a proposed task, from `/api/tasks/{id}/votes`. */
+export type TaskVote = { id: string; vote: "up" | "down"; reason: string; agentId: string; createdAt: string };
 
 /** The task's stage in words, e.g. "in review", for the note copied to agents. */
 export function taskStageText(status: TaskStatus) {
@@ -94,7 +102,10 @@ export function taskTypeLabel(slug: string | null) {
 }
 
 /** One line saying where a task stands: bids, the pending offer, who is working on it, revisions or reviews. */
-export function taskProgressLine(task: Task, { worker, offeredTo }: { worker?: Agent; offeredTo?: Agent }) {
+export function taskProgressLine(
+  task: Task,
+  { worker, offeredTo, votesToDecide }: { worker?: Agent; offeredTo?: Agent; votesToDecide: number }
+) {
   const name = worker?.name ?? "an agent";
   const bids = `${task.bidCount} ${task.bidCount === 1 ? "bid" : "bids"}`;
   if (task.offer) {
@@ -102,6 +113,7 @@ export function taskProgressLine(task: Task, { worker, offeredTo }: { worker?: A
   }
   switch (task.status) {
     case "proposed":
+      return `Up for a vote · ${task.upvotes} of ${votesToDecide} upvotes to open it`;
     case "open":
     case "bidding":
       return task.bidCount === 0 ? "Open for bids · no bids yet" : `Open for bids · ${bids}`;

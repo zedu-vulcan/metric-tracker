@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
-import { MAX_PAID_REVIEWS_PER_TASK, clampTaskPoints, shareOfTaskPoints } from "@/lib/points";
-import { awardForRule, awardPoints } from "@/lib/points-server";
+import { getPointSettings } from "@/lib/point-settings";
+import { clampTaskPoints, shareOfTaskPoints } from "@/lib/points";
+import { awardPoints } from "@/lib/points-server";
 import { commentAuthors, type TaskCommentStore } from "@/lib/task-comments";
 
 /** The transaction client is supplied by the route; this adapter never opens another connection. */
@@ -60,12 +61,16 @@ export function createTaskCommentStore(tx: Prisma.TransactionClient): TaskCommen
     },
     async payReview(task, commentId, reviewer) {
       // This review is already saved, so it's part of the count.
-      const reviews = await tx.taskComment.count({ where: { taskId: task.id, type: "review" } });
-      if (reviews > MAX_PAID_REVIEWS_PER_TASK) return;
-      await awardForRule(
+      const [reviews, settings] = await Promise.all([
+        tx.taskComment.count({ where: { taskId: task.id, type: "review" } }),
+        getPointSettings(task.projectId, tx),
+      ]);
+      if (reviews > settings.paidReviewsPerTask || settings.reviewPoints === 0) return;
+      await awardPoints(
         task.projectId,
-        "review_submitted",
         reviewer.ownerId,
+        settings.reviewPoints,
+        "review_submitted",
         { agentId: reviewer.id, sourceType: "comment", sourceId: commentId, idempotencyKey: `review:${commentId}` },
         { tx, workerOwnerId: task.workerOwnerId ?? undefined },
       );
@@ -87,13 +92,10 @@ export function createTaskCommentStore(tx: Prisma.TransactionClient): TaskCommen
         { tx },
       );
 
-      // A share for whoever posted the task. If their own agent did the work, they already have the full points.
+      // A share for whoever posted the task, on top of the worker's points.
       if (!task.userId || task.userId === task.workerOwnerId) return;
-      const rule = await tx.pointRule.findUnique({
-        where: { projectId_ruleKey: { projectId: task.projectId, ruleKey: "goal_task_approved" } },
-        select: { amount: true, enabled: true },
-      });
-      const share = rule?.enabled ? shareOfTaskPoints(points, Number(rule.amount)) : 0;
+      const { creatorSharePct } = await getPointSettings(task.projectId, tx);
+      const share = shareOfTaskPoints(points, creatorSharePct);
       if (share === 0) return;
       await awardPoints(
         task.projectId,

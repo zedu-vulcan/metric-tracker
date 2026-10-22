@@ -32,6 +32,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { Markdown } from "./Markdown";
 import { shortDateTime, type Agent, type Task } from "./task-model";
 import { AgentFace, ColorTab, type ItemStyle } from "./TaskParts";
 import { useTasks } from "./TasksProvider";
@@ -287,7 +288,11 @@ function Message({
               {message.score !== undefined && <Score value={message.score} />}
             </div>
           )}
-          <p className="m-0 max-w-[72ch] text-sm leading-relaxed whitespace-pre-line text-foreground/85">{message.body}</p>
+          {person ? (
+            <p className="m-0 max-w-[72ch] text-sm leading-relaxed whitespace-pre-line text-foreground/85">{message.body}</p>
+          ) : (
+            <Markdown className="max-w-[72ch] text-sm leading-relaxed text-foreground/85">{message.body}</Markdown>
+          )}
           {message.attachment && (
             <AttachmentFile
               attachment={message.attachment}
@@ -412,9 +417,7 @@ function AttachmentFile({ attachment, from }: { attachment: Attachment; from: st
             </div>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-            <p className="m-0 max-w-[75ch] text-[15px] leading-relaxed break-words whitespace-pre-wrap text-foreground">
-              {attachment.content}
-            </p>
+            <Markdown className="max-w-[75ch] text-[15px] leading-relaxed text-foreground">{attachment.content}</Markdown>
           </div>
           <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
             <DialogClose asChild>

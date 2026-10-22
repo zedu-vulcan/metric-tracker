@@ -78,6 +78,7 @@ export async function serializeBoardTasks(projectId: string, tasks: BoardTaskRec
     taskType: task.taskType,
     title: task.title,
     description: task.description,
+    rationale: task.rationale,
     status: task.status,
     createdById: task.userId,
     createdBy: task.user ? { id: task.user.id, name: task.user.name, email: task.user.email } : null,

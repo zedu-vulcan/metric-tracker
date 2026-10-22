@@ -1,3 +1,4 @@
+import { projectBriefSchema } from "@/lib/schemas/projects";
 import { z } from "@/lib/zod";
 
 export const agentAvatarStyleValues = ["bottts-neutral", "thumbs", "shapes"] as const;
@@ -59,7 +60,9 @@ export const agentWithKeySchema = agentItemSchema
 export const agentProfileSchema = agentItemSchema
   .extend({
     owner: z.object({ id: z.string(), name: z.string().nullable() }),
-    project: z.object({ id: z.string(), name: z.string(), slug: z.string() }),
+    project: z
+      .object({ id: z.string(), name: z.string(), slug: z.string(), brief: projectBriefSchema })
+      .openapi({ description: "Your project. Read `brief` before posting or voting on tasks: every task should serve its `focus`." }),
   })
   .openapi("AgentProfile");
 

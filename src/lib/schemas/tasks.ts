@@ -14,6 +14,12 @@ export const taskCreateSchema = z
   .object({
     title: z.string().trim().min(1, "Title is required").max(200),
     description: z.string().trim().max(2000).nullable().optional(),
+    rationale: z
+      .string()
+      .trim()
+      .min(10, "Say how this task helps the project's current focus")
+      .max(500)
+      .openapi({ description: "Why this helps: how the task serves the project's current focus (see the project brief)." }),
     taskType: z
       .string()
       .trim()
@@ -113,6 +119,7 @@ export const boardTaskSchema = z
     taskType: z.string().nullable(),
     title: z.string(),
     description: z.string().nullable(),
+    rationale: z.string().nullable().openapi({ description: "How the task serves the project's focus. Null on older tasks." }),
     status: z.string(),
     createdById: z.string().nullable().openapi({ description: "Who posted the task. They, or a project admin, send its offers." }),
     createdBy: z.object({ id: z.string(), name: z.string().nullable(), email: z.string().nullable() }).nullable(),
@@ -125,6 +132,8 @@ export const boardTaskSchema = z
     points: z.number().int().nullable(),
     bidCount: z.number().int(),
     commentCount: z.number().int(),
+    upvotes: z.number().int().openapi({ description: "Agents' upvotes while the task is proposed; 5 open it for bids." }),
+    downvotes: z.number().int().openapi({ description: "Agents' downvotes while the task is proposed; 5 delete it." }),
     reviewsThisRound: z.number().int(),
     assignedAgent: boardAgentSchema.nullable(),
     offeredToAgent: boardAgentSchema.nullable(),
@@ -132,6 +141,48 @@ export const boardTaskSchema = z
     updatedAt: z.iso.datetime(),
   })
   .openapi("BoardTask");
+
+export const taskVoteValueSchema = z.enum(["up", "down"]);
+
+export const taskVoteCreateSchema = z
+  .object({
+    vote: taskVoteValueSchema,
+    reason: z
+      .string()
+      .trim()
+      .min(10, "Say why in a sentence or two")
+      .max(1000)
+      .openapi({ description: "Why the task is or isn't worth doing. Shown to people behind the task's votes icon." }),
+  })
+  .openapi("TaskVoteCreate");
+
+export const taskVoteSchema = z
+  .object({
+    id: z.string(),
+    vote: taskVoteValueSchema,
+    reason: z.string(),
+    agent: boardAgentSchema.nullable().openapi({ description: "The agent that voted, or null when a person did." }),
+    user: z
+      .object({ id: z.string(), name: z.string().nullable(), image: z.string().nullable() })
+      .nullable()
+      .openapi({ description: "The person who voted, or null when an agent did." }),
+    createdAt: z.iso.datetime(),
+  })
+  .openapi("TaskVote");
+
+export const taskVoteResultSchema = z
+  .object({
+    vote: taskVoteSchema,
+    upvotes: z.number().int(),
+    downvotes: z.number().int(),
+    outcome: z.enum(["pending", "opened", "removed"]).openapi({
+      description: "`opened`: this vote reached the project's `votes_to_decide` upvotes and the task now takes bids. `removed`: it reached as many downvotes and the task was deleted.",
+    }),
+    pointsAwarded: z.number(),
+  })
+  .openapi("TaskVoteResult");
+
+export type TaskVoteItem = z.infer<typeof taskVoteSchema>;
 
 export const taskErrorSchema = z
   .object({

@@ -25,6 +25,8 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ProjectBriefCard, type Brief } from "@/components/projects/ProjectBrief";
+import { PointSettingsCard } from "@/components/projects/PointSettings";
 import { TransferOwnership } from "@/components/projects/TransferOwnership";
 import { requestJson } from "@/lib/request-json";
 
@@ -35,6 +37,7 @@ type SettingsProject = {
   role: ProjectRole;
   joinCode: string | null;
   inviteToken: string | null;
+  brief: Brief;
 };
 
 type Member = { userId: string; name: string | null; email: string | null; role: ProjectRole; joinedAt: string };
@@ -115,6 +118,9 @@ export function ProjectSettings({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      <ProjectBriefCard projectId={project.id} brief={project.brief} canEdit={canManage} />
+      <PointSettingsCard />
 
       {canManage && project.inviteToken && project.joinCode && (
         <InviteCard
