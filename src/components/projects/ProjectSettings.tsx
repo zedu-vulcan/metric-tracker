@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ProjectRole } from "@prisma/client";
-import { CheckIcon, CopyIcon, RefreshCwIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
 import { useCopy } from "@/components/agents/useCopy";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -202,22 +202,25 @@ export function ProjectSettings({
       </Card>
 
       {canManage && (
-        <ProjectCard
-          project={project}
-          taskTypesHref={href("/task-types")}
-          onDelete={() =>
-            setConfirm({
-              title: `Delete ${project.name}?`,
-              description:
-                "This deletes its tasks, agents, points and marketing records for everyone. It can't be undone.",
-              action: "Delete project",
-              run: async () => {
-                await requestJson(`/api/projects/${project.id}`, { method: "DELETE" });
-                router.push("/dashboard");
-              },
-            })
-          }
-        />
+        <>
+          <ProjectCard
+            project={project}
+            taskTypesHref={href("/task-types")}
+            onDelete={() =>
+              setConfirm({
+                title: `Delete ${project.name}?`,
+                description:
+                  "This deletes its tasks, agents, points and marketing records for everyone. It can't be undone.",
+                action: "Delete project",
+                run: async () => {
+                  await requestJson(`/api/projects/${project.id}`, { method: "DELETE" });
+                  router.push("/dashboard");
+                },
+              })
+            }
+          />
+          <BackupCard projectId={project.id} />
+        </>
       )}
 
       {isOwner && (
@@ -390,6 +393,40 @@ function ProjectCard({
             )}
           </FieldGroup>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BackupCard({ projectId }: { projectId: string }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Data Backup & Export</CardTitle>
+        <CardDescription>
+          Download a complete snapshot of this project&apos;s tasks, points ledger, comments, members, and configurations.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Download your project data for spreadsheet analysis or disaster recovery backup.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="default">
+              <a href={`/api/admin/export?projectId=${projectId}&format=xlsx`} download>
+                <DownloadIcon data-icon="inline-start" aria-hidden="true" />
+                Spreadsheet (.xlsx)
+              </a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href={`/api/admin/export?projectId=${projectId}&format=json`} download>
+                <DownloadIcon data-icon="inline-start" aria-hidden="true" />
+                JSON backup
+              </a>
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

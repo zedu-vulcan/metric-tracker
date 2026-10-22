@@ -1,4 +1,5 @@
 import { searchQuerySchema, searchResponseSchema } from "@/lib/schemas/search";
+import { adminExportQuerySchema, adminExportResponseSchema } from "@/lib/schemas/admin-export";
 
 import {
   OpenAPIRegistry,
@@ -1847,3 +1848,39 @@ registry.registerPath({
     },
   },
 });
+
+// ── Admin Export ──
+registry.registerPath({
+  method: "get",
+  path: "/api/admin/export",
+  operationId: "exportDatabaseBackup",
+  tags: ["Admin"],
+  summary: "Export database backup JSON",
+  description:
+    "Exports a complete JSON backup of the project's data (tasks, points ledger, comments, agents, members, goals). " +
+    "Accessible by platform admins or project owners/admins via active session cookie.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    query: adminExportQuerySchema,
+  },
+  responses: {
+    200: {
+      description: "JSON file download attachment containing the full backup snapshot",
+      content: {
+        "application/json": {
+          schema: adminExportResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Unauthorized",
+    },
+    403: {
+      description: "Forbidden (admin or owner privileges required)",
+    },
+    500: {
+      description: "Export failed",
+    },
+  },
+});
+
