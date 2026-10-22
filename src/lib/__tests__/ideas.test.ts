@@ -50,6 +50,7 @@ describe("Ideas Validation, Serialization & OpenAPI", () => {
     const now = new Date("2026-10-20T12:00:00.000Z");
     const mockRecord: IdeaRecord = {
       id: "ws-idea-1",
+      number: 7,
       goalId: "goal-1",
       title: "Automate Directory Submissions",
       description: "Pitch 50 SaaS directories automatically",

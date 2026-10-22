@@ -75,6 +75,7 @@ export const ideaUpvoteSchema = z
 export const ideaItemSchema = z
   .object({
     id: z.string(),
+    ref: z.string().openapi({ description: "Short reference to paste to agents, e.g. I-7." }),
     goalId: z.string(),
     title: z.string(),
     description: z.string().nullable(),

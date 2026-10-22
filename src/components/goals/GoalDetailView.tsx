@@ -2,9 +2,9 @@
 
 import { useProject } from "@/components/projects/ProjectProvider";
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { ArrowRightIcon, CheckIcon, LayersIcon, LightbulbIcon, TargetIcon, ThumbsDownIcon, ThumbsUpIcon, XIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
+import { CopyRef } from "./CopyRef";
 import { DeleteGoalButton } from "./DeleteGoalButton";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -13,9 +13,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { goalTypeLabel, shortDate, summarizeTasks, DOWNVOTES_TO_REMOVE, UPVOTES_TO_PROMOTE, type Agent, type Idea } from "./goal-model";
+import {
+  goalTypeLabel,
+  ideaStatusText,
+  shortDate,
+  summarizeTasks,
+  DOWNVOTES_TO_REMOVE,
+  UPVOTES_TO_PROMOTE,
+  type Agent,
+  type Goal,
+  type Idea,
+} from "./goal-model";
 import {
   BackLink,
+  CardLink,
   GoalPageLoading,
   ByAgent,
   CardStack,
@@ -115,7 +126,12 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
       <PageHeader
         title={goal.title}
         description={goal.description || undefined}
-        actions={<DeleteGoalButton goal={goal} />}
+        actions={
+          <>
+            <CopyRef kind="goal" refText={goal.ref} title={goal.title} labelled />
+            <DeleteGoalButton goal={goal} />
+          </>
+        }
         className="pt-2"
       />
 
@@ -156,13 +172,12 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
                   const work = summarizeTasks(workstream.taskStatuses);
                   return (
                     <li key={workstream.id}>
-                      <Link
-                        href={href(`/goals/${goal.id}/workstreams/${workstream.id}`)}
-                        className={cn(ITEM_CARD, ITEM_LINK, "flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-10")}
-                      >
+                      <div className={cn(ITEM_CARD, ITEM_LINK, "relative flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-10")}>
+                        <CardLink href={href(`/goals/${goal.id}/workstreams/${workstream.id}`)} label={workstream.title} />
                         <ItemHeading style={KINDS.workstream} title={workstream.title} interactive>
                           {workstream.description && <Description>{workstream.description}</Description>}
-                          <p className="m-0 text-[13px] text-muted-foreground tabular-nums">
+                          <p className="m-0 flex flex-wrap items-center gap-x-1 gap-y-1.5 text-[13px] text-muted-foreground tabular-nums">
+                            <IdeaRef idea={workstream} goal={goal} className="mr-1.5" />
                             <span className="font-semibold text-foreground">{work.openTasks} open</span> ·{" "}
                             {work.activeTasks} in progress · from {agentFor(workstream.agentId)?.name ?? "an agent"}&rsquo;s
                             idea{!workstream.decidedBy && workstream.upvotes.length >= UPVOTES_TO_PROMOTE && ", promoted by upvotes"}
@@ -177,7 +192,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
                             aria-hidden="true"
                           />
                         </div>
-                      </Link>
+                      </div>
                     </li>
                   );
                 })}
@@ -214,7 +229,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
                     Boolean(agent?.ownerName && agent.ownerName === currentUser.name);
 
                   return (
-                    <IdeaCard key={idea.id} idea={idea} agentFor={agentFor}>
+                    <IdeaCard key={idea.id} idea={idea} goal={goal} agentFor={agentFor}>
                       {canDecide ? (
                         <div className="flex shrink-0 items-center gap-2">
                           <Button variant="outline" onClick={() => setRejecting(idea)} disabled={approving === idea.id}>
@@ -250,7 +265,7 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
             <RejectedToggle count={rejected.length}>
               <CardStack>
                 {rejected.map((idea) => (
-                  <IdeaCard key={idea.id} idea={idea} agentFor={agentFor} />
+                  <IdeaCard key={idea.id} idea={idea} goal={goal} agentFor={agentFor} />
                 ))}
               </CardStack>
             </RejectedToggle>
@@ -267,12 +282,27 @@ export function GoalDetailView({ goalId }: { goalId: string }) {
   );
 }
 
+function IdeaRef({ idea, goal, className }: { idea: Idea; goal: Goal; className?: string }) {
+  return (
+    <CopyRef
+      kind="idea"
+      refText={idea.ref}
+      title={idea.title}
+      status={ideaStatusText(idea.status)}
+      parent={{ label: "Goal", ref: goal.ref, title: goal.title }}
+      className={className}
+    />
+  );
+}
+
 function IdeaCard({
   idea,
+  goal,
   agentFor,
   children,
 }: {
   idea: Idea;
+  goal: Goal;
   agentFor: (agentId: string) => Agent | undefined;
   children?: React.ReactNode;
 }) {
@@ -284,7 +314,10 @@ function IdeaCard({
     <li className={cn(ITEM_CARD, "flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-8")}>
       <ItemHeading style={rejected ? KINDS.rejected : KINDS.idea} title={idea.title} muted={rejected}>
         {idea.description && <Description>{idea.description}</Description>}
-        <ByAgent agent={agent} at={idea.proposedAt} />
+        <div className="flex flex-wrap items-center gap-2">
+          <IdeaRef idea={idea} goal={goal} />
+          <ByAgent agent={agent} at={idea.proposedAt} />
+        </div>
         <Votes idea={idea} agentFor={agentFor} />
         {rejected && (
           <p className="m-0 mt-2 max-w-[68ch] self-start rounded-xl bg-destructive-muted px-3.5 py-2.5 text-[13px] text-foreground">

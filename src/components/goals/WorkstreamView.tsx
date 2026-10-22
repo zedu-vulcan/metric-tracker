@@ -2,16 +2,26 @@
 
 import { useProject } from "@/components/projects/ProjectProvider";
 import { useEffect, useMemo } from "react";
-import Link from "next/link";
 import { ArrowRightIcon, FolderTreeIcon, LayersIcon, MessageSquareIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TASK_STAGES, shortDate, summarizeTasks, taskProgressLine, taskTypeLabel, type Task } from "./goal-model";
+import { CopyRef } from "./CopyRef";
+import {
+  TASK_STAGES,
+  ideaStatusText,
+  shortDate,
+  summarizeTasks,
+  taskProgressLine,
+  taskStageText,
+  taskTypeLabel,
+  type Task,
+} from "./goal-model";
 import {
   BackLink,
+  CardLink,
   GoalPageLoading,
   CardStack,
   ColorTab,
@@ -76,7 +86,21 @@ export function WorkstreamView({ goalId, workstreamId }: { goalId: string; works
   return (
     <>
       <BackLink href={href(`/goals/${goal.id}`)} label={goal.title} />
-      <PageHeader title={workstream.title} description={workstream.description || undefined} className="pt-2" />
+      <PageHeader
+        title={workstream.title}
+        description={workstream.description || undefined}
+        actions={
+          <CopyRef
+            kind="idea"
+            refText={workstream.ref}
+            title={workstream.title}
+            status={ideaStatusText(workstream.status)}
+            parent={{ label: "Goal", ref: goal.ref, title: goal.title }}
+            labelled
+          />
+        }
+        className="pt-2"
+      />
 
       <PageContent>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
@@ -132,6 +156,7 @@ export function WorkstreamView({ goalId, workstreamId }: { goalId: string; works
                       <TaskCard
                         key={task.id}
                         task={task}
+                        workstream={{ ref: workstream.ref, title: workstream.title }}
                         style={STAGE_STYLES[stage.value]}
                         href={href(`/goals/${goal.id}/workstreams/${workstream.id}/tasks/${task.id}`)}
                         progress={taskProgressLine(task, {
@@ -151,17 +176,34 @@ export function WorkstreamView({ goalId, workstreamId }: { goalId: string; works
   );
 }
 
-function TaskCard({ task, style, progress, href }: { task: Task; style: ItemStyle; progress: string; href: string }) {
+function TaskCard({
+  task,
+  workstream,
+  style,
+  progress,
+  href,
+}: {
+  task: Task;
+  workstream: { ref: string; title: string };
+  style: ItemStyle;
+  progress: string;
+  href: string;
+}) {
   const comments = `${task.commentCount} ${task.commentCount === 1 ? "comment" : "comments"}`;
 
   return (
     <li>
-      <Link
-        href={href}
-        className={cn(ITEM_CARD, ITEM_LINK, "flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8")}
-      >
+      <div className={cn(ITEM_CARD, ITEM_LINK, "relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8")}>
+        <CardLink href={href} label={task.title} />
         <ItemHeading style={style} title={task.title} interactive>
           <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px] text-muted-foreground">
+            <CopyRef
+              kind="task"
+              refText={task.ref}
+              title={task.title}
+              status={taskStageText(task.status)}
+              parent={{ label: "Workstream", ref: workstream.ref, title: workstream.title }}
+            />
             {task.status === "changes_requested" && <Badge variant="warning">Changes requested</Badge>}
             <span>{progress}</span>
           </p>
@@ -185,7 +227,7 @@ function TaskCard({ task, style, progress, href }: { task: Task; style: ItemStyl
             aria-hidden="true"
           />
         </div>
-      </Link>
+      </div>
     </li>
   );
 }

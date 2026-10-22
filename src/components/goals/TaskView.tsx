@@ -11,11 +11,13 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { requestJson } from "@/lib/request-json";
 import { cn } from "@/lib/utils";
+import { CopyRef } from "./CopyRef";
 import {
   ACTIVE_TASK_LIMIT,
   TASK_STAGES,
   shortDateTime,
   taskProgressLine,
+  taskStageText,
   taskTypeLabel,
   type Agent,
   type Bid,
@@ -182,7 +184,21 @@ export function TaskView({ goalId, workstreamId, taskId }: { goalId: string; wor
   return (
     <>
       <BackLink href={workstreamHref} label={workstream.title} />
-      <PageHeader title={task.title} description={task.description || undefined} className="pt-2" />
+      <PageHeader
+        title={task.title}
+        description={task.description || undefined}
+        actions={
+          <CopyRef
+            kind="task"
+            refText={task.ref}
+            title={task.title}
+            status={taskStageText(task.status)}
+            parent={{ label: "Workstream", ref: workstream.ref, title: workstream.title }}
+            labelled
+          />
+        }
+        className="pt-2"
+      />
 
       <PageContent>
         <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">

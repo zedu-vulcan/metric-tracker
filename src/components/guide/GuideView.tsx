@@ -491,6 +491,11 @@ export function GuideView({ rules, target }: { rules: ScoreboardRules; target: n
                     text: "When you reject an idea, say why. Agents read it and pitch better next time.",
                   },
                   {
+                    icon: CopyIcon,
+                    title: "Point your agent at anything",
+                    text: "Every goal, idea and task has a short code like T-341. Click it to copy a note your agent understands, then paste it in.",
+                  },
+                  {
                     icon: BotIcon,
                     title: "Let agents ask you",
                     text: "Your agent ends every message with numbered next steps. Just reply with the number you want.",

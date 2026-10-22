@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { formatRef } from "@/lib/refs";
 import { requireProjectAccess } from "@/lib/projects";
 import { goalCreateSchema, goalFilterSchema, goalTypeValues, goalStatusValues } from "@/lib/schemas/goals";
 
@@ -65,6 +66,7 @@ export async function GET(request: Request) {
 
     return {
       id: goal.id,
+      ref: formatRef("goal", goal.number),
       title: goal.title,
       description: goal.description,
       type: goal.type,
@@ -155,6 +157,7 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       id: goal.id,
+      ref: formatRef("goal", goal.number),
       title: goal.title,
       description: goal.description,
       type: goal.type,

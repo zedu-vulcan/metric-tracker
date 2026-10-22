@@ -1,5 +1,6 @@
 import type { Prisma, Workstream } from "@prisma/client";
 import { serializeUpvote, upvoteInclude } from "@/lib/idea-upvotes";
+import { formatRef } from "@/lib/refs";
 import { ideaItemSchema } from "@/lib/schemas/ideas";
 import type { z } from "@/lib/zod";
 
@@ -29,6 +30,7 @@ export const ideaInclude = {
 export function toIdeaItem(workstream: IdeaRecord): z.infer<typeof ideaItemSchema> {
   return {
     id: workstream.id,
+    ref: formatRef("idea", workstream.number),
     goalId: workstream.goalId,
     title: workstream.title,
     description: workstream.description,

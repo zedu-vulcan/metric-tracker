@@ -20,6 +20,7 @@ export type NewGoal = { title: string; type: GoalType; description: string };
 /** A goal as `/api/goals` returns it. */
 type ApiGoal = {
   id: string;
+  ref: string;
   title: string;
   description: string | null;
   type: GoalType;
@@ -37,6 +38,7 @@ const NO_COUNTS: GoalCounts = { pendingIdeas: 0, workstreams: 0, totalTasks: 0, 
 function toGoal(goal: ApiGoal): Goal {
   return {
     id: goal.id,
+    ref: goal.ref,
     title: goal.title,
     type: goal.type,
     description: goal.description ?? "",
@@ -80,6 +82,7 @@ function toAgent(agent: ApiAgentRef, fallbackActiveAt: string): Agent {
 /** An idea (a workstream record) as `/api/goals/{id}` and the idea routes return it. */
 type ApiIdea = {
   id: string;
+  ref: string;
   goalId: string;
   title: string;
   description: string | null;
@@ -105,6 +108,7 @@ type ApiGoalDetail = { acceptedWorkstreams: ApiIdea[]; pendingIdeas: ApiIdea[]; 
 function toIdea(idea: ApiIdea): Idea {
   return {
     id: idea.id,
+    ref: idea.ref,
     goalId: idea.goalId,
     agentId: idea.proposedByAgentId ?? "",
     title: idea.title,
@@ -124,6 +128,7 @@ function toIdea(idea: ApiIdea): Idea {
 /** A task as `/api/workstreams/{id}` returns it, with the board numbers merged in. */
 type ApiTask = {
   id: string;
+  ref: string;
   workstreamId: string | null;
   taskType: string | null;
   title: string;
@@ -154,6 +159,7 @@ function toTask(task: ApiTask, workstreamId: string): Task {
       : undefined;
   return {
     id: task.id,
+    ref: task.ref,
     workstreamId,
     title: task.title,
     description: task.description ?? "",

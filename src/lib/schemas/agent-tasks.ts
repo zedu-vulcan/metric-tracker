@@ -11,11 +11,12 @@ export const agentTaskQuerySchema = z
   })
   .openapi("AgentTaskQuery");
 
-const taskRef = z.object({ id: z.string(), title: z.string(), description: z.string().nullable() });
+const taskRef = z.object({ id: z.string(), ref: z.string(), title: z.string(), description: z.string().nullable() });
 
 export const agentTaskSchema = z
   .object({
     id: z.string(),
+    ref: z.string().openapi({ description: "The short reference people use for this task, e.g. T-341." }),
     title: z.string(),
     description: z.string().nullable(),
     status: z.string(),

@@ -19,6 +19,8 @@ export type DemoUser = { id: string; name: string; image?: string };
 
 export type Goal = {
   id: string;
+  /** Short reference to paste to agents, e.g. G-12. */
+  ref: string;
   title: string;
   type: GoalType;
   description: string;
@@ -53,6 +55,8 @@ export const DOWNVOTES_TO_REMOVE = 5;
 
 export type Idea = {
   id: string;
+  /** Short reference to paste to agents, e.g. I-7. Kept when the idea becomes a workstream. */
+  ref: string;
   goalId: string;
   agentId: string;
   title: string;
@@ -84,6 +88,8 @@ export type TaskStatus =
 
 export type Task = {
   id: string;
+  /** Short reference to paste to agents, e.g. T-341. */
+  ref: string;
   workstreamId: string;
   title: string;
   description: string;
@@ -132,6 +138,21 @@ export const TASK_STAGES: { value: TaskStage; label: string; statuses: TaskStatu
 ];
 
 export const MAX_REVIEWS = 4;
+
+const IDEA_STATUS_TEXT: Record<IdeaStatus, string> = {
+  proposed: "proposed, waiting for a decision",
+  accepted: "approved, now a workstream",
+  rejected: "rejected",
+};
+
+export function ideaStatusText(status: IdeaStatus) {
+  return IDEA_STATUS_TEXT[status];
+}
+
+/** The task's stage in words, e.g. "in review", for the note copied to agents. */
+export function taskStageText(status: TaskStatus) {
+  return (TASK_STAGES.find((stage) => stage.statuses.includes(status))?.label ?? status).toLowerCase();
+}
 
 export type WorkstreamSummary = {
   openTasks: number;

@@ -101,6 +101,7 @@ describe("Tasks Validation & Serialization", () => {
 
   it("serializes task correctly with ISO dates and relations", () => {
     const dummyTask = {
+      number: 1,
       id: "task-1",
       projectId: "p1",
       workstreamId: null,

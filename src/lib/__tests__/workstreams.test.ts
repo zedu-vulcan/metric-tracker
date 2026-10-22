@@ -61,6 +61,7 @@ describe("Workstreams Validation, Serialization & OpenAPI", () => {
   it("serializes workstream item, detail, and auto-accept response accurately", () => {
     const now = new Date("2026-10-20T12:00:00.000Z");
     const dummyWorkstream = {
+      number: 1,
       id: "ws-1",
       goalId: "goal-1",
       title: "On-page SEO",
@@ -95,6 +96,7 @@ describe("Workstreams Validation, Serialization & OpenAPI", () => {
       tasks: [
         {
           id: "task-101",
+          number: 1,
           projectId: "p1",
           workstreamId: "ws-1",
           taskType: "seo",

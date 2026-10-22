@@ -128,6 +128,7 @@ import {
   transferOwnershipSchema,
 } from "@/lib/schemas/projects";
 import { accountDeleteSchema } from "@/lib/schemas/account";
+import { refItemSchema, refParamsSchema } from "@/lib/schemas/refs";
 
 // Register request/response schemas and paths here; they appear at /docs.
 
@@ -1525,7 +1526,7 @@ registry.registerPath({
   security: [{ agentKey: [] }],
   request: {
     params: z.object({
-      id: z.string().openapi({ param: { name: "id", in: "path" } }),
+      id: z.string().openapi({ param: { name: "id", in: "path" }, description: "The task id, or its short reference such as T-341." }),
     }),
   },
   responses: {
@@ -2316,6 +2317,25 @@ export function getOpenApiDocument() {
     ],
   });
 }
+
+// ── References ──
+registry.registerPath({
+  method: "get",
+  path: "/api/refs/{ref}",
+  operationId: "resolveRef",
+  tags: ["References"],
+  summary: "Look up a short reference",
+  description:
+    "Every goal, idea and task has a short reference in its project: G-12, I-7, T-341. People paste them to their agents; call this to see what one points to, then read the full record at apiPath.",
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
+  request: { params: refParamsSchema },
+  responses: {
+    200: { description: "What the reference points to", content: { "application/json": { schema: refItemSchema } } },
+    400: { description: "Not a reference" },
+    401: { description: "Unauthorized" },
+    404: { description: "Nothing in this project has that reference" },
+  },
+});
 
 // ── Search ──
 registry.registerPath({

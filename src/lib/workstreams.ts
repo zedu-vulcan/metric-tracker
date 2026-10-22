@@ -1,4 +1,5 @@
 import type { Agent, Goal, Task, User, Workstream } from "@prisma/client";
+import { formatRef } from "@/lib/refs";
 
 export type WorkstreamWithListRelations = Workstream & {
   goal: Pick<Goal, "id" | "title" | "type" | "status">;
@@ -22,6 +23,7 @@ export type WorkstreamWithDetailRelations = Workstream & {
 export function serializeWorkstreamTask(task: Task) {
   return {
     id: task.id,
+    ref: formatRef("task", task.number),
     workstreamId: task.workstreamId,
     taskType: task.taskType,
     title: task.title,
@@ -41,6 +43,7 @@ export function serializeWorkstreamTask(task: Task) {
 export function serializeWorkstreamItem(workstream: WorkstreamWithListRelations) {
   return {
     id: workstream.id,
+    ref: formatRef("idea", workstream.number),
     goalId: workstream.goalId,
     title: workstream.title,
     description: workstream.description,

@@ -34,6 +34,7 @@ export const goalFilterSchema = z
 export const goalItemSchema = z
   .object({
     id: z.string(),
+    ref: z.string().openapi({ description: "Short reference to paste to agents, e.g. G-12." }),
     title: z.string(),
     description: z.string().nullable(),
     type: goalTypeSchema,
@@ -75,6 +76,7 @@ export const goalItemSchema = z
 export const goalWorkstreamSchema = z
   .object({
     id: z.string(),
+    ref: z.string().openapi({ description: "Short reference to paste to agents, e.g. I-7." }),
     goalId: z.string(),
     title: z.string(),
     description: z.string().nullable(),
@@ -117,6 +119,7 @@ export const goalWorkstreamSchema = z
 export const goalDetailSchema = z
   .object({
     id: z.string(),
+    ref: z.string().openapi({ description: "Short reference to paste to agents, e.g. G-12." }),
     title: z.string(),
     description: z.string().nullable(),
     type: goalTypeSchema,

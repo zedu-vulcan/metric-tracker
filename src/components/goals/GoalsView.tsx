@@ -2,7 +2,6 @@
 
 import { useProject } from "@/components/projects/ProjectProvider";
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRightIcon, PlusIcon, TargetIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
@@ -20,9 +19,10 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CopyRef } from "./CopyRef";
 import { GOAL_TYPES, goalTypeLabel, type Goal, type GoalCounts } from "./goal-model";
 import { GoalFormDialog } from "./GoalFormDialog";
-import { OwnerAvatar, TaskProgress } from "./GoalParts";
+import { CardLink, OwnerAvatar, TaskProgress } from "./GoalParts";
 import { useGoals } from "./GoalsProvider";
 
 export function GoalsView() {
@@ -178,19 +178,20 @@ function GoalCard({
 
   return (
     <li className="flex">
-      <Link
-        href={href(`/goals/${goal.id}`)}
-        className="group/goal flex w-full flex-col gap-5 rounded-[22px] border border-border bg-card p-5 text-inherit no-underline transition-colors duration-150 outline-none hover:border-border-strong focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
+      <div className="group/goal relative flex w-full flex-col gap-5 rounded-[22px] border border-border bg-card p-5 transition-colors duration-150 hover:border-border-strong">
+        <CardLink href={href(`/goals/${goal.id}`)} label={goal.title} />
         <div className="flex flex-col gap-1.5">
           <div className="flex items-start justify-between gap-4">
             <h3 className="m-0 line-clamp-2 text-lg leading-snug font-bold tracking-[-0.02em] text-balance text-foreground transition-colors group-hover/goal:text-primary-deep">
               {goal.title}
             </h3>
-            <ArrowRightIcon
-              className="mt-1 size-4 shrink-0 text-muted-foreground transition-[color,translate] duration-150 group-hover/goal:translate-x-0.5 group-hover/goal:text-primary-deep"
-              aria-hidden="true"
-            />
+            <div className="flex shrink-0 items-center gap-2">
+              <CopyRef kind="goal" refText={goal.ref} title={goal.title} />
+              <ArrowRightIcon
+                className="size-4 shrink-0 text-muted-foreground transition-[color,translate] duration-150 group-hover/goal:translate-x-0.5 group-hover/goal:text-primary-deep"
+                aria-hidden="true"
+              />
+            </div>
           </div>
           {goal.description && (
             <p className="m-0 line-clamp-2 max-w-[60ch] text-sm leading-relaxed text-muted-foreground">{goal.description}</p>
@@ -213,7 +214,7 @@ function GoalCard({
             <span className="text-[13px] text-muted-foreground">{plural(summary.pendingIdeas, "idea")} proposed</span>
           ) : null}
         </div>
-      </Link>
+      </div>
     </li>
   );
 }

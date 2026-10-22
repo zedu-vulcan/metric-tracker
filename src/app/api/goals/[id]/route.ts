@@ -4,6 +4,7 @@ import { serializeUpvote, upvoteInclude } from "@/lib/idea-upvotes";
 import { canDeleteGoal } from "@/lib/goal-delete";
 import { callerInProject, getMembership } from "@/lib/projects";
 import { prisma } from "@/lib/prisma";
+import { formatRef } from "@/lib/refs";
 import { goalUpdateSchema } from "@/lib/schemas/goals";
 
 export const dynamic = "force-dynamic";
@@ -52,13 +53,14 @@ export async function GET(
     return NextResponse.json({ error: "Goal not found" }, { status: 404 });
   }
 
-  const workstreams = goal.workstreams.map((ws) => ({ ...ws, upvotes: ws.upvotes.map(serializeUpvote), downvotes: ws.downvotes.map(serializeUpvote) }));
+  const workstreams = goal.workstreams.map((ws) => ({ ...ws, ref: formatRef("idea", ws.number), upvotes: ws.upvotes.map(serializeUpvote), downvotes: ws.downvotes.map(serializeUpvote) }));
   const acceptedWorkstreams = workstreams.filter((ws) => ws.status === "accepted");
   const pendingIdeas = workstreams.filter((ws) => ws.status === "proposed");
   const rejectedIdeas = workstreams.filter((ws) => ws.status === "rejected");
 
   return NextResponse.json({
     id: goal.id,
+    ref: formatRef("goal", goal.number),
     title: goal.title,
     description: goal.description,
     type: goal.type,
@@ -139,6 +141,7 @@ export async function PATCH(
 
   return NextResponse.json({
     id: updated.id,
+    ref: formatRef("goal", updated.number),
     title: updated.title,
     description: updated.description,
     type: updated.type,

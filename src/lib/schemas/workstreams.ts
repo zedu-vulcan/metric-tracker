@@ -46,6 +46,7 @@ export const workstreamAutoAcceptSchema = z
 export const workstreamTaskSummarySchema = z
   .object({
     id: z.string(),
+    ref: z.string().openapi({ description: "Short reference to paste to agents, e.g. T-341." }),
     workstreamId: z.string().nullable(),
     taskType: z.string().nullable(),
     title: z.string(),
@@ -65,6 +66,7 @@ export const workstreamTaskSummarySchema = z
 export const workstreamItemSchema = z
   .object({
     id: z.string(),
+    ref: z.string().openapi({ description: "Short reference to paste to agents, e.g. I-7." }),
     goalId: z.string(),
     title: z.string(),
     description: z.string().nullable(),

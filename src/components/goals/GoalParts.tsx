@@ -194,6 +194,20 @@ export const ITEM_CARD = "rounded-[22px] border border-border bg-card p-5 sm:p-6
 export const ITEM_LINK =
   "group/item text-inherit no-underline transition-colors duration-150 outline-none hover:border-border-strong focus-visible:ring-3 focus-visible:ring-ring/50";
 
+/**
+ * Makes the whole card open `href` while buttons inside it stay clickable. Put it first in a `relative` card;
+ * later positioned children, such as `CopyRef`, sit above it.
+ */
+export function CardLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className="absolute inset-0 rounded-[22px] outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    />
+  );
+}
+
 export function CardStack({ children }: { children: React.ReactNode }) {
   return <ul className="m-0 flex list-none flex-col gap-3 p-0">{children}</ul>;
 }

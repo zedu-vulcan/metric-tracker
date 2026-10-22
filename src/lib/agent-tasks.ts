@@ -1,6 +1,7 @@
 import type { Agent, Prisma, TaskStatus } from "@prisma/client";
 import { ACTIVE_TASK_LIMIT } from "@/lib/points";
 import { prisma } from "@/lib/prisma";
+import { formatRef, parseRef } from "@/lib/refs";
 import { prismaTaskTypesStore } from "@/lib/task-types-server";
 
 /** Peer reviews that count per delivery round (matches the cap in `task-comments`). */
@@ -16,10 +17,11 @@ const taskInclude = {
   workstream: {
     select: {
       id: true,
+      number: true,
       title: true,
       description: true,
       status: true,
-      goal: { select: { id: true, title: true, description: true, type: true, status: true } },
+      goal: { select: { id: true, number: true, title: true, description: true, type: true, status: true } },
     },
   },
   assignedAgent: { select: { id: true, name: true, ownerId: true } },
@@ -98,6 +100,7 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
 
   return {
     id: task.id,
+    ref: formatRef("task", task.number),
     title: task.title,
     description: task.description,
     status: task.status,
@@ -106,13 +109,19 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
     goal: task.workstream
       ? {
           id: task.workstream.goal.id,
+          ref: formatRef("goal", task.workstream.goal.number),
           title: task.workstream.goal.title,
           description: task.workstream.goal.description,
           type: task.workstream.goal.type,
         }
       : null,
     workstream: task.workstream
-      ? { id: task.workstream.id, title: task.workstream.title, description: task.workstream.description }
+      ? {
+          id: task.workstream.id,
+          ref: formatRef("idea", task.workstream.number),
+          title: task.workstream.title,
+          description: task.workstream.description,
+        }
       : null,
     assignedAgent: task.assignedAgent ? { id: task.assignedAgent.id, name: task.assignedAgent.name } : null,
     youAreWorker: isWorker,
@@ -183,10 +192,16 @@ export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) 
   return { activeTasks, activeTaskLimit: ACTIVE_TASK_LIMIT, tasks: workable };
 }
 
-/** One task with everything an agent needs before acting on it, or null if it isn't a workstream task. */
-export async function getAgentTask(agent: Agent, taskId: string) {
+/**
+ * One task with everything an agent needs before acting on it, or null if it isn't a workstream task.
+ * Takes the task's id or its short reference, e.g. T-341.
+ */
+export async function getAgentTask(agent: Agent, taskIdOrRef: string) {
+  const ref = parseRef(taskIdOrRef);
+  const where =
+    ref?.kind === "task" ? { projectId: agent.projectId, number: ref.number } : { id: taskIdOrRef, projectId: agent.projectId };
   const [task, points, activeTasks] = await Promise.all([
-    prisma.task.findFirst({ where: { id: taskId, projectId: agent.projectId }, include: taskInclude }),
+    prisma.task.findFirst({ where, include: taskInclude }),
     pointsBySlug(agent.projectId),
     activeTaskCount(agent.id),
   ]);
