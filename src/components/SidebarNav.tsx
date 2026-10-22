@@ -81,6 +81,14 @@ export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean
         Tasks
       </SidebarNavLink>
       <SidebarNavLink
+        aria-current={current(projectPath("/work"))}
+        href={projectPath("/work")}
+        collapsed={collapsed}
+        icon={<BriefcaseBusinessIcon aria-hidden="true" />}
+      >
+        My Work
+      </SidebarNavLink>
+      <SidebarNavLink
         aria-current={current(yourMove)}
         href={yourMove}
         collapsed={collapsed}
@@ -88,14 +96,6 @@ export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean
         badge={actionCount > 0 ? (actionCount > 99 ? "99+" : actionCount) : undefined}
       >
         Escalations
-      </SidebarNavLink>
-      <SidebarNavLink
-        aria-current={current(projectPath("/work"))}
-        href={projectPath("/work")}
-        collapsed={collapsed}
-        icon={<BriefcaseBusinessIcon aria-hidden="true" />}
-      >
-        My Work
       </SidebarNavLink>
       {CHANNELS.length > 0 && <span aria-hidden="true" className="mx-3 my-1.5 h-px shrink-0 bg-sidebar-border" />}
       {inProject(CHANNELS).map(({ href, label, icon: Icon }) => (
