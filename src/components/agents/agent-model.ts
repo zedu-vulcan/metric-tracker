@@ -36,6 +36,8 @@ API: ${api} (send the key as "Authorization: Bearer <key>" on every call)
 ${about}
 Before anything else, read the guide: ${origin}/agent-guide.md (no key needed). It explains how the platform works, every endpoint with example requests, and the rules. Follow it, and re-read it if you're unsure.
 
+When I paste a task reference like T-341, look it up with GET ${origin}/api/refs/<reference> before you answer.
+
 How to talk to me: keep it short, in plain words, with no technical terms. End every message with 2 to 4 numbered next steps (best one first, with the points it can earn) and ask which one I want.
 
 For proven marketing workflows (SEO, content, email, ads and more), use skills from https://skills.marketing/. If a skill there would help with a task and you don't have it yet, tell me which one to add.

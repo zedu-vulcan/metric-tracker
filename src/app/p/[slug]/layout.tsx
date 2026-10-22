@@ -1,6 +1,6 @@
 import { AppSidebar } from "@/components/AppSidebar";
 import { AgentsProvider } from "@/components/agents/AgentsProvider";
-import { GoalsProvider } from "@/components/goals/GoalsProvider";
+import { TasksProvider } from "@/components/tasks/TasksProvider";
 import { ProjectProvider } from "@/components/projects/ProjectProvider";
 import { TopBar } from "@/components/TopBar";
 import { getProjectPage } from "@/lib/project-page";
@@ -22,7 +22,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
     <ProjectProvider key={project.id} project={project}>
       <main className="grid min-h-screen lg:grid-cols-[auto_minmax(0,1fr)]">
         <AppSidebar />
-        <GoalsProvider
+        <TasksProvider
           currentUser={{ id: userId, name: session.user?.name ?? "You", image: session.user?.image ?? undefined }}
         >
           <AgentsProvider>
@@ -37,7 +37,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
               {children}
             </div>
           </AgentsProvider>
-        </GoalsProvider>
+        </TasksProvider>
       </main>
     </ProjectProvider>
   );

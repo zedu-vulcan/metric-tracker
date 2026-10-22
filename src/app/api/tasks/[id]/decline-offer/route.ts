@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireProjectAccess } from "@/lib/projects";
@@ -7,7 +8,7 @@ import { serializeTaskOffered } from "@/lib/tasks";
 export const dynamic = "force-dynamic";
 
 /**
- * The offered agent turns the offer down, so the goal owner can pick another bidder now instead of
+ * The offered agent turns the offer down, so the task's creator can pick another bidder now instead of
  * waiting for it to expire. The task keeps taking bids, and the reason is posted on its thread.
  */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -34,7 +35,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     );
   }
 
-  const task = await prisma.task.findFirst({ where: { id: params.id, projectId }, select: { id: true } });
+  const task = await prisma.task.findFirst({
+    where: { id: params.id, projectId },
+    select: { id: true, project: { select: { slug: true } } },
+  });
   if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const reason = parsed.data.reason;
@@ -60,5 +64,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!updated) {
     return NextResponse.json({ error: "There's no offer for you on this task" }, { status: 400 });
   }
+
+  if (task.project?.slug) {
+    revalidatePath(`/p/${task.project.slug}/work`);
+  }
+
   return NextResponse.json(taskOfferedSchema.parse(serializeTaskOffered(updated)));
 }

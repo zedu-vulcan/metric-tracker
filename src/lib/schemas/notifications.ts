@@ -1,13 +1,10 @@
 import { z } from "@/lib/zod";
 
 export const NOTIFICATION_KINDS = [
-  "idea_proposed",
   "task_proposed",
   "bids_waiting",
   "escalation",
   "offer_received",
-  "idea_accepted",
-  "idea_rejected",
   "task_approved",
   "changes_requested",
   "comment",
@@ -16,12 +13,12 @@ export const NOTIFICATION_KINDS = [
 
 export const notificationSchema = z
   .object({
-    id: z.string().openapi({ description: "Stable key for this item, e.g. `idea:<id>`; used to mark it read" }),
+    id: z.string().openapi({ description: "Stable key for this item, e.g. `bids:<id>:3`; used to mark it read" }),
     kind: z.enum(NOTIFICATION_KINDS),
     title: z.string(),
     message: z.string(),
-    href: z.string().openapi({ description: "Where to act on it, relative to the project, e.g. `/goals/<id>`" }),
-    needsAction: z.boolean().openapi({ description: "Waiting on you: an idea, task, bids or a question on a goal you own" }),
+    href: z.string().openapi({ description: "Where to act on it, relative to the project, e.g. `/tasks/<id>`" }),
+    needsAction: z.boolean().openapi({ description: "Waiting on you: bids or a question on a task you posted, or an open offer to one of your agents" }),
     createdAt: z.iso.datetime(),
     read: z.boolean(),
   })

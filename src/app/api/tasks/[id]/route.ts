@@ -3,26 +3,26 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireProjectAccess } from "@/lib/projects";
 import { taskUpdateSchema } from "@/lib/schemas/tasks";
-import { serializeTask } from "@/lib/tasks";
+import { boardTaskInclude, serializeBoardTasks, serializeTask } from "@/lib/tasks";
 
 export const dynamic = "force-dynamic";
 
+/** One task as the board shows it. People and agents. */
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const { projectId, error } = await requireProjectAccess(request, { allowAgents: false });
+  const { projectId, error } = await requireProjectAccess(request);
   if (error) return error;
 
   const task = await prisma.task.findFirst({
     where: { id: params.id, projectId },
-    include: {
-      owner: { select: { id: true, name: true, email: true } },
-    },
+    include: boardTaskInclude,
   });
 
   if (!task) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(serializeTask(task));
+  const [serialized] = await serializeBoardTasks(projectId, [task]);
+  return NextResponse.json(serialized);
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {

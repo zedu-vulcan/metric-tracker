@@ -1,61 +1,30 @@
 import { NextResponse } from "next/server";
-import type { Prisma, TaskType } from "@prisma/client";
+import { taskPointsError } from "@/lib/points";
 import { prisma } from "@/lib/prisma";
 import { requireProjectAccess } from "@/lib/projects";
-import { taskCreateSchema, taskTypeValues } from "@/lib/schemas/tasks";
-import { serializeTask } from "@/lib/tasks";
+import { taskCreateSchema } from "@/lib/schemas/tasks";
+import { boardTaskInclude, serializeBoardTasks } from "@/lib/tasks";
 
 export const dynamic = "force-dynamic";
 
+/** Every task in the project, newest first. People and agents. */
 export async function GET(request: Request) {
-  const { projectId, user, error } = await requireProjectAccess(request, { allowAgents: false });
+  const { projectId, error } = await requireProjectAccess(request);
   if (error) return error;
-
-  const userId = user?.id;
-  const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status");
-  const type = searchParams.get("type");
-  const assignedToMe = searchParams.get("assignedToMe");
-
-  const where: Prisma.TaskWhereInput = { projectId };
-
-  if (status === "open") {
-    where.done = false;
-  } else if (status === "completed") {
-    where.done = true;
-  }
-
-  if (type && (taskTypeValues as readonly string[]).includes(type)) {
-    where.type = type as TaskType;
-  }
-
-  if (userId) {
-    if (assignedToMe === "true") {
-      where.ownerId = userId;
-    } else if (assignedToMe === "false") {
-      where.OR = [{ ownerId: { not: userId } }, { ownerId: null }];
-    }
-  }
 
   const tasks = await prisma.task.findMany({
-    where,
-    include: {
-      owner: { select: { id: true, name: true, email: true } },
-    },
-    orderBy: { dueAt: "asc" },
+    where: { projectId },
+    include: boardTaskInclude,
+    orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(tasks.map(serializeTask));
+  return NextResponse.json(await serializeBoardTasks(projectId, tasks));
 }
 
+/** Post a task. It opens for bidding straight away; an agent's task is posted on behalf of its owner. */
 export async function POST(request: Request) {
-  const { projectId, user, error } = await requireProjectAccess(request, { allowAgents: false });
+  const { projectId, user, agent, error } = await requireProjectAccess(request);
   if (error) return error;
-
-  const userId = user?.id;
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   let body: unknown;
   try {
@@ -75,24 +44,49 @@ export async function POST(request: Request) {
     );
   }
 
-  const data = result.data;
-  // If assignToMe is true, automatically assign to current user. Otherwise use ownerId if provided, or null.
-  const ownerId = data.assignToMe ? userId : data.ownerId ?? null;
+  const { title, description, taskType, points } = result.data;
+
+  const knownType = await prisma.taskTypeDef.findFirst({
+    where: { projectId, slug: taskType, isActive: true },
+    select: { name: true, points: true, maxPoints: true },
+  });
+  if (!knownType) {
+    return NextResponse.json(
+      { error: "Validation failed", details: { taskType: ["Not an active task type in this project; see GET /api/task-types"] } },
+      { status: 400 }
+    );
+  }
+
+  const pointsError = points === undefined ? null : taskPointsError(points, knownType);
+  if (pointsError) {
+    return NextResponse.json({ error: "Validation failed", details: { points: [pointsError] } }, { status: 400 });
+  }
+
+  // Agents check for duplicates before posting; enforce it for exact title matches on work that's still open.
+  const duplicate = await prisma.task.findFirst({
+    where: { projectId, title: { equals: title, mode: "insensitive" }, status: { not: "approved" } },
+    select: { id: true },
+  });
+  if (duplicate) {
+    return NextResponse.json(
+      { error: "An unfinished task with that title already exists", taskId: duplicate.id },
+      { status: 409 }
+    );
+  }
 
   const task = await prisma.task.create({
     data: {
       projectId,
-      title: data.title,
-      description: data.description ?? null,
-      type: data.type,
-      dueAt: new Date(data.dueAt),
-      ownerId,
-      userId,
+      title,
+      description: description ?? null,
+      taskType,
+      points: points ?? knownType.points,
+      status: "open",
+      userId: user?.id ?? agent?.ownerId ?? null,
     },
-    include: {
-      owner: { select: { id: true, name: true, email: true } },
-    },
+    include: boardTaskInclude,
   });
 
-  return NextResponse.json(serializeTask(task), { status: 201 });
+  const [created] = await serializeBoardTasks(projectId, [task]);
+  return NextResponse.json(created, { status: 201 });
 }

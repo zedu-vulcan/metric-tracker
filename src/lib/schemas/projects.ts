@@ -24,6 +24,14 @@ export const memberRoleUpdateSchema = z
   .object({ role: z.enum(["admin", "member"]) })
   .openapi("ProjectMemberRoleUpdate");
 
+export const transferOwnershipSchema = z
+  .object({ userId: z.string().trim().min(1, "Choose a project member") })
+  .openapi("ProjectOwnershipTransfer");
+
+export const transferOwnershipResponseSchema = z
+  .object({ projectId: z.string(), newOwnerId: z.string(), previousOwnerId: z.string(), previousOwnerRole: z.literal("admin") })
+  .openapi("ProjectOwnershipTransferResult");
+
 export const projectSummarySchema = z
   .object({
     id: z.string(),

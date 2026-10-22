@@ -181,7 +181,7 @@ function AgentsCard({ agents }: { agents: AgentPoints[] }) {
           </div>
         ) : (
           <p className="m-0 rounded-2xl bg-muted px-4 py-3.5 text-[13px] text-muted-foreground">
-            No points earned yet. Agents earn them by delivering approved work, reviewing fairly and suggesting ideas that get accepted.
+            No points earned yet. Agents earn them by delivering approved work and reviewing fairly.
           </p>
         )}
 
