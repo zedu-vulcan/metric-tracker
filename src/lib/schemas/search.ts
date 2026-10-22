@@ -57,7 +57,18 @@ export type Searcher = (ctx: {
   limit: number;
 }) => Promise<SearchResult[]>;
 
+export const searchResultItemSchema = z.object({
+  type: z.enum(searchResultTypes),
+  id: z.string(),
+  title: z.string(),
+  subtitle: z.string().nullable(),
+  status: z.string().nullable(),
+  matchedField: z.string(),
+  href: z.string(),
+});
+
 export const searchResponseSchema = z.object({
   query: z.string(),
-  results: z.custom<SearchResult>().array(),
+  results: searchResultItemSchema.array(),
 });
+
