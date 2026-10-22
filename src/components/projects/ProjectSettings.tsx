@@ -399,6 +399,39 @@ function ProjectCard({
 }
 
 function BackupCard({ projectId }: { projectId: string }) {
+  const [downloadingFormat, setDownloadingFormat] = useState<"xlsx" | "json" | null>(null);
+
+  const handleDownload = async (format: "xlsx" | "json") => {
+    if (downloadingFormat) return;
+    setDownloadingFormat(format);
+    try {
+      const res = await fetch(`/api/admin/export?projectId=${projectId}&format=${format}`);
+      if (!res.ok) {
+        throw new Error(`Failed to export data: ${res.statusText}`);
+      }
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get("Content-Disposition");
+      let filename = `backup-${projectId}-${new Date().toISOString().slice(0, 10)}.${format}`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match?.[1]) filename = match[1];
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      window.location.href = `/api/admin/export?projectId=${projectId}&format=${format}`;
+    } finally {
+      setDownloadingFormat(null);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -413,17 +446,31 @@ function BackupCard({ projectId }: { projectId: string }) {
             Download your project data for spreadsheet analysis or disaster recovery backup.
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="default">
-              <a href={`/api/admin/export?projectId=${projectId}&format=xlsx`} download>
+            <Button
+              type="button"
+              variant="default"
+              disabled={downloadingFormat !== null}
+              onClick={() => handleDownload("xlsx")}
+            >
+              {downloadingFormat === "xlsx" ? (
+                <Spinner className="mr-2" />
+              ) : (
                 <DownloadIcon data-icon="inline-start" aria-hidden="true" />
-                Spreadsheet (.xlsx)
-              </a>
+              )}
+              {downloadingFormat === "xlsx" ? "Generating .xlsx..." : "Spreadsheet (.xlsx)"}
             </Button>
-            <Button asChild variant="outline">
-              <a href={`/api/admin/export?projectId=${projectId}&format=json`} download>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={downloadingFormat !== null}
+              onClick={() => handleDownload("json")}
+            >
+              {downloadingFormat === "json" ? (
+                <Spinner className="mr-2" />
+              ) : (
                 <DownloadIcon data-icon="inline-start" aria-hidden="true" />
-                JSON backup
-              </a>
+              )}
+              {downloadingFormat === "json" ? "Generating JSON..." : "JSON backup"}
             </Button>
           </div>
         </div>

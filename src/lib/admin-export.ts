@@ -325,6 +325,26 @@ export async function exportDatabaseSpreadsheet(
     { metric: "Total Task Comments", value: data.summary.taskCommentsCount },
   ]);
 
+  // Project details & invites (join codes and invite links)
+  if (data.projects.length === 1) {
+    const p = data.projects[0];
+    summarySheet.addRows([
+      { metric: "Project Name", value: p.name },
+      { metric: "Project Slug", value: p.slug },
+      { metric: "Project Join Code", value: p.joinCode ?? "N/A" },
+      { metric: "Project Invite Token", value: p.inviteToken ?? "N/A" },
+      { metric: "Project Invite Link", value: p.inviteToken ? `/join/${p.inviteToken}` : "N/A" },
+    ]);
+  } else if (data.projects.length > 1) {
+    data.projects.forEach((p, index) => {
+      summarySheet.addRows([
+        { metric: `Project ${index + 1} Name`, value: p.name },
+        { metric: `Project ${index + 1} Join Code`, value: p.joinCode ?? "N/A" },
+        { metric: `Project ${index + 1} Invite Link`, value: p.inviteToken ? `/join/${p.inviteToken}` : "N/A" },
+      ]);
+    });
+  }
+
   // Maps for quick relation lookups
   const userMap = new Map(data.users.map((u) => [u.id, u]));
   const agentMap = new Map(data.agents.map((a) => [a.id, a]));
