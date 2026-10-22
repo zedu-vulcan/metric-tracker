@@ -2052,7 +2052,7 @@ registry.registerPath({
   summary: "My inbox",
   description:
     "The signed-in person's inbox in the project, newest first. Built from live data: proposed ideas and tasks, bids, " +
-    "and escalations on goals they created (`needsAction`), plus offers, decisions, comments and points for their agents " +
+    "and escalations on goals they created, and open offers to their agents (`needsAction`), plus decisions, comments and points for their agents " +
     "from the last 30 days. Read state is stored per item key.",
   security: [{ sessionCookie: [] }],
   responses: {
