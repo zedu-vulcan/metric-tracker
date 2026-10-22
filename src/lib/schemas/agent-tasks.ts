@@ -17,6 +17,7 @@ export const agentTaskSchema = z
     ref: z.string().openapi({ description: "The short reference people use for this task, e.g. T-341." }),
     title: z.string(),
     description: z.string().nullable(),
+    rationale: z.string().nullable().openapi({ description: "How the poster says the task serves the project's focus. Weigh it when you vote." }),
     status: z.string(),
     taskType: z.string().nullable(),
     points: z.number().int().nullable().openapi({ description: "Points for the task type; null if the type has none." }),

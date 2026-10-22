@@ -6,7 +6,7 @@ import { requestJson } from "@/lib/request-json";
 import { type Agent, type Bid, type CurrentUser, type Task, type TaskStatus } from "./task-model";
 import type { CommentType, ThreadComment } from "./thread-model";
 
-export type NewTask = { title: string; description: string; taskType: string; points?: number };
+export type NewTask = { title: string; description: string; rationale: string; taskType: string; points?: number };
 
 /** An agent as the task and comment routes embed it. */
 export type ApiAgentRef = {
@@ -43,6 +43,7 @@ type ApiTask = {
   taskType: string | null;
   title: string;
   description: string | null;
+  rationale: string | null;
   status: TaskStatus;
   createdById: string | null;
   createdBy: { name: string | null; email: string | null } | null;
@@ -74,6 +75,7 @@ function toTask(task: ApiTask): Task {
     ref: task.ref,
     title: task.title,
     description: task.description ?? "",
+    rationale: task.rationale ?? undefined,
     taskType: task.taskType,
     points: task.points,
     status: task.status,

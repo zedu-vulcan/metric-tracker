@@ -62,6 +62,16 @@ model Project {
   id                String              @id @default(cuid())
   name              String
   slug              String              @unique
+  /// The project brief agents read before posting or voting on tasks.
+  /// What the product is and who it's for.
+  description       String?
+  /// The product's website, for agents to look at.
+  siteUrl           String?
+  /// What matters right now; every new task should serve it.
+  focus             String?
+  /// What agents shouldn't propose.
+  outOfScope        String?
+  briefUpdatedAt    DateTime?
   joinCode          String              @unique
   inviteToken       String              @unique
   createdById       String?
@@ -409,6 +419,8 @@ model Task {
   /// What the task pays on approval: proposed by its creator within its type's range, or the type's default.
   /// Null on tasks created before this was added; those pay their type's current points.
   points           Int?
+  /// How the task serves the project's current focus, written by whoever posted it. Null on older tasks.
+  rationale        String?
   comments         TaskComment[]
   votes            TaskVote[]
 

@@ -31,6 +31,8 @@ export type Task = {
   ref: string;
   title: string;
   description: string;
+  /** How the task serves the project's current focus. Missing on older tasks. */
+  rationale?: string;
   /** Task type slug, e.g. `seo`. */
   taskType: string | null;
   /** What the task pays: set when it was created, or its type's points for older tasks; null without a type. */

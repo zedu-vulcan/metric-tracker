@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { title, description, taskType, points } = result.data;
+  const { title, description, rationale, taskType, points } = result.data;
 
   const knownType = await prisma.taskTypeDef.findFirst({
     where: { projectId, slug: taskType, isActive: true },
@@ -82,6 +82,7 @@ export async function POST(request: Request) {
       projectId,
       title,
       description: description ?? null,
+      rationale,
       taskType,
       points: points ?? knownType.points,
       status: "proposed",

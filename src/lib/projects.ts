@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/api";
 import { DEFAULT_POINT_RULES, DEFAULT_TASK_TYPES, WEEKLY_TARGET, WEEKLY_TARGET_RULE } from "@/lib/points";
 import { prisma } from "@/lib/prisma";
+import { serializeProjectBrief, type ProjectBriefRecord } from "@/lib/project-brief";
 
 /** The header the dashboard sends with every request, naming the project it's working in. */
 export const PROJECT_HEADER = "x-project-id";
@@ -58,12 +59,18 @@ async function availableSlug(tx: Prisma.TransactionClient, name: string) {
   return `${base}-${suffix}`;
 }
 
-/** Creates a project owned by `userId`, with the default task types and point rules. */
-export async function createProject(userId: string, name: string) {
+/** Creates a project owned by `userId`, with its brief, the default task types and point rules. */
+export async function createProject(
+  userId: string,
+  { name, description, siteUrl }: { name: string; description: string; siteUrl?: string | null }
+) {
   return prisma.$transaction(async (tx) => {
     const project = await tx.project.create({
       data: {
         name,
+        description,
+        siteUrl: siteUrl ?? null,
+        briefUpdatedAt: new Date(),
         slug: await availableSlug(tx, name),
         joinCode: generateJoinCode(),
         inviteToken: generateInviteToken(),
@@ -185,7 +192,7 @@ export async function requireProjectAccess(
   return { error: null, projectId: target, user: auth.user, role: membership.role, agent: null };
 }
 
-type ProjectRecord = { id: string; name: string; slug: string; joinCode: string; inviteToken: string; createdAt: Date };
+type ProjectRecord = { id: string; name: string; slug: string; joinCode: string; inviteToken: string; createdAt: Date } & ProjectBriefRecord;
 
 /** A project as its members see it; the join code and invite token only go to owners and admins. */
 export function serializeProject(project: ProjectRecord, role: ProjectRole, memberCount: number) {
@@ -198,6 +205,7 @@ export function serializeProject(project: ProjectRecord, role: ProjectRole, memb
     memberCount,
     joinCode: manager ? project.joinCode : null,
     inviteToken: manager ? project.inviteToken : null,
+    brief: serializeProjectBrief(project),
     createdAt: project.createdAt.toISOString(),
   };
 }

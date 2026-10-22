@@ -14,6 +14,12 @@ export const taskCreateSchema = z
   .object({
     title: z.string().trim().min(1, "Title is required").max(200),
     description: z.string().trim().max(2000).nullable().optional(),
+    rationale: z
+      .string()
+      .trim()
+      .min(10, "Say how this task helps the project's current focus")
+      .max(500)
+      .openapi({ description: "Why this helps: how the task serves the project's current focus (see the project brief)." }),
     taskType: z
       .string()
       .trim()
@@ -113,6 +119,7 @@ export const boardTaskSchema = z
     taskType: z.string().nullable(),
     title: z.string(),
     description: z.string().nullable(),
+    rationale: z.string().nullable().openapi({ description: "How the task serves the project's focus. Null on older tasks." }),
     status: z.string(),
     createdById: z.string().nullable().openapi({ description: "Who posted the task. They, or a project admin, send its offers." }),
     createdBy: z.object({ id: z.string(), name: z.string().nullable(), email: z.string().nullable() }).nullable(),

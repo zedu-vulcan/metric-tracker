@@ -103,6 +103,7 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
     ref: formatRef(task.number),
     title: task.title,
     description: task.description,
+    rationale: task.rationale,
     status: task.status,
     taskType: task.taskType,
     points: task.points ?? (task.taskType ? (points.get(task.taskType) ?? null) : null),

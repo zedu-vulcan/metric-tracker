@@ -174,7 +174,7 @@ export function TaskView({ taskId }: { taskId: string }) {
       />
 
       <PageContent>
-        {task.description && <TaskDescription text={task.description} />}
+        {(task.description || task.rationale) && <TaskDescription text={task.description} rationale={task.rationale} />}
 
         <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
           <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
@@ -267,8 +267,11 @@ export function TaskView({ taskId }: { taskId: string }) {
   );
 }
 
-/** The brief at full width, so long text reads comfortably; past a few lines it folds behind "Show more". */
-function TaskDescription({ text }: { text: string }) {
+/**
+ * The task's description at full width, so long text reads comfortably; past a few lines it folds behind
+ * "Show more". Under it, the poster's reason the task serves the project's focus.
+ */
+function TaskDescription({ text, rationale }: { text: string; rationale?: string }) {
   const body = useRef<HTMLParagraphElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
@@ -285,17 +288,19 @@ function TaskDescription({ text }: { text: string }) {
 
   return (
     <section aria-label="Task description" className="flex flex-col items-start gap-2 rounded-[22px] border border-border bg-card p-5 sm:p-6">
-      <p
-        ref={body}
-        id="task-description"
-        className={cn(
-          "m-0 w-full text-[15px] leading-relaxed break-words whitespace-pre-line text-foreground/85",
-          !expanded && "line-clamp-6"
-        )}
-      >
-        {text}
-      </p>
-      {(overflows || expanded) && (
+      {text && (
+        <p
+          ref={body}
+          id="task-description"
+          className={cn(
+            "m-0 w-full text-[15px] leading-relaxed break-words whitespace-pre-line text-foreground/85",
+            !expanded && "line-clamp-6"
+          )}
+        >
+          {text}
+        </p>
+      )}
+      {text && (overflows || expanded) && (
         <Button
           variant="ghost"
           size="sm"
@@ -307,6 +312,12 @@ function TaskDescription({ text }: { text: string }) {
           {expanded ? "Show less" : "Show more"}
           <ChevronDownIcon data-icon="inline-end" aria-hidden="true" className={cn("transition-transform", expanded && "rotate-180")} />
         </Button>
+      )}
+      {rationale && (
+        <div className={cn("flex w-full flex-col gap-1", text && "mt-2 border-t border-border pt-4")}>
+          <span className="text-[13px] font-semibold text-muted-foreground">Why this helps</span>
+          <p className="m-0 text-sm leading-relaxed break-words whitespace-pre-line text-foreground">{rationale}</p>
+        </div>
       )}
     </section>
   );
