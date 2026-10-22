@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export type ProjectFate = {
   id: string;
   name: string;
-  /** Who takes over the person's goals, content and SEO checks. Null when nobody else is in it, so it's deleted. */
+  /** Who takes over the person's tasks, content and SEO checks. Null when nobody else is in it, so it's deleted. */
   heir: { id: string; name: string } | null;
   /** True when the person owned it and the heir becomes the new owner. */
   handedOver: boolean;
@@ -15,18 +15,18 @@ const ROLE_ORDER: Record<ProjectRole, number> = { owner: 0, admin: 1, member: 2 
 const ACTIVE_WORK: TaskStatus[] = ["in_progress", "submitted", "in_review", "changes_requested"];
 
 /**
- * Every project the person is in, or has created goals, content or SEO checks in, and who inherits it.
+ * Every project the person is in, or has created tasks, content or SEO checks in, and who inherits it.
  * The heir is the owner, or when the person is the owner, the longest-serving admin and then member.
  */
 export async function planAccountDeletion(userId: string): Promise<ProjectFate[]> {
-  const [memberships, goals, content, seoChecks] = await Promise.all([
+  const [memberships, tasks, content, seoChecks] = await Promise.all([
     prisma.projectMember.findMany({ where: { userId }, select: { projectId: true, role: true } }),
-    prisma.goal.findMany({ where: { createdById: userId }, select: { projectId: true }, distinct: ["projectId"] }),
+    prisma.task.findMany({ where: { userId }, select: { projectId: true }, distinct: ["projectId"] }),
     prisma.contentItem.findMany({ where: { userId }, select: { projectId: true }, distinct: ["projectId"] }),
     prisma.seoCheck.findMany({ where: { createdById: userId }, select: { projectId: true }, distinct: ["projectId"] }),
   ]);
   const roles = new Map(memberships.map((membership) => [membership.projectId, membership.role]));
-  const projectIds = [...new Set([...roles.keys(), ...[...goals, ...content, ...seoChecks].map((row) => row.projectId)])];
+  const projectIds = [...new Set([...roles.keys(), ...[...tasks, ...content, ...seoChecks].map((row) => row.projectId)])];
 
   const projects = await prisma.project.findMany({
     where: { id: { in: projectIds } },
@@ -56,7 +56,7 @@ export async function planAccountDeletion(userId: string): Promise<ProjectFate[]
 
 /**
  * Deletes the person and their agents, sessions and points. Projects nobody else is in go with them; in the rest,
- * ownership, goals, content and SEO checks pass to the heir so the team keeps its work, and the agents' tasks reopen.
+ * ownership, tasks, content and SEO checks pass to the heir so the team keeps its work, and the agents' tasks reopen.
  */
 export async function deleteAccount(userId: string) {
   const fates = await planAccountDeletion(userId);
@@ -98,7 +98,7 @@ export async function deleteAccount(userId: string) {
             data: { role: "owner" },
           });
         }
-        await tx.goal.updateMany({ where: { projectId: fate.id, createdById: userId }, data: { createdById: fate.heir.id } });
+        await tx.task.updateMany({ where: { projectId: fate.id, userId }, data: { userId: fate.heir.id } });
         await tx.contentItem.updateMany({ where: { projectId: fate.id, userId }, data: { userId: fate.heir.id } });
         await tx.seoCheck.updateMany({ where: { projectId: fate.id, createdById: userId }, data: { createdById: fate.heir.id } });
       }

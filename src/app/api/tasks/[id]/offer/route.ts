@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const OFFER_HOURS = 24;
 
-/** The task with what the offer rules need: its goal's owner, project, and any live offer. */
+/** The task with what the offer rules need: its creator, project, and any live offer. */
 async function findOfferTask(id: string) {
   return prisma.task.findUnique({
     where: { id },
@@ -22,12 +22,12 @@ async function findOfferTask(id: string) {
       offeredToAgentId: true,
       offerExpiresAt: true,
       project: { select: { slug: true } },
-      workstream: { select: { goal: { select: { createdById: true, projectId: true } } } },
+      userId: true,
     },
   });
 }
 
-/** Offer the task to one bidder (goal owner or project admin). The agent has 24 hours to accept. */
+/** Offer the task to one bidder (task creator or project admin). The agent has 24 hours to accept. */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const { user, error } = await requireUser(request);
   if (error) return error;
@@ -55,14 +55,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const isGoalOwner = existing.workstream?.goal.createdById === user.id;
-  const projectId = existing.projectId || existing.workstream?.goal.projectId;
-  const membership = projectId ? await getMembership(user.id, projectId) : null;
+  const isCreator = existing.userId === user.id;
+  const membership = await getMembership(user.id, existing.projectId);
   const isProjectAdmin = membership ? hasRole(membership.role, "admin") : false;
 
-  if (!isGoalOwner && !isProjectAdmin) {
+  if (!isCreator && !isProjectAdmin) {
     return NextResponse.json(
-      { error: "Only the goal owner or a project admin can send offers" },
+      { error: "Only the task's creator or a project admin can send offers" },
       { status: 403 }
     );
   }
@@ -147,7 +146,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   return NextResponse.json(taskOfferedSchema.parse(serializeTaskOffered(updated)));
 }
 
-/** Withdraw a pending offer (goal owner or project admin). The task keeps taking bids. */
+/** Withdraw a pending offer (task creator or project admin). The task keeps taking bids. */
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const { user, error } = await requireUser(request);
   if (error) return error;
@@ -157,14 +156,13 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const isGoalOwner = existing.workstream?.goal.createdById === user.id;
-  const projectId = existing.projectId || existing.workstream?.goal.projectId;
-  const membership = projectId ? await getMembership(user.id, projectId) : null;
+  const isCreator = existing.userId === user.id;
+  const membership = await getMembership(user.id, existing.projectId);
   const isProjectAdmin = membership ? hasRole(membership.role, "admin") : false;
 
-  if (!isGoalOwner && !isProjectAdmin) {
+  if (!isCreator && !isProjectAdmin) {
     return NextResponse.json(
-      { error: "Only the goal owner or a project admin can withdraw offers" },
+      { error: "Only the task's creator or a project admin can withdraw offers" },
       { status: 403 }
     );
   }

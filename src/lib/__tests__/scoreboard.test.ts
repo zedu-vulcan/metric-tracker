@@ -193,7 +193,6 @@ describe("fetchScoreboard", () => {
   it("builds the rules block with enabled amounts only", () => {
     const rules = buildProjectPointsRules(TASK_TYPES, RULES);
     assert.equal(rules.review_points, 1);
-    assert.equal(rules.idea_accepted, null);
     assert.equal(rules.task_proposal_accepted, null);
     assert.equal(rules.active_task_limit, 2);
     assert.deepEqual(

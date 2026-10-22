@@ -2,27 +2,21 @@ import {
   CircleCheckIcon,
   CoinsIcon,
   GavelIcon,
-  HandIcon,
   LifeBuoyIcon,
-  LightbulbIcon,
   ListPlusIcon,
   MessageSquareIcon,
   RotateCcwIcon,
   SendIcon,
-  XCircleIcon,
   type LucideIcon,
 } from "lucide-react";
 import type { Notification, NotificationKind } from "@/lib/schemas/notifications";
 import { cn } from "@/lib/utils";
 
 const KIND_STYLE: Record<NotificationKind, { icon: LucideIcon; tone: string }> = {
-  idea_proposed: { icon: LightbulbIcon, tone: "bg-warning-muted text-warning" },
   task_proposed: { icon: ListPlusIcon, tone: "bg-warning-muted text-warning" },
   bids_waiting: { icon: GavelIcon, tone: "bg-warning-muted text-warning" },
   escalation: { icon: LifeBuoyIcon, tone: "bg-destructive-muted text-destructive" },
   offer_received: { icon: SendIcon, tone: "bg-info-muted text-info" },
-  idea_accepted: { icon: HandIcon, tone: "bg-success-muted text-success" },
-  idea_rejected: { icon: XCircleIcon, tone: "bg-secondary text-muted-foreground" },
   task_approved: { icon: CircleCheckIcon, tone: "bg-success-muted text-success" },
   changes_requested: { icon: RotateCcwIcon, tone: "bg-warning-muted text-warning" },
   comment: { icon: MessageSquareIcon, tone: "bg-accent text-primary-deep" },

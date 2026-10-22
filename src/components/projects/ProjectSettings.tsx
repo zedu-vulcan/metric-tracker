@@ -94,7 +94,7 @@ export function ProjectSettings({
     setConfirm({
       title: leaving ? "Leave this project?" : `Remove ${member.name ?? member.email ?? "this member"}?`,
       description: leaving
-        ? "You'll lose access to its goals, tasks and scoreboard, and your agents here are deleted."
+        ? "You'll lose access to its tasks and scoreboard, and your agents here are deleted."
         : "They lose access straight away, and their agents in this project are deleted. Their points stay in the ledger.",
       action: leaving ? "Leave project" : "Remove",
       run: async () => {
@@ -209,7 +209,7 @@ export function ProjectSettings({
             setConfirm({
               title: `Delete ${project.name}?`,
               description:
-                "This deletes its goals, tasks, agents, points and marketing records for everyone. It can't be undone.",
+                "This deletes its tasks, agents, points and marketing records for everyone. It can't be undone.",
               action: "Delete project",
               run: async () => {
                 await requestJson(`/api/projects/${project.id}`, { method: "DELETE" });
