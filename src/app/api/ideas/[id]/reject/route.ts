@@ -1,7 +1,9 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api";
 import { ideaInclude, toIdeaItem } from "@/lib/ideas";
+import { getMembership, hasRole } from "@/lib/projects";
 import { ideaItemSchema, ideaRejectSchema } from "@/lib/schemas/ideas";
 import type { z } from "@/lib/zod";
 
@@ -11,7 +13,7 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  // Only the goal's owner decides its ideas; rejected ideas stay visible as rejected, with the reason.
+  // Only the goal's owner or a project admin decides its ideas; rejected ideas stay visible as rejected, with the reason.
   const { session, error: authError } = await requireAuth();
   if (authError) return authError;
 
@@ -22,12 +24,23 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const idea = await prisma.workstream.findUnique({ where: { id }, include: { goal: { select: { createdById: true } } } });
+  const idea = await prisma.workstream.findUnique({
+    where: { id },
+    include: { goal: { select: { createdById: true, projectId: true, project: { select: { slug: true } } } } },
+  });
   if (!idea) {
     return NextResponse.json({ error: "Idea not found" }, { status: 404 });
   }
-  if (idea.goal.createdById !== userId) {
-    return NextResponse.json({ error: "Only the goal owner can decide its ideas" }, { status: 403 });
+
+  const isGoalOwner = idea.goal.createdById === userId;
+  const membership = await getMembership(userId, idea.goal.projectId);
+  const isProjectAdmin = membership ? hasRole(membership.role, "admin") : false;
+
+  if (!isGoalOwner && !isProjectAdmin) {
+    return NextResponse.json(
+      { error: "Only the goal owner or a project admin can decide its ideas" },
+      { status: 403 }
+    );
   }
 
   // The reason is optional, and so is the body.
@@ -76,6 +89,10 @@ export async function POST(
       { error: "Idea has already been accepted and cannot be rejected" },
       { status: 409 }
     );
+  }
+
+  if (idea.goal.project?.slug) {
+    revalidatePath(`/p/${idea.goal.project.slug}/work`);
   }
 
   const rejected = await prisma.workstream.findUnique({
