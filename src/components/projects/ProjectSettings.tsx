@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TransferOwnership } from "@/components/projects/TransferOwnership";
 import { requestJson } from "@/lib/request-json";
 
 type SettingsProject = {
@@ -50,10 +51,12 @@ const ROLE_BADGE: Record<ProjectRole, "default" | "info" | "secondary"> = {
 export function ProjectSettings({
   project,
   members,
+  eligibleMembers,
   currentUserId,
 }: {
   project: SettingsProject;
   members: Member[];
+  eligibleMembers: { userId: string; name: string | null; email: string | null }[];
   currentUserId: string;
 }) {
   const router = useRouter();
@@ -214,6 +217,13 @@ export function ProjectSettings({
               },
             })
           }
+        />
+      )}
+
+      {isOwner && (
+        <TransferOwnership
+          projectId={project.id}
+          members={eligibleMembers}
         />
       )}
 

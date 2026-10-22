@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -131,6 +132,8 @@ function contentItemToRow(item: ContentApiItem): ContentRow {
 }
 
 export default function ContentTrackerPage() {
+  const searchParams = useSearchParams();
+  const initialQuery = (searchParams.get("q") ?? "").trim().slice(0, 100);
   const [rowsState, setRowsState] = useState<ContentRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -140,12 +143,19 @@ export default function ContentTrackerPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ContentApiItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ContentRow | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [typeFilter, setTypeFilter] = useState("all");
   const [topicFilter, setTopicFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const q = (searchParams.get("q") ?? "").trim().slice(0, 100);
+    if (q) {
+      setSearchQuery(q);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setPage(1);

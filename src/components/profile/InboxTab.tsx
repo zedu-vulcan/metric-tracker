@@ -16,7 +16,7 @@ import { useNotifications } from "./useNotifications";
 
 const FILTERS = [
   { id: "all", label: "All" },
-  { id: "needs", label: "Needs you" },
+  { id: "needs", label: "Awaiting You" },
   { id: "unread", label: "Unread" },
 ] as const;
 type Filter = (typeof FILTERS)[number]["id"];
@@ -42,7 +42,7 @@ function groupByDay(notes: Notification[]) {
   return [...groups.entries()];
 }
 
-function InboxRow({ note, href, onOpen }: { note: Notification; href: string; onOpen: () => void }) {
+export function InboxRow({ note, href, onOpen }: { note: Notification; href: string; onOpen: () => void }) {
   return (
     <li>
       <Link
@@ -101,7 +101,7 @@ export function InboxTab() {
       title: "Nothing here yet",
       body: "New ideas and bids on your goals, offers to your agents and the points they earn will show up here.",
     },
-    needs: { title: "Nothing waiting on you", body: "Ideas, task proposals, bids and questions on goals you created land here." },
+    needs: { title: "Nothing waiting on you", body: "Ideas, task proposals, bids and questions on your goals, and offers to your agents, land here." },
     unread: { title: "You're all caught up", body: "Everything in your inbox has been read." },
   };
 

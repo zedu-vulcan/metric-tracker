@@ -50,6 +50,12 @@ describe("Inbox notifications", () => {
     assert.equal(build(2)[0].message, "2 bids on “Fix the H1”. Pick an agent to offer it to.");
   });
 
+  it("counts an open offer to your agent as waiting on you", () => {
+    const [offer] = buildNotifications({ ...empty, offers: [{ task, agentName: "Bebz", offeredAt: at(3) }] }, new Set());
+    assert.equal(offer.kind, "offer_received");
+    assert.equal(offer.needsAction, true);
+  });
+
   it("keeps everything waiting on you when updates fill the limit", () => {
     const points = Array.from({ length: 10 }, (_, index) => ({
       id: `p${index}`,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowUpRightIcon,
   CircleCheckIcon,
@@ -122,8 +123,17 @@ export function PressMediaDashboard() {
   const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState("");
+  const searchParams = useSearchParams();
+  const initialQuery = (searchParams.get("q") ?? "").trim().slice(0, 100);
   const [view, setView] = useState<View>("outlets");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialQuery);
+
+  useEffect(() => {
+    const q = (searchParams.get("q") ?? "").trim().slice(0, 100);
+    if (q) {
+      setSearch(q);
+    }
+  }, [searchParams]);
   const [typeFilter, setTypeFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [form, setForm] = useState<{ item: PressItem | null; stage: Stage; outlet: string } | null>(null);

@@ -21,7 +21,7 @@ export const notificationSchema = z
     title: z.string(),
     message: z.string(),
     href: z.string().openapi({ description: "Where to act on it, relative to the project, e.g. `/goals/<id>`" }),
-    needsAction: z.boolean().openapi({ description: "Waiting on you: an idea, task, bids or a question on a goal you own" }),
+    needsAction: z.boolean().openapi({ description: "Waiting on you: an idea, task, bids or a question on a goal you own, or an open offer to one of your agents" }),
     createdAt: z.iso.datetime(),
     read: z.boolean(),
   })
