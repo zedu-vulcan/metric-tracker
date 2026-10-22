@@ -17,8 +17,6 @@ export type DbClient = Pick<
   | "taskComment"
   | "taskTypeDef"
   | "pointRule"
-  | "goal"
-  | "workstream"
   | "contentItem"
   | "directory"
   | "pressOutlet"
@@ -91,8 +89,6 @@ export async function exportDatabaseData(
     taskComments,
     taskTypes,
     pointRules,
-    goals,
-    workstreams,
     contentItems,
     directories,
     pressOutlets,
@@ -154,18 +150,6 @@ export async function exportDatabaseData(
     db.pointRule.findMany({
       where: { projectId: { in: targetProjectIds } },
     }),
-    db.goal.findMany({
-      where: { projectId: { in: targetProjectIds } },
-      orderBy: { createdAt: "asc" },
-    }),
-    db.workstream.findMany({
-      where: { goal: { projectId: { in: targetProjectIds } } },
-      include: {
-        upvotes: true,
-        downvotes: true,
-      },
-      orderBy: { createdAt: "asc" },
-    }),
     db.contentItem.findMany({
       where: { projectId: { in: targetProjectIds } },
     }),
@@ -183,7 +167,7 @@ export async function exportDatabaseData(
     }),
   ]);
 
-  // Collect all unique user IDs involved across projects, ledger, tasks, agents, goals
+  // Collect all unique user IDs involved across projects, ledger, tasks, agents
   const userIds = new Set<string>();
   projectMembers.forEach((pm) => userIds.add(pm.userId));
   agents.forEach((a) => userIds.add(a.ownerId));
@@ -195,7 +179,6 @@ export async function exportDatabaseData(
     userIds.add(pl.userId);
     if (pl.grantedByUserId) userIds.add(pl.grantedByUserId);
   });
-  goals.forEach((g) => userIds.add(g.createdById));
 
   const users = await db.user.findMany({
     where: { id: { in: Array.from(userIds) } },
@@ -216,7 +199,7 @@ export async function exportDatabaseData(
         name: user.name,
         email: user.email,
       },
-      version: "1.0",
+      version: "2.0",
       projectCount: targetProjectIds.length,
     },
     summary: {
@@ -229,8 +212,6 @@ export async function exportDatabaseData(
         (sum, pl) => sum + Number(pl.amount),
         0
       ),
-      goalsCount: goals.length,
-      workstreamsCount: workstreams.length,
       taskCommentsCount: taskComments.length,
     },
     projects: projects.map((p) => ({
@@ -257,6 +238,7 @@ export async function exportDatabaseData(
     })),
     tasks: tasks.map((t) => ({
       ...t,
+      ref: `T-${t.number}`,
       offeredAt: t.offeredAt?.toISOString() ?? null,
       offerExpiresAt: t.offerExpiresAt?.toISOString() ?? null,
       dueAt: t.dueAt?.toISOString() ?? null,
@@ -277,24 +259,6 @@ export async function exportDatabaseData(
     pointRules: pointRules.map((pr) => ({
       ...pr,
       amount: Number(pr.amount),
-    })),
-    goals: goals.map((g) => ({
-      ...g,
-      createdAt: g.createdAt.toISOString(),
-      updatedAt: g.updatedAt.toISOString(),
-    })),
-    workstreams: workstreams.map((w) => ({
-      ...w,
-      createdAt: w.createdAt.toISOString(),
-      updatedAt: w.updatedAt.toISOString(),
-      upvotes: w.upvotes.map((u) => ({
-        ...u,
-        createdAt: u.createdAt.toISOString(),
-      })),
-      downvotes: w.downvotes.map((d) => ({
-        ...d,
-        createdAt: d.createdAt.toISOString(),
-      })),
     })),
     marketing: {
       contentItems: contentItems.map((c) => ({
@@ -358,8 +322,6 @@ export async function exportDatabaseSpreadsheet(
     { metric: "Total Tasks", value: data.summary.tasksCount },
     { metric: "Total Points Awarded", value: data.summary.totalPointsAwarded },
     { metric: "Total Points Ledger Entries", value: data.summary.pointsLedgerCount },
-    { metric: "Total Goals", value: data.summary.goalsCount },
-    { metric: "Total Workstreams", value: data.summary.workstreamsCount },
     { metric: "Total Task Comments", value: data.summary.taskCommentsCount },
   ]);
 
@@ -432,6 +394,7 @@ export async function exportDatabaseSpreadsheet(
   // 4. Tasks Sheet
   const tasksSheet = workbook.addWorksheet("Tasks");
   tasksSheet.columns = [
+    { header: "Ref", key: "ref", width: 12 },
     { header: "Task ID", key: "id", width: 28 },
     { header: "Title", key: "title", width: 35 },
     { header: "Status", key: "status", width: 18 },
@@ -449,6 +412,7 @@ export async function exportDatabaseSpreadsheet(
     const user = t.userId ? userMap.get(t.userId as string) : null;
     const project = projectMap.get(t.projectId as string);
     tasksSheet.addRow({
+      ref: `T-${(t as { number?: number }).number ?? 0}`,
       id: t.id,
       title: t.title,
       status: t.status,
@@ -536,4 +500,3 @@ export async function exportDatabaseSpreadsheet(
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
-

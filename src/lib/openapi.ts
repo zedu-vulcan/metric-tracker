@@ -1567,6 +1567,27 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "get",
+  path: "/api/me/inbox",
+  operationId: "getAgentInbox",
+  tags: ["Agents"],
+  summary: "Get the agent inbox",
+  description:
+    "Pending offers, revision requests and recent comments on the agent's tasks. Expired offers are reset to bidding before the inbox is returned.",
+  security: [{ agentKey: [] }],
+  responses: {
+    200: {
+      description: "Actionable work for the agent",
+      content: { "application/json": { schema: agentInboxSchema } },
+    },
+    401: {
+      description: "Unauthorized",
+      content: { "application/json": { schema: inboxErrorSchema } },
+    },
+  },
+});
+
 // ── Task types ──
 const taskTypeIdParams = z.object({
   id: z.string().openapi({ param: { name: "id", in: "path" } }),

@@ -36,8 +36,6 @@ export const adminExportResponseSchema = z.object({
     tasksCount: z.number().int(),
     pointsLedgerCount: z.number().int(),
     totalPointsAwarded: z.number(),
-    goalsCount: z.number().int(),
-    workstreamsCount: z.number().int(),
     taskCommentsCount: z.number().int(),
   }),
   projects: z.array(z.record(z.string(), z.unknown())),
@@ -49,7 +47,5 @@ export const adminExportResponseSchema = z.object({
   taskComments: z.array(z.record(z.string(), z.unknown())),
   taskTypes: z.array(z.record(z.string(), z.unknown())),
   pointRules: z.array(z.record(z.string(), z.unknown())),
-  goals: z.array(z.record(z.string(), z.unknown())),
-  workstreams: z.array(z.record(z.string(), z.unknown())),
   marketing: z.record(z.string(), z.unknown()),
 }).openapi("AdminExportBackup");

@@ -27,7 +27,7 @@ function createMockDb(): DbClient {
     } as unknown as DbClient["user"],
 
     project: {
-      findMany: async ({ where }: { where?: { id?: { in?: string[] } } }) => [
+      findMany: async () => [
         {
           id: "proj-1",
           name: "Zedu Vulcan",
@@ -35,6 +35,7 @@ function createMockDb(): DbClient {
           joinCode: "K7QX-3MPR",
           inviteToken: "token-123",
           createdById: "user-admin",
+          lastTaskNumber: 1,
           createdAt: mockDate,
           updatedAt: mockDate,
         },
@@ -120,7 +121,7 @@ function createMockDb(): DbClient {
         {
           id: "task-1",
           projectId: "proj-1",
-          workstreamId: "ws-1",
+          number: 1,
           taskType: "research",
           type: "Other",
           title: "Research Competitor Pricing",
@@ -195,42 +196,6 @@ function createMockDb(): DbClient {
       ],
     } as unknown as DbClient["pointRule"],
 
-    goal: {
-      findMany: async () => [
-        {
-          id: "goal-1",
-          projectId: "proj-1",
-          title: "Q4 Marketing Push",
-          description: "Reach 10,000 users",
-          type: "marketing",
-          status: "active",
-          createdById: "user-admin",
-          createdAt: mockDate,
-          updatedAt: mockDate,
-        },
-      ],
-    } as unknown as DbClient["goal"],
-
-    workstream: {
-      findMany: async () => [
-        {
-          id: "ws-1",
-          goalId: "goal-1",
-          title: "Competitor Analysis",
-          description: "Evaluate competitive landscape",
-          status: "accepted",
-          autoAcceptTasks: false,
-          proposedByAgentId: "agent-1",
-          acceptedById: "user-admin",
-          rejectionReason: null,
-          upvotes: [],
-          downvotes: [],
-          createdAt: mockDate,
-          updatedAt: mockDate,
-        },
-      ],
-    } as unknown as DbClient["workstream"],
-
     contentItem: {
       findMany: async () => [],
     } as unknown as DbClient["contentItem"],
@@ -271,7 +236,6 @@ test("exportDatabaseData: denies non-admin member from exporting a project", asy
 
 test("exportDatabaseData: denies user with no admin memberships when no project is specified", async () => {
   const db = createMockDb();
-  // Override projectMember.findMany to return empty for member
   (db.projectMember.findMany as unknown) = async () => [];
 
   await assert.rejects(
@@ -287,7 +251,7 @@ test("exportDatabaseData: successfully exports data for a project admin", async 
     projectId: "proj-1",
   });
 
-  assert.equal(backup.metadata.version, "1.0");
+  assert.equal(backup.metadata.version, "2.0");
   assert.equal(backup.metadata.projectCount, 1);
   assert.equal(backup.metadata.exportedBy.id, "user-admin");
 
@@ -297,13 +261,12 @@ test("exportDatabaseData: successfully exports data for a project admin", async 
   assert.equal(backup.summary.totalPointsAwarded, 75);
   assert.equal(backup.summary.tasksCount, 1);
   assert.equal(backup.summary.taskCommentsCount, 1);
-  assert.equal(backup.summary.goalsCount, 1);
-  assert.equal(backup.summary.workstreamsCount, 1);
 
   // Check data contents and serialization
   assert.equal(backup.projects[0].slug, "zedu-vulcan");
   assert.equal(typeof backup.projects[0].createdAt, "string");
   assert.equal(backup.tasks[0].title, "Research Competitor Pricing");
+  assert.equal(backup.tasks[0].ref, "T-1");
   assert.equal(typeof backup.tasks[0].createdAt, "string");
   assert.equal(backup.pointsLedger[0].amount, 50);
   assert.equal(typeof backup.pointsLedger[0].amount, "number");
@@ -362,5 +325,9 @@ test("exportDatabaseSpreadsheet: generates a valid excel buffer with all sheets"
   const pointsSheet = workbook.getWorksheet("Points Ledger");
   assert.ok(pointsSheet, "Points Ledger sheet must exist");
   assert.equal(pointsSheet.rowCount, 3); // Header row + 2 ledger entries
-});
 
+  const tasksSheet = workbook.getWorksheet("Tasks");
+  assert.ok(tasksSheet, "Tasks sheet must exist");
+  const taskRow = tasksSheet.getRow(2);
+  assert.equal(taskRow.getCell(1).value, "T-1"); // Ref column
+});

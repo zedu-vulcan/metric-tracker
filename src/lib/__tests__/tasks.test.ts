@@ -159,11 +159,11 @@ describe("Tasks Validation & Serialization", () => {
     assert.ok(doc.paths["/api/tasks/{id}/offer"]?.delete);
     assert.equal(
       doc.paths["/api/tasks/{id}/offer"]?.post?.responses?.[403]?.description,
-      "Only the goal owner or a project admin can send offers"
+      "Only the task's creator or a project admin can send offers"
     );
     assert.equal(
       doc.paths["/api/tasks/{id}/offer"]?.delete?.responses?.[403]?.description,
-      "Only the goal owner or a project admin can withdraw offers"
+      "Only the task's creator or a project admin can withdraw offers"
     );
     assert.ok(doc.paths["/api/tasks/{id}/accept-offer"]);
     assert.ok(doc.paths["/api/tasks/{id}/accept-offer"]?.post);
