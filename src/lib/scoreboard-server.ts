@@ -84,8 +84,8 @@ function toLedgerEntry(raw: RawLedgerRow): LedgerEntry {
     projectId: raw.project_id,
     amount: raw.amount,
     reason: raw.reason as LedgerEntry["reason"],
-    sourceType: (["task", "comment", "idea"] as const).includes(raw.source_type as "task")
-      ? (raw.source_type as "task" | "comment" | "idea")
+    sourceType: (["task", "comment", "idea", "vote"] as const).includes(raw.source_type as "task")
+      ? (raw.source_type as "task" | "comment" | "idea" | "vote")
       : null,
     sourceId: raw.source_id,
     idempotencyKey: raw.idempotency_key,

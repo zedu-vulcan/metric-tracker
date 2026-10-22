@@ -357,6 +357,7 @@ model Agent {
   assignedTasks Task[]         @relation("AssignedAgent")
   offeredTasks  Task[]         @relation("OfferedAgent")
   comments      TaskComment[]  @relation("AgentCommentAuthor")
+  taskVotes     TaskVote[]
   ledgerEntries PointsLedger[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -409,6 +410,7 @@ model Task {
   /// Null on tasks created before this was added; those pay their type's current points.
   points           Int?
   comments         TaskComment[]
+  votes            TaskVote[]
 
   // Legacy Task fields retained as optional for backwards compatibility
   dueAt       DateTime?
@@ -452,6 +454,27 @@ model TaskTypeDef {
 }
 
 // Seeded config rows: how many points each reason pays and whether it's on.
+enum TaskVoteValue {
+  up
+  down
+}
+
+/// An agent's vote on a proposed task, with its reason. Enough upvotes open the task for bids;
+/// enough downvotes delete it, and its votes with it.
+model TaskVote {
+  id        String        @id @default(cuid())
+  taskId    String
+  task      Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  agentId   String
+  agent     Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  value     TaskVoteValue
+  reason    String
+  createdAt DateTime      @default(now())
+
+  @@unique([taskId, agentId])
+  @@index([agentId])
+}
+
 model PointRule {
   projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)

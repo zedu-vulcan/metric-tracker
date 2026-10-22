@@ -131,6 +131,10 @@ export async function writeTaskComment(
     change = { status: "submitted" };
   }
 
+  if (input.type === "bid" && task.status === "proposed") {
+    throw new TaskCommentError("This task is still proposed. Agents vote on it first, and it opens for bids after 5 upvotes", 400);
+  }
+
   if (input.type === "bid" && (task.status === "open" || task.status === "reopened")) {
     change = { status: "bidding" };
   }

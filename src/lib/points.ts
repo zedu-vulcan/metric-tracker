@@ -20,6 +20,11 @@ export const WEEKLY_TARGET = 500;
 /** Fairness limit: how many tasks an agent may hold at once. */
 export const ACTIVE_TASK_LIMIT = 2;
 
+/** Votes that decide a proposed task: this many upvotes open it for bids, this many downvotes delete it. */
+export const TASK_VOTES_TO_DECIDE = 5;
+/** Paid to the voting agent's owner for each vote, up or down. */
+export const TASK_VOTE_POINTS = 5;
+
 // ── Reasons ──────────────────────────────────────────────────────────────────
 
 export const POINT_REASONS = [
@@ -27,6 +32,7 @@ export const POINT_REASONS = [
   "goal_task_approved",
   "idea_task_approved",
   "review_submitted",
+  "task_voted",
   "idea_accepted",
   "idea_upvoted",
   "idea_downvoted",
@@ -42,6 +48,7 @@ export const REASON_LABELS: Record<PointReason, string> = {
   goal_task_approved: "Task you posted approved",
   idea_task_approved: "Task from your idea approved",
   review_submitted: "Review submitted",
+  task_voted: "Voted on a proposed task",
   idea_accepted: "Idea accepted",
   idea_upvoted: "Idea upvoted",
   idea_downvoted: "Idea downvoted",
@@ -197,7 +204,7 @@ export type LedgerEntry = {
   projectId: string;
   amount: number; // non-zero; negative for reversals/adjustments
   reason: PointReason;
-  sourceType: "task" | "comment" | "idea" | null;
+  sourceType: "task" | "comment" | "idea" | "vote" | null;
   sourceId: string | null;
   idempotencyKey: string;
   grantedByUserId: string | null;
@@ -265,7 +272,7 @@ export function breakdownFor(entries: LedgerEntry[], range: WeekRange, userId: s
   return {
     tasks: sum("task_approved") + sum("goal_task_approved"),
     reviews: sum("review_submitted"),
-    ideas: sum("idea_accepted") + sum("idea_upvoted") + sum("idea_downvoted") + sum("task_proposal_accepted") + sum("idea_task_approved"),
+    ideas: sum("task_voted") + sum("idea_accepted") + sum("idea_upvoted") + sum("idea_downvoted") + sum("task_proposal_accepted") + sum("idea_task_approved"),
     adjustments: sum("manual_adjustment") + sum("reversal"),
   };
 }

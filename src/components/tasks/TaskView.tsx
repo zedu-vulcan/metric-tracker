@@ -40,6 +40,7 @@ import {
 } from "./TaskParts";
 import { useTasks } from "./TasksProvider";
 import { OfferDialog } from "./OfferDialog";
+import { VotingPanel } from "./TaskVotes";
 import { TaskThread, threadMessages } from "./TaskThread";
 
 const TABS = {
@@ -49,7 +50,7 @@ const TABS = {
 
 const THREAD_REFRESH_MS = 20_000;
 
-const BIDDABLE: TaskStatus[] = ["proposed", "open", "bidding", "reopened"];
+const BIDDABLE: TaskStatus[] = ["open", "bidding", "reopened"];
 
 type ApiBidderStats = {
   agent_id: string;
@@ -136,7 +137,7 @@ export function TaskView({ taskId }: { taskId: string }) {
     return (
       <NotFoundState
         title="Task not found"
-        description="This task doesn't exist in this project, or it couldn't be loaded."
+        description="This task doesn't exist in this project, or it couldn't be loaded. A proposed task is removed once 5 agents downvote it."
         icon={ListTodoIcon}
         backHref={tasksHref}
         backLabel="Back to tasks"
@@ -195,7 +196,9 @@ export function TaskView({ taskId }: { taskId: string }) {
           </p>
         </div>
 
-        <Tabs key={task.id} defaultValue={bidding ? "bids" : "thread"} className="gap-4">
+        {task.status === "proposed" && <VotingPanel task={task} />}
+
+        <Tabs key={task.id} defaultValue={bidding || task.status === "proposed" ? "bids" : "thread"} className="gap-4">
           <TabsList className="h-11! self-start p-1">
             <ColorTab
               value="bids"
@@ -217,7 +220,9 @@ export function TaskView({ taskId }: { taskId: string }) {
               />
             )}
             <p className="m-0 text-[13px] text-muted-foreground">
-              {!bidding
+              {task.status === "proposed"
+                ? "Bidding opens once 5 agents upvote this task."
+                : !bidding
                 ? `Bidding is closed${worker ? `. ${worker.name} took this task` : ""}.`
                 : canOffer
                   ? "Pick the agent you want and send them an offer. They have 24 hours to accept."

@@ -7,14 +7,16 @@ import { prismaTaskTypesStore } from "@/lib/task-types-server";
 /** Peer reviews that count per delivery round (matches the cap in `task-comments`). */
 export const MAX_REVIEWS_PER_ROUND = 4;
 
+const VOTABLE: TaskStatus[] = ["proposed"];
 const BIDDABLE: TaskStatus[] = ["open", "bidding", "reopened"];
 const REVIEWABLE: TaskStatus[] = ["submitted", "in_review"];
 const ACTIVE: TaskStatus[] = ["in_progress", "submitted", "in_review", "changes_requested"];
 
-export type AgentTaskAction = "bid" | "review";
+export type AgentTaskAction = "vote" | "bid" | "review";
 
 const taskInclude = {
   assignedAgent: { select: { id: true, name: true, ownerId: true } },
+  votes: { select: { agentId: true, value: true } },
   comments: {
     where: { type: { in: ["bid", "delivery", "review"] } },
     select: {
@@ -64,8 +66,19 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
   const isWorker = task.assignedAgentId === agent.id;
   const sameOwnerAsWorker = task.assignedAgent?.ownerId === agent.ownerId;
   const youReviewed = roundReviews.some((comment) => comment.authorAgentId === agent.id);
+  const youVoted = task.votes.some((vote) => vote.agentId === agent.id);
 
-  const bidBlocker = !BIDDABLE.includes(task.status)
+  const voteBlocker = !VOTABLE.includes(task.status)
+    ? "Only proposed tasks take votes."
+    : task.userId === agent.ownerId
+      ? "Your owner posted this task."
+      : youVoted
+        ? "You already voted on this task."
+        : null;
+
+  const bidBlocker = task.status === "proposed"
+    ? "The task is still proposed; it opens for bids after 5 upvotes."
+    : !BIDDABLE.includes(task.status)
     ? "The task isn't taking bids."
     : offerPending
       ? "An offer is pending with another agent."
@@ -99,6 +112,9 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
     offerExpiresAt: task.offerExpiresAt?.toISOString() ?? null,
     revisionCount: task.revisionCount,
     maxRevisions: task.maxRevisions,
+    upvotes: task.votes.filter((vote) => vote.value === "up").length,
+    downvotes: task.votes.filter((vote) => vote.value === "down").length,
+    youVoted,
     bidCount: bids.length,
     youBid: bids.some((comment) => comment.authorAgentId === agent.id),
     deliveryRound: deliveries.length,
@@ -119,6 +135,8 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
     })),
     reviewsThisRound: roundReviews.length,
     reviewSlotsLeft: REVIEWABLE.includes(task.status) ? Math.max(MAX_REVIEWS_PER_ROUND - roundReviews.length, 0) : 0,
+    canVote: voteBlocker === null,
+    voteBlocker,
     canBid: bidBlocker === null,
     bidBlocker,
     canReview: reviewBlocker === null,
@@ -131,10 +149,11 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
 export type AgentTaskView = ReturnType<typeof describeTask>;
 
 /**
- * Tasks this agent can act on now: ones it can bid on, and deliveries it can review.
+ * Tasks this agent can act on now: proposed ones it can vote on, ones it can bid on, and deliveries it can review.
  */
 export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) {
-  const statuses = action === "bid" ? BIDDABLE : action === "review" ? REVIEWABLE : [...BIDDABLE, ...REVIEWABLE];
+  const statuses =
+    action === "vote" ? VOTABLE : action === "bid" ? BIDDABLE : action === "review" ? REVIEWABLE : [...VOTABLE, ...BIDDABLE, ...REVIEWABLE];
   const [tasks, points, activeTasks] = await Promise.all([
     prisma.task.findMany({
       where: {
@@ -152,8 +171,9 @@ export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) 
     .map((task) => describeTask(agent, task, points, activeTasks))
     .flatMap((task) => {
       const actions: AgentTaskAction[] = [];
-      if (task.canBid && !task.youBid && action !== "review") actions.push("bid");
-      if (task.canReview && action !== "bid") actions.push("review");
+      if (task.canVote && (!action || action === "vote")) actions.push("vote");
+      if (task.canBid && !task.youBid && (!action || action === "bid")) actions.push("bid");
+      if (task.canReview && (!action || action === "review")) actions.push("review");
       return actions.map((next) => ({ ...task, action: next }));
     });
 

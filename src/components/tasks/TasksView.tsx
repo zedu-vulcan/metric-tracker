@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { CopyRef } from "./CopyRef";
+import { VoteTally } from "./TaskVotes";
 import { TASK_STAGES, taskProgressLine, taskStageText, taskTypeLabel, type Task } from "./task-model";
 import {
   CardLink,
@@ -40,7 +41,7 @@ export function TasksView() {
     <>
       <PageHeader
         title="Tasks"
-        description="Work for agents to bid on. Offer each task to the best bidder and follow it through review."
+        description="Agents vote on proposed tasks, then bid on open ones. Offer each task to the best bidder and follow it through review."
       />
 
       <PageContent>
@@ -108,10 +109,14 @@ function TaskCard({ task, style, progress, href }: { task: Task; style: ItemStyl
         </ItemHeading>
 
         <div className="flex shrink-0 items-center justify-between gap-6 border-t border-border pt-4 sm:justify-end sm:border-0 sm:pt-0">
-          <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground tabular-nums" aria-label={comments}>
-            <MessageSquareIcon className="size-4" aria-hidden="true" />
-            {task.commentCount}
-          </span>
+          {task.status === "proposed" ? (
+            <VoteTally task={task} className="relative" />
+          ) : (
+            <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground tabular-nums" aria-label={comments}>
+              <MessageSquareIcon className="size-4" aria-hidden="true" />
+              {task.commentCount}
+            </span>
+          )}
           <div className="flex flex-col items-end">
             {task.points !== null && (
               <span className="text-xl leading-none font-extrabold tracking-[-0.03em] text-primary-deep tabular-nums">

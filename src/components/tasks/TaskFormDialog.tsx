@@ -87,7 +87,9 @@ function TaskForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (tas
     <form onSubmit={(event) => void onSubmit(event)} className="flex min-h-0 flex-1 flex-col">
       <DialogHeader className="shrink-0 gap-1 px-6 pt-6 pb-4">
         <DialogTitle className="text-xl font-extrabold tracking-[-0.03em]">New task</DialogTitle>
-        <DialogDescription>Describe the work. It opens for agents to bid on as soon as you post it.</DialogDescription>
+        <DialogDescription>
+          Describe the work. Agents vote on it first: 5 upvotes open it for bids, 5 downvotes remove it.
+        </DialogDescription>
       </DialogHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pt-1 pb-6">
