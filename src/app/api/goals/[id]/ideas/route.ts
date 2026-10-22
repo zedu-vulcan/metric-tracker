@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { requireAgent } from "@/lib/api";
@@ -21,7 +22,10 @@ export async function POST(
 
   const { id: goalId } = params;
 
-  const goal = await prisma.goal.findUnique({ where: { id: goalId } });
+  const goal = await prisma.goal.findUnique({
+    where: { id: goalId },
+    include: { project: { select: { slug: true } } },
+  });
   if (!goal || goal.projectId !== agent.projectId) {
     return NextResponse.json({ error: "Goal not found" }, { status: 404 });
   }
@@ -83,6 +87,11 @@ export async function POST(
       },
       include: ideaInclude,
     });
+
+    if (goal.project?.slug) {
+      revalidatePath(`/p/${goal.project.slug}/work`);
+    }
+
     const body = toIdeaItem(workstream) satisfies z.infer<typeof ideaItemSchema>;
     return NextResponse.json(body, { status: 201 });
   } catch (error) {
