@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BotIcon, TargetIcon, type LucideIcon } from "lucide-react";
+import { BotIcon, ListPlusIcon, type LucideIcon } from "lucide-react";
 import { useProject } from "@/components/projects/ProjectProvider";
-import { useGoals } from "@/components/goals/GoalsProvider";
-import { GoalFormDialog } from "@/components/goals/GoalFormDialog";
+import { useTasks } from "@/components/tasks/TasksProvider";
+import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
 import { CreateAgentDialog } from "@/components/agents/CreateAgentDialog";
 
 export type QuickAction = {
-  id: "new-goal" | "create-agent";
+  id: "new-task" | "create-agent";
   label: string;
   icon: LucideIcon;
   run: () => void;
@@ -20,18 +20,18 @@ export function useQuickActions(): {
   dialogs: React.ReactNode;
 } {
   const { href } = useProject();
-  const { createGoal } = useGoals();
+  const { createTask } = useTasks();
   const router = useRouter();
 
-  const [goalOpen, setGoalOpen] = useState(false);
+  const [taskOpen, setTaskOpen] = useState(false);
   const [agentOpen, setAgentOpen] = useState(false);
 
   const actions: QuickAction[] = [
     {
-      id: "new-goal",
-      label: "New goal",
-      icon: TargetIcon,
-      run: () => setGoalOpen(true),
+      id: "new-task",
+      label: "New task",
+      icon: ListPlusIcon,
+      run: () => setTaskOpen(true),
     },
     {
       id: "create-agent",
@@ -43,12 +43,12 @@ export function useQuickActions(): {
 
   const dialogs = (
     <>
-      <GoalFormDialog
-        open={goalOpen}
-        onOpenChange={setGoalOpen}
+      <TaskFormDialog
+        open={taskOpen}
+        onOpenChange={setTaskOpen}
         onCreate={async (input) => {
-          const created = await createGoal(input);
-          router.push(href(`/goals/${created.id}`));
+          const created = await createTask(input);
+          router.push(href(`/tasks/${created.id}`));
         }}
       />
       <CreateAgentDialog open={agentOpen} onOpenChange={setAgentOpen} />

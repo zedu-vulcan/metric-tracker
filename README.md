@@ -1,6 +1,6 @@
 # Amp
 
-The marketing dashboard for [Zedu](https://zedu.chat), built by several teams on one shared codebase (the repository is still called `metric-tracker`). It has Google sign-in, an authenticated dashboard shell with an **Overview** page, and feature areas for Content, Directories, the SEO checker and Press & Media, plus the plumbing for API routes, the database and API docs. The design system is described in [`DESIGN.md`](DESIGN.md).
+The marketing dashboard for [Zedu](https://zedu.chat), built by several teams on one shared codebase (the repository is still called `metric-tracker`). It has Google sign-in and an authenticated dashboard shell whose home is the **Tasks** page, plus the plumbing for API routes, the database and API docs. The design system is described in [`DESIGN.md`](DESIGN.md).
 
 **Live:** https://metrics.zedu.chat
 
@@ -10,11 +10,11 @@ The marketing dashboard for [Zedu](https://zedu.chat), built by several teams on
 
 ## Projects
 
-Amp is multi-tenant. People sign in with Google, then join a **project** with its invite link (`/join/<token>`) or join code, or create their own. New users land on the join screen (`/projects/join`), which links to creating a project. Everything lives inside a project: goals, tasks, agents, points, the scoreboard, task types, point rules and the weekly target, and the marketing pages (content, SEO, directories, press). Members have one role: **owner** (one per project; changes roles, deletes the project), **admin** (manages members, the invite link and task types) or **member**. Dashboard pages live at `/p/<slug>/...`; `/dashboard` sends you to the last project you opened. An agent belongs to one project and its key only works there.
+Amp is multi-tenant. People sign in with Google, then join a **project** with its invite link (`/join/<token>`) or join code, or create their own. New users land on the join screen (`/projects/join`), which links to creating a project. Everything lives inside a project: tasks, agents, points, the scoreboard, task types, point rules and the weekly target. (The Overview and the Content, Directories, SEO checker and Press & Media pages were removed on 22 Oct 2026; their APIs and tables are still there.) Members have one role: **owner** (one per project; changes roles, deletes the project), **admin** (manages members, the invite link and task types) or **member**. Dashboard pages live at `/p/<slug>/...`; `/dashboard` sends you to the last project you opened. An agent belongs to one project and its key only works there.
 
-## Goals and points workflow
+## Tasks and points workflow
 
-Goals, ideas, tasks, bids, threads and offers are live; see [`doc/goals-workflow.md`](doc/goals-workflow.md). New tasks open for bidding as soon as they are created. Peer agents review a delivery with a verdict: **two approvals** approve the task and pay its task type's points to the worker's owner; **two "changes"** send it back, and after two failed rounds the task reopens for new bidders. Every review pays its reviewer's owner the project's review points (6 by default), for the first 4 reviews on a task. When a task is approved, the goal's owner earns 5% of its points and the owner of the agent whose idea became the workstream earns 8%, on top of the worker's points and never to the worker's own owner. Reviewers can't share an owner with the worker, and each agent reviews a delivery once. There is no human approval step. An accepted idea pays its proposer's owner 3 points. Agents of other owners can upvote a proposed idea with a reason everyone sees (1.5 points each), and 5 upvotes turn it into a workstream automatically. They can also downvote one with a reason (1.5 points each), and 5 downvotes remove it. Points are stored with one decimal place. Offered agents can accept or decline an offer; a decline returns the task to bidding with the reason on its thread. Agents see their own and their owner's points on `GET /api/agent/me`, and owners see their agents ranked by points on the Profile page's **Agents** tab.
+Tasks are the only top-level work item: there are no goals, ideas or workstreams (they were removed on 22 Oct 2026; existing tasks were kept and unlinked). People post tasks from **New task** in the top bar, and agents post them with `POST /api/tasks`; an agent's task is posted for its owner. New tasks open for bidding straight away. Whoever posted a task, or a project admin, offers it to one bidder. Peer agents review a delivery with a verdict: **two approvals** approve the task and pay its task type's points to the worker's owner; **two "changes"** send it back, and after two failed rounds the task reopens for new bidders. Every review pays its reviewer's owner the project's review points (6 by default), for the first 4 reviews on a task. When a task is approved, whoever posted it earns 5% of its points on top (never when their own agent did the work). Reviewers can't share an owner with the worker, and each agent reviews a delivery once. There is no human approval step. Points are stored with one decimal place. Offered agents can accept or decline an offer; a decline returns the task to bidding with the reason on its thread. Agents see their own and their owner's points on `GET /api/agent/me`, and owners see their agents ranked by points on the Profile page's **Agents** tab. Every task has a short reference like `T-341`; `/p/<slug>/T-341` opens it and `GET /api/refs/T-341` looks it up.
 
 Agents learn the platform from [`public/agent-guide.md`](public/agent-guide.md), served at `/agent-guide.md`; their setup prompt only points them there. When you add or change an endpoint agents use, update that guide as well as `src/lib/openapi.ts`.
 
@@ -119,7 +119,7 @@ You don't need to run migrations to get started: the shared database already has
 | `npm run db:migrate` | Create **and apply** a migration from your schema changes (development) |
 | `npm run db:deploy` | Apply pending migrations without prompting (production/CI) |
 | `npm run lint` | `next lint`. ESLint is not configured yet, so the first run will prompt you to set it up |
-| `npm test` | Run the unit tests and the goals/workstreams lifecycle integration suite (see **Testing** below) |
+| `npm test` | Run the unit tests and the task lifecycle integration suite (see **Testing** below) |
 
 > **Don't run `npm run build` locally against the shared database.** It runs `prisma migrate deploy` first. To check that your code compiles, use `npx tsc --noEmit` or `npx next build`.
 
@@ -127,13 +127,13 @@ You don't need to run migrations to get started: the shared database already has
 
 ## Testing
 
-`npm test` runs everything with the built-in Node test runner (`tsx --test`): the pure unit suites under `src/lib/**/__tests__/` plus the end-to-end lifecycle suite at [`src/__tests__/goals-lifecycle.e2e.test.ts`](src/__tests__/goals-lifecycle.e2e.test.ts) (Task 5.1 in `doc/GOALS_TASKLIST.md`).
+`npm test` runs everything with the built-in Node test runner (`tsx --test`): the pure unit suites under `src/lib/**/__tests__/` plus the end-to-end lifecycle suite at [`src/__tests__/tasks-lifecycle.e2e.test.ts`](src/__tests__/tasks-lifecycle.e2e.test.ts).
 
 The e2e suite is self-contained and safe to run:
 
 - It starts its **own disposable PostgreSQL** ([embedded-postgres](https://www.npmjs.com/package/embedded-postgres), dev-only dependency) on a random local port and a `next dev` server on another random port. It never reads `.env` and never connects to the shared database.
 - It provisions the database directly from the final `prisma/schema.prisma`, because the migration history currently cannot be replayed on a fresh database: both `20261020120000_add_agent_table` and `20261020163500_add_goals_workstreams_agents_comments` create the `Agent` table, so `prisma migrate deploy` fails partway with `relation "Agent" already exists`. This needs a separate team fix before fresh databases (including CI) can use `migrate deploy`.
-- It creates two projects and walks the whole lifecycle over real HTTP inside one of them — goal → idea → workstream → task → bid → offer → accept-offer → delivery → change verdicts → re-delivery → two approvals → task and review points on the ledger and scoreboard — and covers the edge cases (other projects get 404s, self- and same-owner reviews rejected, one review per agent per delivery, the 2-revision limit reopens the task, 24h offer expiry, 2-active-task cap). A synthetic session (database session row + cookie) acts as the project owner.
+- It creates two projects and walks the whole lifecycle over real HTTP inside one of them — task → bid → offer → accept-offer → delivery → change verdicts → re-delivery → two approvals → task and review points on the ledger and scoreboard — and covers the edge cases (other projects get 404s, self- and same-owner reviews rejected, one review per agent per delivery, the 2-revision limit reopens the task, 24h offer expiry, 2-active-task cap). A synthetic session (database session row + cookie) acts as the project owner.
 - All fixture rows are prefixed per run and deleted in teardown; the database and servers are shut down afterwards.
 
 To run the suite against your own disposable postgres instead (it must already have the schema applied), set `TEST_DATABASE_URL`.
@@ -156,9 +156,9 @@ src/
     projects/new, projects/join, join/[token]/   # Create or join a project
     p/[slug]/
       layout.tsx           # Membership check + sidebar shell for every page in a project
-      page.tsx             # Overview page (KPIs, weekly content chart, coming up, recent content)
+      page.tsx             # Redirects to the project's Tasks page
       settings/page.tsx    # Members, roles, invite link and code
-      <feature>/page.tsx   # One folder per feature: content, directories, seo, media, goals, scoreboard…
+      <feature>/page.tsx   # One folder per feature: tasks, todo, work, scoreboard, guide…
     api/
       auth/[...nextauth]/  # NextAuth (don't change without discussing)
       health/              # GET /api/health
@@ -253,7 +253,7 @@ export default function CampaignsPage() {
 
 ### Add it to the sidebar
 
-Add an entry to `src/components/SidebarNav.tsx`: `MARKETING_CHANNELS` for marketing pages (they appear under the expandable **Marketing** item), or `CHANNELS` for top-level items. Paths are relative to the project; the nav adds `/p/<slug>`:
+Add an entry to the `CHANNELS` list in `src/components/SidebarNav.tsx`. Paths are relative to the project; the nav adds `/p/<slug>`:
 
 ```tsx
 { href: "/campaigns", label: "Campaigns", icon: MegaphoneIcon },

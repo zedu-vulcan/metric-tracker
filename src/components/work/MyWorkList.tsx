@@ -32,12 +32,7 @@ export function TaskRow({ task, slug }: { task: UnifiedWorkItem; slug: string })
   const currentTab = getWorkItemTab(task);
   const stage = STAGES.find((item) => item.value === currentTab) ?? STAGES[0];
 
-  const href =
-    task.type === "idea"
-      ? task.status === "ACCEPTED" || currentTab === "approved"
-        ? `/p/${encodeURIComponent(slug)}/goals/${encodeURIComponent(task.goalId)}/workstreams/${encodeURIComponent(task.id)}`
-        : `/p/${encodeURIComponent(slug)}/goals/${encodeURIComponent(task.goalId)}`
-      : `/p/${encodeURIComponent(slug)}/goals/${encodeURIComponent(task.goalId)}/workstreams/${encodeURIComponent(task.workstreamId || "")}/tasks/${encodeURIComponent(task.id)}`;
+  const href = `/p/${encodeURIComponent(slug)}/tasks/${encodeURIComponent(task.id)}`;
 
   return (
     <Link
@@ -45,25 +40,8 @@ export function TaskRow({ task, slug }: { task: UnifiedWorkItem; slug: string })
       className="grid gap-3 rounded-[18px] border border-border bg-card p-4 text-inherit no-underline transition-colors hover:bg-muted/50 sm:grid-cols-[minmax(0,1fr)_minmax(130px,0.4fr)_90px_140px] sm:items-center sm:px-5"
     >
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <Badge
-            variant={task.type === "idea" ? "secondary" : "outline"}
-            className="text-[10px] uppercase tracking-wider px-1.5 py-0.5"
-          >
-            {task.type}
-          </Badge>
-          <p className="m-0 truncate font-semibold text-foreground">{task.title}</p>
-        </div>
-        <p className="m-0 mt-1 truncate text-xs text-muted-foreground">
-          {task.breadcrumbs?.goalTitle ?? task.goalTitle}
-          {task.breadcrumbs?.workstreamTitle || task.workstreamTitle ? (
-            <>
-              {" "}
-              <span aria-hidden="true">›</span>{" "}
-              {task.breadcrumbs?.workstreamTitle ?? task.workstreamTitle}
-            </>
-          ) : null}
-        </p>
+        <p className="m-0 truncate font-semibold text-foreground">{task.title}</p>
+        <p className="m-0 mt-1 font-mono text-xs text-muted-foreground">{task.ref}</p>
       </div>
 
       <div className="flex min-w-0 items-center gap-2">
@@ -166,7 +144,7 @@ export function MyWorkList({
         <div className="flex flex-col gap-2">
           {visible.map((task) => (
             <TaskRow
-              key={`${task.type}:${task.id}:${task.agent?.id ?? "none"}`}
+              key={`${task.id}:${task.agent?.id ?? "none"}`}
               task={task}
               slug={slug}
             />

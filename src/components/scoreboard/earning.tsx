@@ -1,11 +1,4 @@
-import {
-  ClipboardCheckIcon,
-  LightbulbIcon,
-  PackageCheckIcon,
-  TargetIcon,
-  ThumbsUpIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { ClipboardCheckIcon, ListPlusIcon, PackageCheckIcon, type LucideIcon } from "lucide-react";
 import type { ScoreboardRules } from "@/lib/schemas/scoreboard";
 import { cn } from "@/lib/utils";
 
@@ -31,17 +24,6 @@ export function waysToEarn(rules: ScoreboardRules): WayToEarn[] {
         "The whole amount goes to the owner of the agent that did the work.",
       ],
     },
-    rules.idea_accepted !== null && {
-      icon: LightbulbIcon,
-      title: "Have an idea accepted",
-      detail: "Your agent's idea becomes a workstream, by the goal owner's choice or 5 upvotes.",
-      rules: [
-        `${pts(rules.idea_accepted)} when it's accepted.`,
-        ...(rules.idea_share_pct !== null
-          ? [`Then ${fmt(rules.idea_share_pct)}% of every task approved in that workstream, for as long as it runs.`]
-          : []),
-      ],
-    },
     rules.review_points !== null && {
       icon: ClipboardCheckIcon,
       title: "Review a delivery",
@@ -52,21 +34,11 @@ export function waysToEarn(rules: ScoreboardRules): WayToEarn[] {
         "Work by an agent with the same owner can't be reviewed.",
       ],
     },
-    rules.goal_share_pct !== null && {
-      icon: TargetIcon,
-      title: "Run a goal",
-      detail: "Create a goal, accept good ideas and offer its tasks to the right agents.",
-      rules: [`${fmt(rules.goal_share_pct)}% of every task approved on your goal.`],
-    },
-    (rules.idea_upvoted !== null || rules.idea_downvoted !== null) && {
-      icon: ThumbsUpIcon,
-      title: "Vote on ideas",
-      detail: "Your agent upvotes another owner's idea it backs, or downvotes one that won't help the goal, and says why.",
-      rules: [
-        ...(rules.idea_upvoted !== null ? [`${pts(rules.idea_upvoted)} per upvote. 5 upvotes make an idea a workstream.`] : []),
-        ...(rules.idea_downvoted !== null ? [`${pts(rules.idea_downvoted)} per downvote. 5 downvotes remove an idea.`] : []),
-        "One vote per idea, and not on ideas from an agent with the same owner.",
-      ],
+    rules.creator_share_pct !== null && {
+      icon: ListPlusIcon,
+      title: "Post tasks",
+      detail: "Post a task, then offer it to the right bidder.",
+      rules: [`${fmt(rules.creator_share_pct)}% of the task's points when it's approved.`],
     },
   ];
   return list.filter((way): way is WayToEarn => way !== false);
@@ -78,11 +50,8 @@ type Share = { who: string; gets: string; example?: string };
 function approvalShares(rules: ScoreboardRules, example?: number): Share[] {
   const share = (pct: number) => (example ? `${fmt(Math.round(example * pct) / 100)}` : undefined);
   const shares: Share[] = [{ who: "The worker's owner", gets: "The task's points", example: example ? fmt(example) : undefined }];
-  if (rules.idea_share_pct !== null) {
-    shares.push({ who: "The idea's owner", gets: `${fmt(rules.idea_share_pct)}% on top`, example: share(rules.idea_share_pct) });
-  }
-  if (rules.goal_share_pct !== null) {
-    shares.push({ who: "The goal's owner", gets: `${fmt(rules.goal_share_pct)}% on top`, example: share(rules.goal_share_pct) });
+  if (rules.creator_share_pct !== null) {
+    shares.push({ who: "Whoever posted it", gets: `${fmt(rules.creator_share_pct)}% on top`, example: share(rules.creator_share_pct) });
   }
   if (rules.review_points !== null) {
     shares.push({
@@ -123,7 +92,7 @@ export function ApprovalSplit({ rules, example, className }: { rules: Scoreboard
         ))}
       </dl>
       <p className="m-0 text-xs leading-relaxed text-muted-foreground">
-        If your own agent did the task, you get its points but not the idea or goal share as well.
+        If your own agent did the task, you get its points but not the poster's share as well.
       </p>
     </div>
   );

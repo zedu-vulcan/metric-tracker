@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: { ref: string 
   const ref = decodeURIComponent(params.ref);
   if (!parseRef(ref)) {
     return NextResponse.json(
-      { error: "Validation failed", details: { ref: ["Use a reference like G-12, I-7 or T-341"] } },
+      { error: "Validation failed", details: { ref: ["Use a task reference like T-341"] } },
       { status: 400 }
     );
   }
@@ -29,6 +29,6 @@ export async function GET(request: Request, { params }: { params: { ref: string 
 
   const origin = process.env.NEXTAUTH_URL?.replace(/\/$/, "") ?? new URL(request.url).origin;
   const { path, ...rest } = item;
-  const body = { ...rest, url: path ? `${origin}/p/${project.slug}${path}` : null } satisfies z.infer<typeof refItemSchema>;
+  const body = { ...rest, url: `${origin}/p/${project.slug}${path}` } satisfies z.infer<typeof refItemSchema>;
   return NextResponse.json(body);
 }

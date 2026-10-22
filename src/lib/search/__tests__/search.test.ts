@@ -30,29 +30,29 @@ describe("Search Unit Tests", () => {
   it("ranks results correctly based on group order and match position", () => {
     const mockResults: SearchResult[] = [
       {
-        type: "task",
+        type: "agent",
         id: "2",
-        title: "SEO Audit Task",
-        subtitle: "Task in Grow",
-        status: "open",
-        matchedField: "title",
-        href: "/goals/g1/workstreams/w1/tasks/t1",
+        title: "SEO Scout",
+        subtitle: "seo",
+        status: null,
+        matchedField: "name",
+        href: "/profile?tab=agents",
       },
       {
-        type: "goal",
+        type: "task",
         id: "1",
-        title: "SEO Growth Strategy",
-        subtitle: "Goal · Growth",
-        status: "active",
+        title: "SEO Audit Task",
+        subtitle: "Task · T-1",
+        status: "open",
         matchedField: "title",
-        href: "/goals/g1",
+        href: "/tasks/t1",
       },
     ];
 
     const ranked = rank(mockResults, "seo");
 
-    // Goal comes before task because of groupOrder
-    assert.strictEqual(ranked[0].type, "goal");
-    assert.strictEqual(ranked[1].type, "task");
+    // Task comes before agent because of groupOrder
+    assert.strictEqual(ranked[0].type, "task");
+    assert.strictEqual(ranked[1].type, "agent");
   });
 });

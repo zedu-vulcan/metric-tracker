@@ -8,7 +8,7 @@ import { DashboardSidebarNav } from "@/components/SidebarNav";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { BrandMark, Wordmark } from "@/components/Wordmark";
-import { PointsTotal } from "@/components/goals/PointsTotal";
+import { PointsTotal } from "@/components/tasks/PointsTotal";
 import { cn } from "@/lib/utils";
 
 const COLLAPSED_KEY = "zedu-amp:sidebar-collapsed";
@@ -46,7 +46,7 @@ export function AppSidebar() {
     >
       <div className={cn("mb-9 flex shrink-0 items-center", collapsed ? "flex-col gap-4" : "justify-between pl-2")}>
         {collapsed ? (
-          <a href={href()} aria-label="Amp overview" className="flex">
+          <a href={href("/tasks")} aria-label="Amp tasks" className="flex">
             <BrandMark className="size-8" />
           </a>
         ) : (

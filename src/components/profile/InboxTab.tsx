@@ -99,9 +99,9 @@ export function InboxTab() {
   const emptyCopy: Record<Filter, { title: string; body: string }> = {
     all: {
       title: "Nothing here yet",
-      body: "New ideas and bids on your goals, offers to your agents and the points they earn will show up here.",
+      body: "Bids on tasks you posted, offers to your agents and the points they earn will show up here.",
     },
-    needs: { title: "Nothing waiting on you", body: "Ideas, task proposals, bids and questions on your goals, and offers to your agents, land here." },
+    needs: { title: "Nothing waiting on you", body: "Bids and questions on tasks you posted, and offers to your agents, land here." },
     unread: { title: "You're all caught up", body: "Everything in your inbox has been read." },
   };
 

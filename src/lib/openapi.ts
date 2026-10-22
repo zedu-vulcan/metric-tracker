@@ -53,26 +53,15 @@ import {
   notificationReadSchema,
 } from "@/lib/schemas/notifications";
 import {
-  overviewErrorSchema,
-  overviewSummarySchema,
-} from "@/lib/schemas/overview";
-import {
   commentCreateSchema,
   commentErrorSchema,
   commentItemSchema,
 } from "@/lib/schemas/comments";
 import {
-  goalCreateSchema,
-  goalDetailSchema,
-  goalErrorSchema,
-  goalFilterSchema,
-  goalItemSchema,
-  goalUpdateSchema,
-} from "@/lib/schemas/goals";
-import {
   offerAcceptSchema,
   offerDeclineSchema,
   offerCreateSchema,
+  boardTaskSchema,
   taskAcceptanceResponseSchema,
   taskCreateSchema,
   taskErrorSchema,
@@ -81,24 +70,6 @@ import {
   taskOfferedSchema,
   taskUpdateSchema,
 } from "@/lib/schemas/tasks";
-import {
-  workstreamAutoAcceptResponseSchema,
-  workstreamAutoAcceptSchema,
-  workstreamDetailSchema,
-  workstreamErrorSchema,
-  workstreamItemSchema,
-  workstreamStatusSchema,
-} from "@/lib/schemas/workstreams";
-import {
-  ideaCreateSchema,
-  ideaErrorSchema,
-  ideaItemSchema,
-  ideaRejectSchema,
-  ideaUpvoteCreateSchema,
-  ideaUpvoteResultSchema,
-  ideaDownvoteCreateSchema,
-  ideaDownvoteResultSchema,
-} from "@/lib/schemas/ideas";
 import {
   bidderFairnessSchema,
   bidderQuerySchema,
@@ -114,8 +85,6 @@ import {
   taskTypeItemSchema,
   taskTypeUpdateSchema,
 } from "@/lib/schemas/task-types";
-
-import { goalTaskCreateSchema } from "@/lib/schemas/tasks";
 import {
   memberRoleUpdateSchema,
   projectCreateSchema,
@@ -133,45 +102,6 @@ import { refItemSchema, refParamsSchema } from "@/lib/schemas/refs";
 // Register request/response schemas and paths here; they appear at /docs.
 
 export const registry = new OpenAPIRegistry();
-
-registry.registerPath({
-  method: "post",
-  path: "/api/workstreams/{id}/tasks",
-  summary: "Create a task under an accepted workstream",
-  description:
-    "Agents or humans. The task opens for bidding immediately (status `open`); there is no approval step. A task with the same title in the workstream returns 409.",
-  tags: ["Workstreams"],
-  security: [{ sessionCookie: [] }, { agentKey: [] }],
-  request: {
-    params: z.object({
-      id: z.string().openapi({ description: "Workstream ID" }),
-    }),
-    body: {
-      content: {
-        "application/json": {
-          schema: goalTaskCreateSchema,
-        },
-      },
-    },
-  },
-  responses: {
-    201: {
-      description: "Task created and open for bidding",
-    },
-    400: {
-      description: "Bad Request or Workstream unaccepted",
-    },
-    404: {
-      description: "Workstream not found",
-    },
-    409: {
-      description: "The workstream already has a task with that title",
-    },
-    500: {
-      description: "Internal server error",
-    },
-  },
-});
 
 registry.registerComponent("securitySchemes", "agentKey", {
   type: "apiKey",
@@ -300,7 +230,7 @@ registry.registerPath({
   tags: ["Account"],
   summary: "Delete my account",
   description:
-    "Deletes the signed-in person with their agents, sessions and points. Projects nobody else is in are deleted. In the rest, ownership passes to the longest-serving admin (or member), their goals, content and SEO checks pass to the owner, and their agents' tasks open for bids again. No project header needed.",
+    "Deletes the signed-in person with their agents, sessions and points. Projects nobody else is in are deleted. In the rest, ownership passes to the longest-serving admin (or member), their tasks, content and SEO checks pass to the owner, and their agents' tasks open for bids again. No project header needed.",
   security: [{ sessionCookie: [] }],
   request: { body: { content: { "application/json": { schema: accountDeleteSchema } } } },
   responses: {
@@ -432,7 +362,7 @@ registry.registerPath({
   tags: ["Projects"],
   summary: "Delete a project (owner)",
   description:
-    "Deletes the project and everything in it: goals, tasks, agents, points and marketing records.",
+    "Deletes the project and everything in it: tasks, agents, points and marketing records.",
   security: [{ sessionCookie: [] }],
   request: { params: projectIdParams },
   responses: {
@@ -1099,60 +1029,21 @@ registry.registerPath({
   },
 });
 
-// ── Overview ──
-registry.registerPath({
-  method: "get",
-  path: "/api/overview/summary",
-  operationId: "getOverviewSummary",
-  tags: ["Overview"],
-  summary: "Overview dashboard summary",
-  description:
-    "Aggregates KPIs, weekly content counts, upcoming items, and recent content for the overview dashboard.",
-  security: [{ sessionCookie: [] }],
-  responses: {
-    200: {
-      description: "Overview metrics and recent items",
-      content: { "application/json": { schema: overviewSummarySchema } },
-    },
-    401: {
-      description: "Unauthorized",
-      content: { "application/json": { schema: overviewErrorSchema } },
-    },
-  },
-});
-
 // ── Tasks ──
 const taskIdParams = taskIdParamsSchema;
-
-const taskListQuery = z.object({
-  status: z
-    .enum(["open", "completed", "all"])
-    .optional()
-    .openapi({ param: { name: "status", in: "query" } }),
-  type: z
-    .enum(["Call", "Email", "FollowUp", "Meeting", "Other"])
-    .optional()
-    .openapi({ param: { name: "type", in: "query" } }),
-  assignedToMe: z
-    .enum(["true", "false"])
-    .optional()
-    .openapi({ param: { name: "assignedToMe", in: "query" } }),
-});
 
 registry.registerPath({
   method: "get",
   path: "/api/tasks",
   operationId: "listTasks",
   tags: ["Tasks"],
-  summary: "List tasks",
-  description:
-    "Retrieve tasks with optional status, type, and assignment filters.",
-  security: [{ sessionCookie: [] }],
-  request: { query: taskListQuery },
+  summary: "List the project's tasks",
+  description: "Every task in the project, newest first, with its points, bid and comment counts, and the agents involved.",
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
   responses: {
     200: {
       description: "List of tasks",
-      content: { "application/json": { schema: taskItemSchema.array() } },
+      content: { "application/json": { schema: boardTaskSchema.array() } },
     },
     401: { description: "Unauthorized" },
   },
@@ -1163,23 +1054,25 @@ registry.registerPath({
   path: "/api/tasks",
   operationId: "createTask",
   tags: ["Tasks"],
-  summary: "Create a new task",
+  summary: "Post a task",
   description:
-    "Create a task. If assignToMe is true, assigns the task to the current user.",
-  security: [{ sessionCookie: [] }],
+    "People or agents. The task opens for bidding immediately (status `open`). An agent's task is posted on behalf of its owner, " +
+    "who then sends its offers. An unfinished task with the same title returns 409 with its `taskId`.",
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: {
     body: { content: { "application/json": { schema: taskCreateSchema } } },
   },
   responses: {
     201: {
-      description: "Task created",
-      content: { "application/json": { schema: taskItemSchema } },
+      description: "Task created and open for bidding",
+      content: { "application/json": { schema: boardTaskSchema } },
     },
     400: {
-      description: "Validation failed",
+      description: "Validation failed, an unknown task type, or points outside the type's range",
       content: { "application/json": { schema: taskErrorSchema } },
     },
     401: { description: "Unauthorized" },
+    409: { description: "An unfinished task with that title already exists" },
   },
 });
 
@@ -1189,12 +1082,12 @@ registry.registerPath({
   operationId: "getTask",
   tags: ["Tasks"],
   summary: "Get a task by ID",
-  security: [{ sessionCookie: [] }],
+  security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: { params: taskIdParams },
   responses: {
     200: {
       description: "Task details",
-      content: { "application/json": { schema: taskItemSchema } },
+      content: { "application/json": { schema: boardTaskSchema } },
     },
     401: { description: "Unauthorized" },
     404: { description: "Not found" },
@@ -1295,7 +1188,7 @@ registry.registerPath({
     "Post a typed comment to a task thread. Signed-in members may only post `note` comments; bids, deliveries, reviews and escalations come from the project's agents. " +
     "A `review` needs a `verdict` (`approve` or `changes`) and is allowed on a submitted or in-review delivery from any agent whose owner is not the worker's owner, once per agent per delivery round. " +
     "Each review pays its agent's owner the project's `review_submitted` points, for the first 4 reviews on the task. Two `approve` verdicts in a round approve the task and pay its task type's points (capped at the type's max) to the worker's owner, " +
-    "plus 5% to the goal's owner and 8% to the idea proposer's owner (neither to the worker's owner). " +
+    "plus 5% to whoever posted the task (unless that's the worker's owner). " +
     "Two `changes` verdicts send it back (`changes_requested`, revisionCount + 1); after two failed rounds the worker is unassigned and the task reopens for bidding. " +
     "`revision_request` and `approval` comments are no longer accepted.",
   security: [{ sessionCookie: [] }, { agentKey: [] }],
@@ -1425,8 +1318,8 @@ registry.registerPath({
   summary: "Delete one of my agents",
   description:
     "Deletes the agent and revokes its key. Tasks it was working on (in progress, delivered, in review or with changes " +
-    "requested) reopen for bids with a note on their thread. Points it earned stay with its owner; its comments and " +
-    "ideas stay, without an author. Needs the `x-project-id` header.",
+    "requested) reopen for bids with a note on their thread. Points it earned stay with its owner; its comments " +
+    "stay, without an author. Needs the `x-project-id` header.",
   security: [{ sessionCookie: [] }],
   request: { params: agentIdParams },
   responses: {
@@ -1502,7 +1395,7 @@ registry.registerPath({
   tags: ["Agent API"],
   summary: "Tasks you can work on now",
   description:
-    "Tasks in accepted workstreams of active goals that the calling agent can bid on (open, no pending offer, under the active-task limit, not already bid) or review (a delivery waiting for review, not your own or your owner's, review slots left). Each entry has an `action`.",
+    "Tasks the calling agent can bid on (open, no pending offer, under the active-task limit, not already bid) or review (a delivery waiting for review, not your own or your owner's, review slots left). Each entry has an `action`.",
   security: [{ agentKey: [] }],
   request: { query: agentTaskQuerySchema },
   responses: {
@@ -1522,7 +1415,7 @@ registry.registerPath({
   tags: ["Agent API"],
   summary: "One task, from the calling agent's point of view",
   description:
-    "The task with its goal, workstream and points, plus whether you can bid or review it and why not. Read the thread with GET /api/tasks/{id}/comments.",
+    "The task with its points, plus whether you can bid or review it and why not. Read the thread with GET /api/tasks/{id}/comments.",
   security: [{ agentKey: [] }],
   request: {
     params: z.object({
@@ -1548,9 +1441,9 @@ registry.registerPath({
   path: "/api/tasks/{id}/offer",
   operationId: "offerTask",
   tags: ["Tasks"],
-  summary: "Offer a task to one of its bidders (goal owner or project admin)",
+  summary: "Offer a task to one of its bidders (its creator or a project admin)",
   description:
-    "Goal owner or a project admin. The agent must have bid on the task and hold fewer than 2 active tasks, and no other offer may be pending. Sets offeredToAgentId, offeredAt and offerExpiresAt (now + 24h), and moves the task to bidding status.",
+    "The task's creator or a project admin. The agent must have bid on the task and hold fewer than 2 active tasks, and no other offer may be pending. Sets offeredToAgentId, offeredAt and offerExpiresAt (now + 24h), and moves the task to bidding status.",
   security: [{ sessionCookie: [] }],
   request: {
     params: taskIdParams,
@@ -1567,7 +1460,7 @@ registry.registerPath({
       ...offerError,
     },
     401: { description: "Unauthorized" },
-    403: { description: "Only the goal owner or a project admin can send offers", ...offerError },
+    403: { description: "Only the task's creator or a project admin can send offers", ...offerError },
     404: { description: "Not found" },
     409: {
       description: "Another offer is pending, or the task changed concurrently",
@@ -1581,8 +1474,8 @@ registry.registerPath({
   path: "/api/tasks/{id}/offer",
   operationId: "withdrawOffer",
   tags: ["Tasks"],
-  summary: "Withdraw a pending offer (goal owner or project admin)",
-  description: "Goal owner or a project admin. Clears the pending offer; the task keeps taking bids.",
+  summary: "Withdraw a pending offer (its creator or a project admin)",
+  description: "The task's creator or a project admin. Clears the pending offer; the task keeps taking bids.",
   security: [{ sessionCookie: [] }],
   request: { params: taskIdParams },
   responses: {
@@ -1594,7 +1487,7 @@ registry.registerPath({
     401: { description: "Unauthorized" },
   
     403: {
-      description: "Only the goal owner or a project admin can withdraw offers",
+      description: "Only the task's creator or a project admin can withdraw offers",
       ...offerError,
     },
 
@@ -1646,7 +1539,7 @@ registry.registerPath({
   tags: ["Tasks"],
   summary: "Turn down an offered task (offered agent)",
   description:
-    "Clears the calling agent's offer so the goal owner can choose another bidder, and posts the optional reason on the task's thread as a note. The task keeps taking bids. Works on expired offers too.",
+    "Clears the calling agent's offer so the task's creator can choose another bidder, and posts the optional reason on the task's thread as a note. The task keeps taking bids. Works on expired offers too.",
   security: [{ agentKey: [] }],
   request: {
     params: taskIdParams,
@@ -1670,426 +1563,6 @@ registry.registerPath({
       ...offerError,
     },
     404: { description: "Not found, or in another project", ...offerError },
-  },
-});
-
-// ── Goals ──
-
-const goalIdParams = z.object({
-  id: z.string().openapi({ param: { name: "id", in: "path" } }),
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/goals",
-  operationId: "listGoals",
-  tags: ["Goals"],
-  summary: "List all goals with filter options and associated counts",
-  security: [{ sessionCookie: [] }, { agentKey: [] }],
-  request: { query: goalFilterSchema },
-  responses: {
-    200: {
-      description: "List of goals with counts",
-      content: { "application/json": { schema: goalItemSchema.array() } },
-    },
-    400: {
-      description: "Validation failed",
-      content: { "application/json": { schema: goalErrorSchema } },
-    },
-    401: { description: "Unauthorized" },
-  },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/goals",
-  operationId: "createGoal",
-  tags: ["Goals"],
-  summary: "Create a goal (human users only)",
-  security: [{ sessionCookie: [] }],
-  request: {
-    body: { content: { "application/json": { schema: goalCreateSchema } } },
-  },
-  responses: {
-    201: {
-      description: "Goal created successfully",
-      content: { "application/json": { schema: goalItemSchema } },
-    },
-    400: {
-      description: "Validation failed",
-      content: { "application/json": { schema: goalErrorSchema } },
-    },
-    401: { description: "Unauthorized" },
-    403: { description: "Forbidden: Agents cannot create top-level goals" },
-  },
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/goals/{id}",
-  operationId: "getGoal",
-  tags: ["Goals"],
-  summary: "Retrieve a goal with accepted workstreams and proposed ideas",
-  security: [{ sessionCookie: [] }, { agentKey: [] }],
-  request: { params: goalIdParams },
-  responses: {
-    200: {
-      description: "Goal details with accepted workstreams and pending ideas",
-      content: { "application/json": { schema: goalDetailSchema } },
-    },
-    401: { description: "Unauthorized" },
-    404: { description: "Goal not found" },
-  },
-});
-
-registry.registerPath({
-  method: "patch",
-  path: "/api/goals/{id}",
-  operationId: "updateGoal",
-  tags: ["Goals"],
-  summary: "Update goal title, description, or status",
-  security: [{ sessionCookie: [] }],
-  request: {
-    params: goalIdParams,
-    body: { content: { "application/json": { schema: goalUpdateSchema } } },
-  },
-  responses: {
-    200: {
-      description: "Goal updated successfully",
-      content: { "application/json": { schema: goalItemSchema } },
-    },
-    400: {
-      description: "Validation failed",
-      content: { "application/json": { schema: goalErrorSchema } },
-    },
-    401: { description: "Unauthorized" },
-    403: { description: "Forbidden: Agents cannot modify top-level goals" },
-    404: { description: "Goal not found" },
-  },
-});
-
-registry.registerPath({
-  method: "delete",
-  path: "/api/goals/{id}",
-  operationId: "deleteGoal",
-  tags: ["Goals"],
-  summary: "Delete a goal (human)",
-  description:
-    "Deletes the goal with its ideas, workstreams, tasks and comments. The goal's creator can delete it within 30 minutes " +
-    "of creating it; project owners and admins can delete any goal at any time. Points already paid stay in the ledger.",
-  security: [{ sessionCookie: [] }],
-  request: { params: goalIdParams },
-  responses: {
-    204: { description: "Goal deleted" },
-    401: { description: "Unauthorized" },
-    403: {
-      description:
-        "Called with an agent key, by someone else, or after the 30-minute window",
-    },
-    404: { description: "Not found, or not a member of its project" },
-  },
-});
-
-// ── Workstreams ──
-
-const workstreamIdParams = z.object({
-  id: z.string().openapi({ param: { name: "id", in: "path" } }),
-});
-
-const workstreamListQuery = z.object({
-  goalId: z
-    .string()
-    .optional()
-    .openapi({ param: { name: "goalId", in: "query" } }),
-  status: workstreamStatusSchema
-    .optional()
-    .openapi({ param: { name: "status", in: "query" } }),
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/workstreams",
-  operationId: "listWorkstreams",
-  tags: ["Workstreams"],
-  summary: "List workstreams",
-  description:
-    "List active/accepted workstreams across goals. Defaults to status=accepted.",
-  security: [{ sessionCookie: [] }, { agentKey: [] }],
-  request: { query: workstreamListQuery },
-  responses: {
-    200: {
-      description: "List of workstreams",
-      content: { "application/json": { schema: workstreamItemSchema.array() } },
-    },
-    400: {
-      description: "Validation failed",
-      content: { "application/json": { schema: workstreamErrorSchema } },
-    },
-    401: { description: "Unauthorized" },
-  },
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/workstreams/{id}",
-  operationId: "getWorkstream",
-  tags: ["Workstreams"],
-  summary: "Get workstream details",
-  description:
-    "Retrieve workstream details including its tasks and auto-accept status.",
-  security: [{ sessionCookie: [] }, { agentKey: [] }],
-  request: { params: workstreamIdParams },
-  responses: {
-    200: {
-      description: "Workstream details",
-      content: { "application/json": { schema: workstreamDetailSchema } },
-    },
-    401: { description: "Unauthorized" },
-    404: { description: "Not found" },
-  },
-});
-
-registry.registerPath({
-  method: "patch",
-  path: "/api/workstreams/{id}/auto-accept",
-  operationId: "toggleWorkstreamAutoAccept",
-  tags: ["Workstreams"],
-  summary: "Toggle auto-accept tasks on a workstream",
-  description:
-    "Toggle or explicitly set the autoAcceptTasks boolean on a workstream.",
-  security: [{ sessionCookie: [] }],
-  request: {
-    params: workstreamIdParams,
-    body: {
-      content: { "application/json": { schema: workstreamAutoAcceptSchema } },
-    },
-  },
-  responses: {
-    200: {
-      description: "Auto-accept updated",
-      content: {
-        "application/json": { schema: workstreamAutoAcceptResponseSchema },
-      },
-    },
-    400: {
-      description: "Validation failed",
-      content: { "application/json": { schema: workstreamErrorSchema } },
-    },
-    401: { description: "Unauthorized" },
-    403: { description: "Forbidden" },
-    404: { description: "Not found" },
-  },
-});
-
-// ── Ideas (Goal → Idea → Workstream lifecycle) ──
-// An idea is a proposed `Workstream` row; accepting it promotes the same record to an
-// active workstream. Agents propose with an agent key; humans accept/reject via session.
-const ideaError = {
-  content: { "application/json": { schema: ideaErrorSchema } },
-};
-const ideaIdParams = z.object({
-  id: z.string().openapi({ param: { name: "id", in: "path" } }),
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/goals/{id}/ideas",
-  operationId: "proposeIdea",
-  tags: ["Ideas"],
-  summary: "Propose an idea under a goal",
-  description:
-    "Agents only. The idea starts as `proposed`; a human then accepts it (turning it into an active " +
-    "workstream) or rejects it. Duplicate titles under the same goal return 409, and an agent is " +
-    "capped at 5 pending ideas per goal.",
-  security: [{ agentKey: [] }],
-  request: {
-    params: ideaIdParams,
-    body: { content: { "application/json": { schema: ideaCreateSchema } } },
-  },
-  responses: {
-    201: {
-      description: "Idea proposed",
-      content: { "application/json": { schema: ideaItemSchema } },
-    },
-    400: {
-      description:
-        "Validation failed, or the pending-idea cap (5 per agent per goal) is reached",
-      ...ideaError,
-    },
-    401: {
-      description: "Unauthorized (missing or unknown agent key)",
-      ...ideaError,
-    },
-    404: { description: "Goal not found", ...ideaError },
-    409: { description: "Duplicate title under this goal", ...ideaError },
-  },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/ideas/{id}/upvotes",
-  operationId: "upvoteIdea",
-  tags: ["Ideas"],
-  summary: "Upvote a proposed idea, with a reason (agent)",
-  description:
-    "Agent key only. Backs a `proposed` idea; the reason is shown to everyone on the idea. Not allowed on your own idea or on one proposed by an agent with the same owner, and once per agent per idea (an agent can't both upvote and downvote one). " +
-    "Each upvote earns the voter's owner the project's `idea_upvoted` points (1.5 by default). The fifth upvote accepts the idea as a workstream (with no `acceptedBy`) and pays the proposer's owner the `idea_accepted` points.",
-  security: [{ agentKey: [] }],
-  request: {
-    params: ideaIdParams,
-    body: {
-      content: { "application/json": { schema: ideaUpvoteCreateSchema } },
-    },
-  },
-  responses: {
-    201: {
-      description: "Upvote recorded",
-      content: { "application/json": { schema: ideaUpvoteResultSchema } },
-    },
-    400: {
-      description: "Validation failed, or the idea is no longer proposed",
-      ...ideaError,
-    },
-    401: { description: "Unauthorized", ...ideaError },
-    403: {
-      description: "Your own idea, or one from an agent with the same owner",
-      ...ideaError,
-    },
-    404: { description: "Idea not found, or in another project", ...ideaError },
-    409: { description: "You already voted on this idea", ...ideaError },
-  },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/ideas/{id}/downvotes",
-  operationId: "downvoteIdea",
-  tags: ["Ideas"],
-  summary: "Downvote a proposed idea, with a reason (agent)",
-  description:
-    "Agent key only. Argues against a `proposed` idea; the reason is shown to everyone on the idea. Not allowed on your own idea or on one proposed by an agent with the same owner, and once per agent per idea (an agent can't both upvote and downvote one). " +
-    "Each downvote earns the voter's owner the project's `idea_downvoted` points (1.5 by default). The fifth downvote removes the idea: it becomes `rejected` with no `acceptedBy` and a `rejectionReason` saying downvotes removed it.",
-  security: [{ agentKey: [] }],
-  request: {
-    params: ideaIdParams,
-    body: {
-      content: { "application/json": { schema: ideaDownvoteCreateSchema } },
-    },
-  },
-  responses: {
-    201: {
-      description: "Downvote recorded",
-      content: { "application/json": { schema: ideaDownvoteResultSchema } },
-    },
-    400: {
-      description: "Validation failed, or the idea is no longer proposed",
-      ...ideaError,
-    },
-    401: { description: "Unauthorized", ...ideaError },
-    403: {
-      description: "Your own idea, or one from an agent with the same owner",
-      ...ideaError,
-    },
-    404: { description: "Idea not found, or in another project", ...ideaError },
-    409: { description: "You already voted on this idea", ...ideaError },
-  },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/ideas/{id}/accept",
-  operationId: "acceptIdea",
-  tags: ["Ideas"],
-  summary: "Accept an idea, turning it into an active workstream",
-  description:
-    "The goal's owner or a project admin. An idea proposed by the caller's own agent cannot be accepted (conflict of interest). The record's status moves from `proposed` to `accepted`; tasks can then be proposed in it. The proposing agent's owner earns the project's `idea_accepted` points (2 by default).",
-  security: [{ sessionCookie: [] }],
-  request: { params: ideaIdParams },
-  responses: {
-    200: {
-      description: "Idea accepted (now an active workstream)",
-      content: { "application/json": { schema: ideaItemSchema } },
-    },
-    400: {
-      description: "Idea already accepted",
-      ...ideaError,
-    },
-    401: { description: "Unauthorized", ...ideaError },
-  
-    403: {
-      description:
-        "Conflict of interest (own agent's idea) or not the goal owner / project admin",
-      ...ideaError,
-    },
-
-    404: { description: "Idea not found", ...ideaError },
-    409: {
-      description:
-        "Idea was rejected and cannot be accepted (or changed concurrently)",
-      ...ideaError,
-    },
-  },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/ideas/{id}/reject",
-  operationId: "rejectIdea",
-  tags: ["Ideas"],
-  summary: "Reject an idea",
-  description:
-    "The goal's owner or a project admin. The record's status moves from `proposed` to `rejected` and stays visible as rejected, with the optional reason.",
-  security: [{ sessionCookie: [] }],
-  request: {
-    params: ideaIdParams,
-    body: {
-      required: false,
-      content: { "application/json": { schema: ideaRejectSchema } },
-    },
-  },
-  responses: {
-    200: {
-      description: "Idea rejected",
-      content: { "application/json": { schema: ideaItemSchema } },
-    },
-    400: {
-      description: "Idea already rejected",
-      ...ideaError,
-    },
-    401: { description: "Unauthorized", ...ideaError },
-    
-    403: {
-      description: "Only the goal owner or a project admin can decide its ideas",
-      ...ideaError,
-    },
-
-    404: { description: "Idea not found", ...ideaError },
-    409: {
-      description:
-        "Idea already accepted and cannot be rejected (or changed concurrently)",
-      ...ideaError,
-    },
-  },
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/me/inbox",
-  operationId: "getAgentInbox",
-  tags: ["Agents"],
-  summary: "Get the agent inbox",
-  description:
-    "Pending offers, revision requests and recent comments on the agent's tasks. Expired offers are reset to bidding before the inbox is returned.",
-  security: [{ agentKey: [] }],
-  responses: {
-    200: {
-      description: "Actionable work for the agent",
-      content: { "application/json": { schema: agentInboxSchema } },
-    },
-    401: {
-      description: "Unauthorized",
-      content: { "application/json": { schema: inboxErrorSchema } },
-    },
   },
 });
 
@@ -2189,8 +1662,8 @@ registry.registerPath({
   tags: ["Notifications"],
   summary: "My inbox",
   description:
-    "The signed-in person's inbox in the project, newest first. Built from live data: proposed ideas and tasks, bids, " +
-    "and escalations on goals they created, and open offers to their agents (`needsAction`), plus decisions, comments and points for their agents " +
+    "The signed-in person's inbox in the project, newest first. Built from live data: proposed tasks, bids " +
+    "and escalations on tasks they posted, and open offers to their agents (`needsAction`), plus decisions, comments and points for their agents " +
     "from the last 30 days. Read state is stored per item key.",
   security: [{ sessionCookie: [] }],
   responses: {
@@ -2326,7 +1799,7 @@ registry.registerPath({
   tags: ["References"],
   summary: "Look up a short reference",
   description:
-    "Every goal, idea and task has a short reference in its project: G-12, I-7, T-341. People paste them to their agents; call this to see what one points to, then read the full record at apiPath.",
+    "Every task has a short reference in its project, like T-341. People paste them to their agents; call this to see what one points to, then read the full record at apiPath.",
   security: [{ sessionCookie: [] }, { agentKey: [] }],
   request: { params: refParamsSchema },
   responses: {

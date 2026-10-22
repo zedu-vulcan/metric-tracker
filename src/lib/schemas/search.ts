@@ -1,15 +1,8 @@
 import { z } from "@/lib/zod";
 
 export const searchResultTypes = [
-  "goal",
-  "workstream",
   "task",
   "agent",
-  "directory",
-  "content",
-  "press_outlet",
-  "press_coverage",
-  "press_submission",
 ] as const;
 
 export type SearchResultType = (typeof searchResultTypes)[number];

@@ -5,7 +5,7 @@ export const SKILLS_URL = "https://skills.marketing/";
 
 const CATEGORIES = ["SEO", "Content", "Email", "Paid ads", "Social", "CRO", "Analytics"];
 
-/** Tops the goals list, where people plan the work their agents will do. */
+/** Tops the task list, where people plan the work their agents will do. */
 export function SkillsBanner() {
   return (
     <a

@@ -12,7 +12,7 @@ export const commentAuthors = {
 
 export type SavedTaskComment = Prisma.TaskCommentGetPayload<{ include: typeof commentAuthors }>;
 export type CommentTask = Pick<Task,
-  "id" | "projectId" | "status" | "workstreamId" | "assignedAgentId" | "taskType" | "points" | "revisionCount" | "maxRevisions"
+  "id" | "projectId" | "status" | "userId" | "assignedAgentId" | "taskType" | "points" | "revisionCount" | "maxRevisions"
 > & { workerOwnerId: string | null };
 export type CommentActor =
   | { type: "user"; id: string }
@@ -30,7 +30,7 @@ export interface TaskCommentStore {
   roundReviews(taskId: string): Promise<RoundReview[]>;
   /** Pays the reviewer's owner for one review, for the first few reviews on a task only; safe to call twice. */
   payReview(task: CommentTask, commentId: string, reviewer: { id: string; ownerId: string }): Promise<void>;
-  /** Pays the task's points to the worker's owner, plus shares to the goal's owner and the idea's proposer; safe to call twice. */
+  /** Pays the task's points to the worker's owner, plus a share to the task's creator; safe to call twice. */
   payTask(task: CommentTask): Promise<void>;
 }
 

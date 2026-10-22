@@ -30,26 +30,24 @@ enum SubmissionStatus {
 }
 
 model User {
-  id                  String          @id @default(cuid())
-  name                String?
-  email               String?         @unique
-  emailVerified       DateTime?
-  image               String?
-  accounts            Account[]
-  sessions            Session[]
-  contentItems        ContentItem[]
-  seoChecks           SeoCheck[]
-  agents              Agent[]
-  createdGoals        Goal[]          @relation("GoalCreator")
-  acceptedWorkstreams Workstream[]    @relation("WorkstreamAcceptor")
-  taskComments        TaskComment[]   @relation("UserCommentAuthor")
-  createdTasks        Task[]          @relation("TaskCreator")
-  assignedTasks       Task[]          @relation("TaskOwner")
-  isPlatformAdmin     Boolean         @default(false) @map("is_platform_admin")
-  ledgerEntries       PointsLedger[]
-  memberships         ProjectMember[]
-  createdProjects     Project[]       @relation("ProjectCreator")
-  inboxReads          InboxRead[]
+  id              String          @id @default(cuid())
+  name            String?
+  email           String?         @unique
+  emailVerified   DateTime?
+  image           String?
+  accounts        Account[]
+  sessions        Session[]
+  contentItems    ContentItem[]
+  seoChecks       SeoCheck[]
+  agents          Agent[]
+  taskComments    TaskComment[]   @relation("UserCommentAuthor")
+  createdTasks    Task[]          @relation("TaskCreator")
+  assignedTasks   Task[]          @relation("TaskOwner")
+  isPlatformAdmin Boolean         @default(false) @map("is_platform_admin")
+  ledgerEntries   PointsLedger[]
+  memberships     ProjectMember[]
+  createdProjects Project[]       @relation("ProjectCreator")
+  inboxReads      InboxRead[]
 }
 
 enum ProjectRole {
@@ -58,7 +56,7 @@ enum ProjectRole {
   member
 }
 
-/// A team's workspace. Everything (goals, agents, points, marketing data) belongs to one project.
+/// A team's workspace. Everything (tasks, agents, points, marketing data) belongs to one project.
 /// People join with the invite link (`inviteToken`) or the join code; admins regenerate both to revoke them.
 model Project {
   id                String              @id @default(cuid())
@@ -70,7 +68,6 @@ model Project {
   createdBy         User?               @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
   members           ProjectMember[]
   agents            Agent[]
-  goals             Goal[]
   tasks             Task[]
   taskTypes         TaskTypeDef[]
   pointRules        PointRule[]
@@ -84,9 +81,7 @@ model Project {
   directories       Directory[]
   directoryActivity DirectoryActivity[]
   savedCopy         SavedCopy[]
-  /// The last goal, idea and task numbers handed out (G-12, I-7, T-341). Database triggers advance them.
-  lastGoalNumber    Int                 @default(0)
-  lastIdeaNumber    Int                 @default(0)
+  /// The last task number handed out (T-341). A database trigger advances it.
   lastTaskNumber    Int                 @default(0)
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -345,132 +340,30 @@ model PressOutlet {
 
 // An AI agent a user connects to the platform. The plain key is shown once at creation; only its hash is stored.
 model Agent {
-  projectId           String
-  project             Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  id                  String         @id @default(cuid())
-  name                String
-  speciality          String // e.g. "seo", "content", "research"
-  description         String?
-  avatarStyle         String         @default("bottts")
-  avatarSeed          String         @default("default")
-  keyHash             String         @unique
-  keyHint             String
-  ownerId             String
-  owner               User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  connectedAt         DateTime?
-  lastActiveAt        DateTime?
-  proposedWorkstreams Workstream[]   @relation("WorkstreamProposer")
-  assignedTasks       Task[]         @relation("AssignedAgent")
-  offeredTasks        Task[]         @relation("OfferedAgent")
-  comments            TaskComment[]  @relation("AgentCommentAuthor")
-  ledgerEntries       PointsLedger[]
-  ideaUpvotes         IdeaUpvote[]
-  ideaDownvotes       IdeaDownvote[]
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  projectId     String
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id            String         @id @default(cuid())
+  name          String
+  speciality    String // e.g. "seo", "content", "research"
+  description   String?
+  avatarStyle   String         @default("bottts")
+  avatarSeed    String         @default("default")
+  keyHash       String         @unique
+  keyHint       String
+  ownerId       String
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  connectedAt   DateTime?
+  lastActiveAt  DateTime?
+  assignedTasks Task[]         @relation("AssignedAgent")
+  offeredTasks  Task[]         @relation("OfferedAgent")
+  comments      TaskComment[]  @relation("AgentCommentAuthor")
+  ledgerEntries PointsLedger[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([ownerId])
   @@index([keyHash])
   @@index([projectId])
-}
-
-enum GoalType {
-  seo
-  content
-  marketing
-  research
-  outreach
-}
-
-enum GoalStatus {
-  active
-  completed
-  archived
-}
-
-model Goal {
-  projectId   String
-  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  id          String       @id @default(cuid())
-  /// Shown as G-<number>, unique in the project. A database trigger sets it on insert.
-  number      Int          @default(0)
-  title       String
-  description String?
-  type        GoalType     @default(marketing)
-  status      GoalStatus   @default(active)
-  createdById String
-  createdBy   User         @relation("GoalCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  workstreams Workstream[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  @@unique([projectId, number])
-  @@index([type])
-  @@index([status])
-  @@index([createdById])
-  @@index([projectId])
-}
-
-enum WorkstreamStatus {
-  proposed
-  accepted
-  rejected
-}
-
-model Workstream {
-  id                String           @id @default(cuid())
-  /// Shown as I-<number>, unique in the goal's project. A database trigger sets it on insert.
-  number            Int              @default(0)
-  goalId            String
-  goal              Goal             @relation(fields: [goalId], references: [id], onDelete: Cascade)
-  title             String
-  description       String?
-  status            WorkstreamStatus @default(proposed)
-  autoAcceptTasks   Boolean          @default(false)
-  proposedByAgentId String?
-  proposedByAgent   Agent?           @relation("WorkstreamProposer", fields: [proposedByAgentId], references: [id], onDelete: SetNull)
-  acceptedById      String?
-  acceptedBy        User?            @relation("WorkstreamAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
-  /// Why the goal owner rejected the idea, shown to the proposing agent.
-  rejectionReason   String?
-  tasks             Task[]
-  upvotes           IdeaUpvote[]
-  downvotes         IdeaDownvote[]
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-
-  @@unique([goalId, title])
-  @@index([goalId, status])
-  @@index([proposedByAgentId])
-  @@index([number])
-}
-
-/// An agent backing a proposed idea, with its reason. Enough upvotes promote the idea to a workstream.
-model IdeaUpvote {
-  id           String     @id @default(cuid())
-  workstreamId String
-  workstream   Workstream @relation(fields: [workstreamId], references: [id], onDelete: Cascade)
-  agentId      String
-  agent        Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  reason       String
-  createdAt    DateTime   @default(now())
-
-  @@unique([workstreamId, agentId])
-  @@index([agentId])
-}
-
-/// An agent arguing against a proposed idea, with its reason. Enough downvotes remove the idea.
-model IdeaDownvote {
-  id           String     @id @default(cuid())
-  workstreamId String
-  workstream   Workstream @relation(fields: [workstreamId], references: [id], onDelete: Cascade)
-  agentId      String
-  agent        Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  reason       String
-  createdAt    DateTime   @default(now())
-
-  @@unique([workstreamId, agentId])
-  @@index([agentId])
 }
 
 enum TaskType {
@@ -499,8 +392,6 @@ model Task {
   id               String        @id @default(cuid())
   /// Shown as T-<number>, unique in the project. A database trigger sets it on insert.
   number           Int           @default(0)
-  workstreamId     String?
-  workstream       Workstream?   @relation(fields: [workstreamId], references: [id], onDelete: Cascade)
   taskType         String? // "research", "lead_hunting", "content", "seo", "press"
   type             TaskType      @default(Other)
   title            String
@@ -532,7 +423,7 @@ model Task {
   updatedAt DateTime @updatedAt
 
   @@unique([projectId, number])
-  @@index([workstreamId, status])
+  @@index([status])
   @@index([assignedAgentId])
   @@index([offeredToAgentId])
   @@index([userId, done])
@@ -644,7 +535,7 @@ model TaskComment {
   @@index([authorUserId])
 }
 
-/// An inbox item a person has read. Items are built from goals, tasks and points, so only the reads are stored.
+/// An inbox item a person has read. Items are built from tasks and points, so only the reads are stored.
 model InboxRead {
   userId  String   @map("user_id")
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)

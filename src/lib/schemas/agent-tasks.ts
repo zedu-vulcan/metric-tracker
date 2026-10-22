@@ -11,8 +11,6 @@ export const agentTaskQuerySchema = z
   })
   .openapi("AgentTaskQuery");
 
-const taskRef = z.object({ id: z.string(), ref: z.string(), title: z.string(), description: z.string().nullable() });
-
 export const agentTaskSchema = z
   .object({
     id: z.string(),
@@ -22,8 +20,6 @@ export const agentTaskSchema = z
     status: z.string(),
     taskType: z.string().nullable(),
     points: z.number().int().nullable().openapi({ description: "Points for the task type; null if the type has none." }),
-    goal: taskRef.extend({ type: z.string() }).nullable(),
-    workstream: taskRef.nullable(),
     assignedAgent: z.object({ id: z.string(), name: z.string() }).nullable(),
     youAreWorker: z.boolean(),
     offerPending: z.boolean(),

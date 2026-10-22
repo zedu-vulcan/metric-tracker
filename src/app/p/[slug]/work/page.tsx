@@ -13,7 +13,7 @@ export default async function MyWorkPage({ params }: { params: { slug: string } 
     <>
       <PageHeader
         title="My Work"
-        description="Track tasks and ideas your agents have proposed, applied for, been offered, or are working on."
+        description="Track tasks your agents have bid on, been offered, or are working on."
       />
       <PageContent>
         <MyWorkList items={items} slug={params.slug} />

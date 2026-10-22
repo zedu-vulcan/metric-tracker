@@ -14,16 +14,6 @@ const ACTIVE: TaskStatus[] = ["in_progress", "submitted", "in_review", "changes_
 export type AgentTaskAction = "bid" | "review";
 
 const taskInclude = {
-  workstream: {
-    select: {
-      id: true,
-      number: true,
-      title: true,
-      description: true,
-      status: true,
-      goal: { select: { id: true, number: true, title: true, description: true, type: true, status: true } },
-    },
-  },
   assignedAgent: { select: { id: true, name: true, ownerId: true } },
   comments: {
     where: { type: { in: ["bid", "delivery", "review"] } },
@@ -74,17 +64,14 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
   const isWorker = task.assignedAgentId === agent.id;
   const sameOwnerAsWorker = task.assignedAgent?.ownerId === agent.ownerId;
   const youReviewed = roundReviews.some((comment) => comment.authorAgentId === agent.id);
-  const workstreamLive = task.workstream?.status === "accepted" && task.workstream.goal.status === "active";
 
-  const bidBlocker = !workstreamLive
-    ? "The goal or workstream isn't active."
-    : !BIDDABLE.includes(task.status)
-      ? "The task isn't taking bids."
-      : offerPending
-        ? "An offer is pending with another agent."
-        : activeTasks >= ACTIVE_TASK_LIMIT
-          ? `You already hold ${ACTIVE_TASK_LIMIT} active tasks.`
-          : null;
+  const bidBlocker = !BIDDABLE.includes(task.status)
+    ? "The task isn't taking bids."
+    : offerPending
+      ? "An offer is pending with another agent."
+      : activeTasks >= ACTIVE_TASK_LIMIT
+        ? `You already hold ${ACTIVE_TASK_LIMIT} active tasks.`
+        : null;
 
   const reviewBlocker = !REVIEWABLE.includes(task.status)
     ? "The task has no delivery waiting for review."
@@ -100,29 +87,12 @@ function describeTask(agent: Agent, task: LoadedTask, points: Map<string, number
 
   return {
     id: task.id,
-    ref: formatRef("task", task.number),
+    ref: formatRef(task.number),
     title: task.title,
     description: task.description,
     status: task.status,
     taskType: task.taskType,
     points: task.points ?? (task.taskType ? (points.get(task.taskType) ?? null) : null),
-    goal: task.workstream
-      ? {
-          id: task.workstream.goal.id,
-          ref: formatRef("goal", task.workstream.goal.number),
-          title: task.workstream.goal.title,
-          description: task.workstream.goal.description,
-          type: task.workstream.goal.type,
-        }
-      : null,
-    workstream: task.workstream
-      ? {
-          id: task.workstream.id,
-          ref: formatRef("idea", task.workstream.number),
-          title: task.workstream.title,
-          description: task.workstream.description,
-        }
-      : null,
     assignedAgent: task.assignedAgent ? { id: task.assignedAgent.id, name: task.assignedAgent.name } : null,
     youAreWorker: isWorker,
     offerPending,
@@ -162,7 +132,6 @@ export type AgentTaskView = ReturnType<typeof describeTask>;
 
 /**
  * Tasks this agent can act on now: ones it can bid on, and deliveries it can review.
- * Only tasks inside accepted workstreams of active goals are considered.
  */
 export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) {
   const statuses = action === "bid" ? BIDDABLE : action === "review" ? REVIEWABLE : [...BIDDABLE, ...REVIEWABLE];
@@ -171,7 +140,6 @@ export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) 
       where: {
         projectId: agent.projectId,
         status: { in: statuses },
-        workstream: { status: "accepted", goal: { status: "active" } },
       },
       include: taskInclude,
       orderBy: { createdAt: "asc" },
@@ -193,18 +161,18 @@ export async function listWorkableTasks(agent: Agent, action?: AgentTaskAction) 
 }
 
 /**
- * One task with everything an agent needs before acting on it, or null if it isn't a workstream task.
+ * One task with everything an agent needs before acting on it, or null if there's no such task.
  * Takes the task's id or its short reference, e.g. T-341.
  */
 export async function getAgentTask(agent: Agent, taskIdOrRef: string) {
   const ref = parseRef(taskIdOrRef);
   const where =
-    ref?.kind === "task" ? { projectId: agent.projectId, number: ref.number } : { id: taskIdOrRef, projectId: agent.projectId };
+    ref ? { projectId: agent.projectId, number: ref.number } : { id: taskIdOrRef, projectId: agent.projectId };
   const [task, points, activeTasks] = await Promise.all([
     prisma.task.findFirst({ where, include: taskInclude }),
     pointsBySlug(agent.projectId),
     activeTaskCount(agent.id),
   ]);
-  if (!task?.workstream) return null;
+  if (!task) return null;
   return describeTask(agent, task, points, activeTasks);
 }

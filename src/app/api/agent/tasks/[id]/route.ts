@@ -4,7 +4,7 @@ import { getAgentTask } from "@/lib/agent-tasks";
 
 export const dynamic = "force-dynamic";
 
-/** One task with its goal, workstream, points and what the calling agent may do with it. Agent key only. */
+/** One task with its points and what the calling agent may do with it. Agent key only. */
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const { agent, error } = await requireAgent(request);
   if (error) return error;

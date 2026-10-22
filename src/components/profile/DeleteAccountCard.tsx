@@ -23,8 +23,8 @@ import { cn } from "@/lib/utils";
 /** One plain line per project, so nobody is surprised by what goes and what the team keeps. */
 function fateLine(fate: ProjectFate) {
   if (!fate.heir) return `${fate.name} is deleted with everything in it, because you're its only member.`;
-  if (fate.handedOver) return `${fate.heir.name} becomes the owner of ${fate.name} and keeps your goals and content there.`;
-  return `Your goals and content in ${fate.name} stay with the team.`;
+  if (fate.handedOver) return `${fate.heir.name} becomes the owner of ${fate.name} and keeps your tasks and content there.`;
+  return `Your tasks and content in ${fate.name} stay with the team.`;
 }
 
 export function DeleteAccountCard({ fates, className }: { fates: ProjectFate[]; className?: string }) {

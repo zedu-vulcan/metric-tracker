@@ -7,8 +7,8 @@ import { LogOutIcon, UserRoundIcon } from "lucide-react";
 import { MobileNav } from "@/components/AppSidebar";
 import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
 import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
-import { NewGoalButton } from "@/components/goals/NewGoalButton";
-import { PointsTotal } from "@/components/goals/PointsTotal";
+import { NewTaskButton } from "@/components/tasks/NewTaskButton";
+import { PointsTotal } from "@/components/tasks/PointsTotal";
 import { InboxMenu } from "@/components/profile/InboxMenu";
 import {
   DropdownMenu,
@@ -43,7 +43,7 @@ export function TopBar({
       <div className="hidden sm:flex">
         <PointsTotal />
       </div>
-      <NewGoalButton />
+      <NewTaskButton />
       <AgentSwitcher />
       <InboxMenu />
       <DropdownMenu>
