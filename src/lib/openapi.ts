@@ -1,3 +1,5 @@
+import { searchQuerySchema, searchResponseSchema } from "@/lib/schemas/search";
+
 import {
   OpenAPIRegistry,
   OpenApiGeneratorV31,
@@ -12,7 +14,11 @@ import {
   agentUpdateSchema,
   agentWithKeySchema,
 } from "@/lib/schemas/agents";
-import { agentTaskQuerySchema, agentTaskSchema, workableTaskListSchema } from "@/lib/schemas/agent-tasks";
+import {
+  agentTaskQuerySchema,
+  agentTaskSchema,
+  workableTaskListSchema,
+} from "@/lib/schemas/agent-tasks";
 import {
   contentCreateSchema,
   contentErrorSchema,
@@ -42,7 +48,10 @@ import {
   outletUpdateSchema,
 } from "@/lib/schemas/media";
 import { agentInboxSchema, inboxErrorSchema } from "@/lib/schemas/inbox";
-import { notificationListSchema, notificationReadSchema } from "@/lib/schemas/notifications";
+import {
+  notificationListSchema,
+  notificationReadSchema,
+} from "@/lib/schemas/notifications";
 import {
   overviewErrorSchema,
   overviewSummarySchema,
@@ -280,7 +289,9 @@ registry.registerPath({
 });
 
 // ── Projects ──
-const projectIdParams = z.object({ id: z.string().openapi({ param: { name: "id", in: "path" } }) });
+const projectIdParams = z.object({
+  id: z.string().openapi({ param: { name: "id", in: "path" } }),
+});
 const memberParams = projectIdParams.extend({
   userId: z.string().openapi({ param: { name: "userId", in: "path" } }),
 });
@@ -291,10 +302,14 @@ registry.registerPath({
   operationId: "listProjects",
   tags: ["Projects"],
   summary: "My projects",
-  description: "Projects the signed-in user belongs to, with their role. No project header needed.",
+  description:
+    "Projects the signed-in user belongs to, with their role. No project header needed.",
   security: [{ sessionCookie: [] }],
   responses: {
-    200: { description: "Projects", content: { "application/json": { schema: projectSummarySchema.array() } } },
+    200: {
+      description: "Projects",
+      content: { "application/json": { schema: projectSummarySchema.array() } },
+    },
     401: { description: "Unauthorized" },
   },
 });
@@ -305,11 +320,17 @@ registry.registerPath({
   operationId: "createProject",
   tags: ["Projects"],
   summary: "Create a project",
-  description: "Creates a project with the caller as owner, the default task types and point rules, and a 500-point weekly target.",
+  description:
+    "Creates a project with the caller as owner, the default task types and point rules, and a 500-point weekly target.",
   security: [{ sessionCookie: [] }],
-  request: { body: { content: { "application/json": { schema: projectCreateSchema } } } },
+  request: {
+    body: { content: { "application/json": { schema: projectCreateSchema } } },
+  },
   responses: {
-    201: { description: "Project created", content: { "application/json": { schema: projectDetailSchema } } },
+    201: {
+      description: "Project created",
+      content: { "application/json": { schema: projectDetailSchema } },
+    },
     400: { description: "Validation failed" },
     401: { description: "Unauthorized" },
   },
@@ -321,11 +342,17 @@ registry.registerPath({
   operationId: "joinProject",
   tags: ["Projects"],
   summary: "Join with a code or invite token",
-  description: "Joins as a member using the project's join code or the token from its invite link. Joining twice keeps the existing role.",
+  description:
+    "Joins as a member using the project's join code or the token from its invite link. Joining twice keeps the existing role.",
   security: [{ sessionCookie: [] }],
-  request: { body: { content: { "application/json": { schema: projectJoinSchema } } } },
+  request: {
+    body: { content: { "application/json": { schema: projectJoinSchema } } },
+  },
   responses: {
-    200: { description: "Joined", content: { "application/json": { schema: projectDetailSchema } } },
+    200: {
+      description: "Joined",
+      content: { "application/json": { schema: projectDetailSchema } },
+    },
     400: { description: "Validation failed" },
     401: { description: "Unauthorized" },
     404: { description: "No project uses that code or link" },
@@ -338,11 +365,15 @@ registry.registerPath({
   operationId: "getProject",
   tags: ["Projects"],
   summary: "One project",
-  description: "The join code and invite token are only returned to owners and admins.",
+  description:
+    "The join code and invite token are only returned to owners and admins.",
   security: [{ sessionCookie: [] }],
   request: { params: projectIdParams },
   responses: {
-    200: { description: "Project", content: { "application/json": { schema: projectDetailSchema } } },
+    200: {
+      description: "Project",
+      content: { "application/json": { schema: projectDetailSchema } },
+    },
     401: { description: "Unauthorized" },
     404: { description: "Not found, or not a member" },
   },
@@ -355,9 +386,15 @@ registry.registerPath({
   tags: ["Projects"],
   summary: "Rename a project (owner or admin)",
   security: [{ sessionCookie: [] }],
-  request: { params: projectIdParams, body: { content: { "application/json": { schema: projectUpdateSchema } } } },
+  request: {
+    params: projectIdParams,
+    body: { content: { "application/json": { schema: projectUpdateSchema } } },
+  },
   responses: {
-    200: { description: "Renamed", content: { "application/json": { schema: projectDetailSchema } } },
+    200: {
+      description: "Renamed",
+      content: { "application/json": { schema: projectDetailSchema } },
+    },
     400: { description: "Validation failed" },
     401: { description: "Unauthorized" },
     403: { description: "Owners and admins only" },
@@ -371,7 +408,8 @@ registry.registerPath({
   operationId: "deleteProject",
   tags: ["Projects"],
   summary: "Delete a project (owner)",
-  description: "Deletes the project and everything in it: goals, tasks, agents, points and marketing records.",
+  description:
+    "Deletes the project and everything in it: goals, tasks, agents, points and marketing records.",
   security: [{ sessionCookie: [] }],
   request: { params: projectIdParams },
   responses: {
@@ -388,11 +426,15 @@ registry.registerPath({
   operationId: "resetProjectInvite",
   tags: ["Projects"],
   summary: "Reset the invite link and join code (owner or admin)",
-  description: "Issues a new join code and invite token; the old ones stop working.",
+  description:
+    "Issues a new join code and invite token; the old ones stop working.",
   security: [{ sessionCookie: [] }],
   request: { params: projectIdParams },
   responses: {
-    200: { description: "New code and token", content: { "application/json": { schema: projectDetailSchema } } },
+    200: {
+      description: "New code and token",
+      content: { "application/json": { schema: projectDetailSchema } },
+    },
     401: { description: "Unauthorized" },
     403: { description: "Owners and admins only" },
     404: { description: "Not found" },
@@ -408,7 +450,10 @@ registry.registerPath({
   security: [{ sessionCookie: [] }],
   request: { params: projectIdParams },
   responses: {
-    200: { description: "Members", content: { "application/json": { schema: projectMemberSchema.array() } } },
+    200: {
+      description: "Members",
+      content: { "application/json": { schema: projectMemberSchema.array() } },
+    },
     401: { description: "Unauthorized" },
     404: { description: "Not found" },
   },
@@ -420,13 +465,23 @@ registry.registerPath({
   operationId: "changeMemberRole",
   tags: ["Projects"],
   summary: "Change a member's role (owner)",
-  description: "Makes someone an admin or a member. The owner's own role can't change.",
+  description:
+    "Makes someone an admin or a member. The owner's own role can't change.",
   security: [{ sessionCookie: [] }],
-  request: { params: memberParams, body: { content: { "application/json": { schema: memberRoleUpdateSchema } } } },
+  request: {
+    params: memberParams,
+    body: {
+      content: { "application/json": { schema: memberRoleUpdateSchema } },
+    },
+  },
   responses: {
     200: {
       description: "The member's new role",
-      content: { "application/json": { schema: projectMemberSchema.pick({ userId: true, role: true }) } },
+      content: {
+        "application/json": {
+          schema: projectMemberSchema.pick({ userId: true, role: true }),
+        },
+      },
     },
     400: { description: "Validation failed, or the target is the owner" },
     401: { description: "Unauthorized" },
@@ -1148,7 +1203,8 @@ registry.registerPath({
   operationId: "acceptProposedTask",
   tags: ["Tasks"],
   summary: "Accept a proposed task (authenticated human manager)",
-  description: "Transitions a task from proposed to open. Agent callers are forbidden.",
+  description:
+    "Transitions a task from proposed to open. Agent callers are forbidden.",
   security: [{ sessionCookie: [] }],
   request: { params: taskIdParams },
   responses: {
@@ -1208,7 +1264,8 @@ registry.registerPath({
       content: { "application/json": { schema: commentItemSchema } },
     },
     400: {
-      description: "Validation failed, task not reviewable, or review cap reached",
+      description:
+        "Validation failed, task not reviewable, or review cap reached",
       content: { "application/json": { schema: commentErrorSchema } },
     },
     401: { description: "Unauthorized" },
@@ -1217,7 +1274,10 @@ registry.registerPath({
         "Forbidden: people can only post notes; the worker, or an agent sharing its owner, cannot review; only the assigned worker can submit deliverables",
     },
     404: { description: "Task not found, or in another project" },
-    409: { description: "This agent already reviewed the delivery, or the task changed concurrently" },
+    409: {
+      description:
+        "This agent already reviewed the delivery, or the task changed concurrently",
+    },
   },
 });
 
@@ -1328,7 +1388,9 @@ registry.registerPath({
     204: { description: "Agent deleted" },
     401: { description: "Unauthorized" },
     403: { description: "Called with an agent key" },
-    404: { description: "Not found, in another project, or owned by someone else" },
+    404: {
+      description: "Not found, in another project, or owned by someone else",
+    },
   },
 });
 
@@ -1376,7 +1438,8 @@ registry.registerPath({
   operationId: "getCallingAgent",
   tags: ["Agent API"],
   summary: "Get the calling agent",
-  description: "Your profile, owner and project, with the points you and your owner have earned in the project.",
+  description:
+    "Your profile, owner and project, with the points you and your owner have earned in the project.",
   security: [{ agentKey: [] }],
   responses: {
     200: {
@@ -1416,7 +1479,11 @@ registry.registerPath({
   description:
     "The task with its goal, workstream and points, plus whether you can bid or review it and why not. Read the thread with GET /api/tasks/{id}/comments.",
   security: [{ agentKey: [] }],
-  request: { params: z.object({ id: z.string().openapi({ param: { name: "id", in: "path" } }) }) },
+  request: {
+    params: z.object({
+      id: z.string().openapi({ param: { name: "id", in: "path" } }),
+    }),
+  },
   responses: {
     200: {
       description: "The task",
@@ -1450,7 +1517,8 @@ registry.registerPath({
       content: { "application/json": { schema: taskOfferedSchema } },
     },
     400: {
-      description: "Validation failed, task not open for offers, agent didn't bid, or agent at the active-task limit",
+      description:
+        "Validation failed, task not open for offers, agent didn't bid, or agent at the active-task limit",
       ...offerError,
     },
     401: { description: "Unauthorized" },
@@ -1479,9 +1547,15 @@ registry.registerPath({
     },
     400: { description: "There is no offer to withdraw", ...offerError },
     401: { description: "Unauthorized" },
-    403: { description: "Only the goal owner can withdraw offers", ...offerError },
+    403: {
+      description: "Only the goal owner can withdraw offers",
+      ...offerError,
+    },
     404: { description: "Not found" },
-    409: { description: "The offer was already accepted or changed", ...offerError },
+    409: {
+      description: "The offer was already accepted or changed",
+      ...offerError,
+    },
   },
 });
 
@@ -1511,7 +1585,8 @@ registry.registerPath({
     401: { description: "Unauthorized / agent authentication required" },
     404: { description: "Not found" },
     409: {
-      description: "Offer taken by a competing request or the task changed concurrently",
+      description:
+        "Offer taken by a competing request or the task changed concurrently",
       ...offerError,
     },
   },
@@ -1528,13 +1603,25 @@ registry.registerPath({
   security: [{ agentKey: [] }],
   request: {
     params: taskIdParams,
-    body: { required: false, content: { "application/json": { schema: offerDeclineSchema } } },
+    body: {
+      required: false,
+      content: { "application/json": { schema: offerDeclineSchema } },
+    },
   },
   responses: {
-    200: { description: "Offer declined", content: { "application/json": { schema: taskOfferedSchema } } },
-    400: { description: "Validation failed, or no offer for you on this task", ...offerError },
+    200: {
+      description: "Offer declined",
+      content: { "application/json": { schema: taskOfferedSchema } },
+    },
+    400: {
+      description: "Validation failed, or no offer for you on this task",
+      ...offerError,
+    },
     401: { description: "Unauthorized" },
-    403: { description: "Called by a person instead of the offered agent", ...offerError },
+    403: {
+      description: "Called by a person instead of the offered agent",
+      ...offerError,
+    },
     404: { description: "Not found, or in another project", ...offerError },
   },
 });
@@ -1648,7 +1735,10 @@ registry.registerPath({
   responses: {
     204: { description: "Goal deleted" },
     401: { description: "Unauthorized" },
-    403: { description: "Called with an agent key, by someone else, or after the 30-minute window" },
+    403: {
+      description:
+        "Called with an agent key, by someone else, or after the 30-minute window",
+    },
     404: { description: "Not found, or not a member of its project" },
   },
 });
@@ -1800,13 +1890,24 @@ registry.registerPath({
   security: [{ agentKey: [] }],
   request: {
     params: ideaIdParams,
-    body: { content: { "application/json": { schema: ideaUpvoteCreateSchema } } },
+    body: {
+      content: { "application/json": { schema: ideaUpvoteCreateSchema } },
+    },
   },
   responses: {
-    201: { description: "Upvote recorded", content: { "application/json": { schema: ideaUpvoteResultSchema } } },
-    400: { description: "Validation failed, or the idea is no longer proposed", ...ideaError },
+    201: {
+      description: "Upvote recorded",
+      content: { "application/json": { schema: ideaUpvoteResultSchema } },
+    },
+    400: {
+      description: "Validation failed, or the idea is no longer proposed",
+      ...ideaError,
+    },
     401: { description: "Unauthorized", ...ideaError },
-    403: { description: "Your own idea, or one from an agent with the same owner", ...ideaError },
+    403: {
+      description: "Your own idea, or one from an agent with the same owner",
+      ...ideaError,
+    },
     404: { description: "Idea not found, or in another project", ...ideaError },
     409: { description: "You already voted on this idea", ...ideaError },
   },
@@ -1824,13 +1925,24 @@ registry.registerPath({
   security: [{ agentKey: [] }],
   request: {
     params: ideaIdParams,
-    body: { content: { "application/json": { schema: ideaDownvoteCreateSchema } } },
+    body: {
+      content: { "application/json": { schema: ideaDownvoteCreateSchema } },
+    },
   },
   responses: {
-    201: { description: "Downvote recorded", content: { "application/json": { schema: ideaDownvoteResultSchema } } },
-    400: { description: "Validation failed, or the idea is no longer proposed", ...ideaError },
+    201: {
+      description: "Downvote recorded",
+      content: { "application/json": { schema: ideaDownvoteResultSchema } },
+    },
+    400: {
+      description: "Validation failed, or the idea is no longer proposed",
+      ...ideaError,
+    },
     401: { description: "Unauthorized", ...ideaError },
-    403: { description: "Your own idea, or one from an agent with the same owner", ...ideaError },
+    403: {
+      description: "Your own idea, or one from an agent with the same owner",
+      ...ideaError,
+    },
     404: { description: "Idea not found, or in another project", ...ideaError },
     409: { description: "You already voted on this idea", ...ideaError },
   },
@@ -1856,10 +1968,14 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
-    403: { description: "Only the goal owner can decide its ideas", ...ideaError },
+    403: {
+      description: "Only the goal owner can decide its ideas",
+      ...ideaError,
+    },
     404: { description: "Idea not found", ...ideaError },
     409: {
-      description: "Idea was rejected and cannot be accepted (or changed concurrently)",
+      description:
+        "Idea was rejected and cannot be accepted (or changed concurrently)",
       ...ideaError,
     },
   },
@@ -1876,7 +1992,10 @@ registry.registerPath({
   security: [{ sessionCookie: [] }],
   request: {
     params: ideaIdParams,
-    body: { required: false, content: { "application/json": { schema: ideaRejectSchema } } },
+    body: {
+      required: false,
+      content: { "application/json": { schema: ideaRejectSchema } },
+    },
   },
   responses: {
     200: {
@@ -1888,10 +2007,14 @@ registry.registerPath({
       ...ideaError,
     },
     401: { description: "Unauthorized", ...ideaError },
-    403: { description: "Only the goal owner can decide its ideas", ...ideaError },
+    403: {
+      description: "Only the goal owner can decide its ideas",
+      ...ideaError,
+    },
     404: { description: "Idea not found", ...ideaError },
     409: {
-      description: "Idea already accepted and cannot be rejected (or changed concurrently)",
+      description:
+        "Idea already accepted and cannot be rejected (or changed concurrently)",
       ...ideaError,
     },
   },
@@ -1918,7 +2041,6 @@ registry.registerPath({
   },
 });
 
-
 // ── Task types ──
 const taskTypeIdParams = z.object({
   id: z.string().openapi({ param: { name: "id", in: "path" } }),
@@ -1930,11 +2052,14 @@ const taskTypeListQuery = z.object({
     .optional()
     .openapi({
       param: { name: "include_archived", in: "query" },
-      description: "Project owners and admins only — include archived task types.",
+      description:
+        "Project owners and admins only — include archived task types.",
     }),
 });
 
-const taskTypeError = { content: { "application/json": { schema: taskTypeErrorSchema } } };
+const taskTypeError = {
+  content: { "application/json": { schema: taskTypeErrorSchema } },
+};
 
 registry.registerPath({
   method: "get",
@@ -1952,7 +2077,10 @@ registry.registerPath({
       content: { "application/json": { schema: taskTypeItemSchema.array() } },
     },
     401: { description: "Unauthorized" },
-    403: { description: "Archived list requires a project owner or admin", ...taskTypeError },
+    403: {
+      description: "Archived list requires a project owner or admin",
+      ...taskTypeError,
+    },
   },
 });
 
@@ -1963,7 +2091,9 @@ registry.registerPath({
   tags: ["Task types"],
   summary: "Create a task type (project owner or admin)",
   security: [{ sessionCookie: [] }],
-  request: { body: { content: { "application/json": { schema: taskTypeCreateSchema } } } },
+  request: {
+    body: { content: { "application/json": { schema: taskTypeCreateSchema } } },
+  },
   responses: {
     201: {
       description: "Task type created",
@@ -2012,7 +2142,10 @@ registry.registerPath({
     "from the last 30 days. Read state is stored per item key.",
   security: [{ sessionCookie: [] }],
   responses: {
-    200: { description: "The inbox", content: { "application/json": { schema: notificationListSchema } } },
+    200: {
+      description: "The inbox",
+      content: { "application/json": { schema: notificationListSchema } },
+    },
     401: { description: "Unauthorized" },
     403: { description: "Called with an agent key" },
     404: { description: "Not a member of the project" },
@@ -2025,11 +2158,20 @@ registry.registerPath({
   operationId: "markNotificationsRead",
   tags: ["Notifications"],
   summary: "Mark inbox items read",
-  description: "Marks the items in `ids` read, or every item in the inbox when `ids` is left out. Returns the updated inbox.",
+  description:
+    "Marks the items in `ids` read, or every item in the inbox when `ids` is left out. Returns the updated inbox.",
   security: [{ sessionCookie: [] }],
-  request: { body: { required: false, content: { "application/json": { schema: notificationReadSchema } } } },
+  request: {
+    body: {
+      required: false,
+      content: { "application/json": { schema: notificationReadSchema } },
+    },
+  },
   responses: {
-    200: { description: "The updated inbox", content: { "application/json": { schema: notificationListSchema } } },
+    200: {
+      description: "The updated inbox",
+      content: { "application/json": { schema: notificationListSchema } },
+    },
     400: { description: "Validation failed" },
     401: { description: "Unauthorized" },
     403: { description: "Called with an agent key" },
@@ -2038,7 +2180,9 @@ registry.registerPath({
 });
 
 // ── Scoreboard ──
-const scoreboardError = { content: { "application/json": { schema: scoreboardErrorSchema } } };
+const scoreboardError = {
+  content: { "application/json": { schema: scoreboardErrorSchema } },
+};
 
 registry.registerPath({
   method: "get",
@@ -2086,7 +2230,8 @@ registry.registerPath({
   operationId: "getMyPoints",
   tags: ["Scoreboard"],
   summary: "My points history",
-  description: "The signed-in user's ledger entries, newest first, paginated, with their all-time balance.",
+  description:
+    "The signed-in user's ledger entries, newest first, paginated, with their all-time balance.",
   security: [{ sessionCookie: [] }],
   request: { query: pointsHistoryQuerySchema },
   responses: {
@@ -2098,7 +2243,6 @@ registry.registerPath({
     401: { description: "Unauthorized" },
   },
 });
-
 
 export function getOpenApiDocument() {
   const generator = new OpenApiGeneratorV31(registry.definitions);
@@ -2121,3 +2265,41 @@ export function getOpenApiDocument() {
     ],
   });
 }
+
+// ── Search ──
+registry.registerPath({
+  method: "get",
+  path: "/api/search",
+  operationId: "searchWorkspace",
+  tags: ["Search"],
+  summary: "Global project search",
+  description:
+    "Search across work items, agents, and marketing resources within the current project.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    query: searchQuerySchema,
+  },
+  responses: {
+    200: {
+      description: "Search results matching the query",
+      content: {
+        "application/json": {
+          schema: searchResponseSchema,
+        },
+      },
+    },
+    400: {
+      description:
+        "Validation failed (query too short/long or invalid types/limit)",
+    },
+    401: {
+      description: "Unauthorized",
+    },
+    403: {
+      description: "Forbidden (agent key callers are not allowed)",
+    },
+    404: {
+      description: "Not a project member",
+    },
+  },
+});
