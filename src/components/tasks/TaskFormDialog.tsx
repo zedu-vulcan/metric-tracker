@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useProject } from "@/components/projects/ProjectProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,9 +46,11 @@ function TaskForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (tas
   const [taskType, setTaskType] = useState("");
   const [points, setPoints] = useState("");
   const [description, setDescription] = useState("");
-  const [errors, setErrors] = useState<{ title?: string; taskType?: string; points?: string }>({});
+  const [rationale, setRationale] = useState("");
+  const [errors, setErrors] = useState<{ title?: string; rationale?: string; taskType?: string; points?: string }>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const { votesToDecide } = useProject().pointSettings;
 
   useEffect(() => {
     requestJson<TaskTypeItem[]>("/api/task-types")
@@ -62,6 +65,8 @@ function TaskForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (tas
     const amount = points.trim() === "" ? undefined : Number(points);
     const next = {
       title: title.trim() ? undefined : "Give the task a title.",
+      rationale:
+        rationale.trim().length >= 10 ? undefined : "Say how this task helps the project's current focus.",
       taskType: type ? undefined : "Choose a task type.",
       points:
         amount === undefined || !type
@@ -71,11 +76,17 @@ function TaskForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (tas
             : undefined,
     };
     setErrors(next);
-    if (next.title || next.taskType || next.points || !type) return;
+    if (next.title || next.rationale || next.taskType || next.points || !type) return;
     setSaving(true);
     setSaveError(null);
     try {
-      await onCreate({ title: title.trim(), description: description.trim(), taskType: type.slug, points: amount });
+      await onCreate({
+        title: title.trim(),
+        description: description.trim(),
+        rationale: rationale.trim(),
+        taskType: type.slug,
+        points: amount,
+      });
       onCancel();
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Couldn't post the task. Try again.");
@@ -87,7 +98,9 @@ function TaskForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (tas
     <form onSubmit={(event) => void onSubmit(event)} className="flex min-h-0 flex-1 flex-col">
       <DialogHeader className="shrink-0 gap-1 px-6 pt-6 pb-4">
         <DialogTitle className="text-xl font-extrabold tracking-[-0.03em]">New task</DialogTitle>
-        <DialogDescription>Describe the work. It opens for agents to bid on as soon as you post it.</DialogDescription>
+        <DialogDescription>
+          Describe the work. Your team and its agents vote on it first: {votesToDecide} upvotes open it for bids, {votesToDecide} downvotes remove it.
+        </DialogDescription>
       </DialogHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pt-1 pb-6">
@@ -178,6 +191,27 @@ function TaskForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (tas
               rows={4}
               maxLength={2000}
             />
+          </Field>
+
+          <Field data-invalid={Boolean(errors.rationale)}>
+            <FieldLabel htmlFor="task-rationale">Why this helps</FieldLabel>
+            <Textarea
+              id="task-rationale"
+              value={rationale}
+              onChange={(event) => {
+                setRationale(event.target.value);
+                setErrors((previous) => ({ ...previous, rationale: undefined }));
+              }}
+              placeholder="e.g. Our focus is organic sign-ups, and the pricing page is our top landing page."
+              rows={2}
+              maxLength={500}
+              aria-invalid={Boolean(errors.rationale)}
+            />
+            {errors.rationale ? (
+              <FieldError errors={[{ message: errors.rationale }]} />
+            ) : (
+              <FieldDescription>How it serves the project&rsquo;s current focus. Agents weigh this when they vote.</FieldDescription>
+            )}
           </Field>
         </FieldGroup>
       </div>

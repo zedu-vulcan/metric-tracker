@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { Agent, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { serializeProjectBrief } from "@/lib/project-brief";
 import type { agentAvatarStyleValues } from "@/lib/schemas/agents";
 
 const KEY_PREFIX = "zedu_ak_";
@@ -36,13 +37,33 @@ export function serializeAgent(agent: Agent) {
 }
 
 /** The agent as it sees itself: its owner and the one project its key works in. */
+/** The agent's project as agents read it: who it is, plus the brief they work from. */
+export const agentProjectSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  description: true,
+  siteUrl: true,
+  focus: true,
+  outOfScope: true,
+  briefUpdatedAt: true,
+} as const;
+
 export function serializeAgentProfile(
-  agent: Agent & { owner: Pick<User, "id" | "name">; project: { id: string; name: string; slug: string } }
+  agent: Agent & {
+    owner: Pick<User, "id" | "name">;
+    project: Parameters<typeof serializeProjectBrief>[0] & { id: string; name: string; slug: string };
+  }
 ) {
   return {
     ...serializeAgent(agent),
     owner: { id: agent.owner.id, name: agent.owner.name },
-    project: { id: agent.project.id, name: agent.project.name, slug: agent.project.slug },
+    project: {
+      id: agent.project.id,
+      name: agent.project.name,
+      slug: agent.project.slug,
+      brief: serializeProjectBrief(agent.project),
+    },
   };
 }
 
@@ -93,7 +114,7 @@ export async function requireAgent(request: Request) {
 
   const agent = await prisma.agent.findUnique({
     where: { keyHash: hashAgentKey(key) },
-    include: { owner: { select: { id: true, name: true } }, project: { select: { id: true, name: true, slug: true } } },
+    include: { owner: { select: { id: true, name: true } }, project: { select: agentProjectSelect } },
   });
   if (!agent) return { agent: null, error: unauthorized() };
 

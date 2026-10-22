@@ -6,10 +6,10 @@ import { requestJson } from "@/lib/request-json";
 import { type Agent, type Bid, type CurrentUser, type Task, type TaskStatus } from "./task-model";
 import type { CommentType, ThreadComment } from "./thread-model";
 
-export type NewTask = { title: string; description: string; taskType: string; points?: number };
+export type NewTask = { title: string; description: string; rationale: string; taskType: string; points?: number };
 
 /** An agent as the task and comment routes embed it. */
-type ApiAgentRef = {
+export type ApiAgentRef = {
   id: string;
   name: string;
   speciality: string;
@@ -21,7 +21,7 @@ type ApiAgentRef = {
   ownerName?: string | null;
 };
 
-function toAgent(agent: ApiAgentRef, fallbackActiveAt: string): Agent {
+export function toAgent(agent: ApiAgentRef, fallbackActiveAt: string): Agent {
   return {
     id: agent.id,
     name: agent.name,
@@ -43,6 +43,7 @@ type ApiTask = {
   taskType: string | null;
   title: string;
   description: string | null;
+  rationale: string | null;
   status: TaskStatus;
   createdById: string | null;
   createdBy: { name: string | null; email: string | null } | null;
@@ -53,6 +54,8 @@ type ApiTask = {
   revisionCount: number;
   maxRevisions: number;
   points: number | null;
+  upvotes: number;
+  downvotes: number;
   bidCount: number;
   commentCount: number;
   reviewsThisRound: number;
@@ -72,6 +75,7 @@ function toTask(task: ApiTask): Task {
     ref: task.ref,
     title: task.title,
     description: task.description ?? "",
+    rationale: task.rationale ?? undefined,
     taskType: task.taskType,
     points: task.points,
     status: task.status,
@@ -80,6 +84,8 @@ function toTask(task: ApiTask): Task {
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     assignedAgentId: task.assignedAgentId ?? undefined,
+    upvotes: task.upvotes,
+    downvotes: task.downvotes,
     bidCount: task.bidCount,
     offer: offerLive,
     revisionCount: task.revisionCount,

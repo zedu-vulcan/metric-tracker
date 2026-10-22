@@ -28,7 +28,7 @@ import {
 
 export type AwardMeta = {
   agentId?: string;
-  sourceType?: "task" | "comment" | "idea";
+  sourceType?: "task" | "comment" | "idea" | "vote";
   sourceId?: string;
   idempotencyKey?: string;
   grantedByUserId?: string;
@@ -97,8 +97,8 @@ function toLedgerEntry(raw: RawLedgerRow): LedgerEntry {
     projectId: raw.project_id,
     amount: raw.amount,
     reason: isPointReason(raw.reason) ? raw.reason : ("manual_adjustment" as PointReason),
-    sourceType: (["task", "comment", "idea"] as const).includes(raw.source_type as "task")
-      ? (raw.source_type as "task" | "comment" | "idea")
+    sourceType: (["task", "comment", "idea", "vote"] as const).includes(raw.source_type as "task")
+      ? (raw.source_type as "task" | "comment" | "idea" | "vote")
       : null,
     sourceId: raw.source_id,
     idempotencyKey: raw.idempotency_key,

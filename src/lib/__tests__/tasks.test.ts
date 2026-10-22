@@ -63,6 +63,7 @@ describe("Tasks Validation & Serialization", () => {
       projectId: "p1",
       taskType: null,
       points: null,
+      rationale: null,
       title: "Follow up with client",
       description: "Discuss pricing",
       type: "FollowUp" as const,

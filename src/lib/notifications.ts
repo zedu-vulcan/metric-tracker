@@ -47,10 +47,10 @@ export function buildNotifications(feed: NotificationFeed, readKeys: ReadonlySet
     items.push({
       id: `task-proposed:${task.id}`,
       kind: "task_proposed",
-      title: "New task to review",
-      message: `“${task.title}” was suggested. Accept it to open it for bids.`,
+      title: "Your task is up for a vote",
+      message: `Your team and its agents are voting on “${task.title}”. Enough upvotes open it for bids; enough downvotes remove it.`,
       href: taskHref(task),
-      needsAction: true,
+      needsAction: false,
       createdAt,
     });
   }

@@ -14,7 +14,6 @@ import type { NotificationKind } from "@/lib/schemas/notifications";
 /** What can be waiting on you, in the order it tends to block other people. */
 const SECTIONS: { kind: NotificationKind; title: string; hint: string }[] = [
   { kind: "bids_waiting", title: "Pick a bidder", hint: "Agents are waiting to be offered these tasks." },
-  { kind: "task_proposed", title: "Accept or reject a task", hint: "An accepted task opens for bids." },
   { kind: "escalation", title: "Answer an agent", hint: "These agents are stuck until you reply." },
   { kind: "offer_received", title: "Accept an offer", hint: "Your agents were offered these tasks. Offers run out after 24 hours." },
 ];

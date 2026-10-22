@@ -1,5 +1,6 @@
 "use client";
 
+import { useAgents } from "@/components/agents/AgentsProvider";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDownIcon, ClockIcon, HandIcon, ListTodoIcon, MessageSquareIcon } from "lucide-react";
@@ -13,7 +14,6 @@ import { requestJson } from "@/lib/request-json";
 import { cn } from "@/lib/utils";
 import { CopyRef } from "./CopyRef";
 import {
-  ACTIVE_TASK_LIMIT,
   TASK_STAGES,
   shortDateTime,
   taskProgressLine,
@@ -40,6 +40,8 @@ import {
 } from "./TaskParts";
 import { useTasks } from "./TasksProvider";
 import { OfferDialog } from "./OfferDialog";
+import { OfferResponse } from "./OfferResponse";
+import { VotingPanel } from "./TaskVotes";
 import { TaskThread, threadMessages } from "./TaskThread";
 
 const TABS = {
@@ -49,7 +51,7 @@ const TABS = {
 
 const THREAD_REFRESH_MS = 20_000;
 
-const BIDDABLE: TaskStatus[] = ["proposed", "open", "bidding", "reopened"];
+const BIDDABLE: TaskStatus[] = ["open", "bidding", "reopened"];
 
 type ApiBidderStats = {
   agent_id: string;
@@ -107,7 +109,8 @@ export function TaskView({ taskId }: { taskId: string }) {
     sendOffer,
     withdrawOffer,
   } = useTasks();
-  const { href, canManage } = useProject();
+  const { href, canManage, pointSettings } = useProject();
+  const { agents: myAgents } = useAgents();
   const [offering, setOffering] = useState<Agent | null>(null);
 
   useEffect(() => loadTask(taskId), [taskId, loadTask]);
@@ -136,7 +139,7 @@ export function TaskView({ taskId }: { taskId: string }) {
     return (
       <NotFoundState
         title="Task not found"
-        description="This task doesn't exist in this project, or it couldn't be loaded."
+        description="This task doesn't exist in this project, or it couldn't be loaded. A proposed task is removed once enough votes go against it."
         icon={ListTodoIcon}
         backHref={tasksHref}
         backLabel="Back to tasks"
@@ -149,6 +152,7 @@ export function TaskView({ taskId }: { taskId: string }) {
   const thread = threadStatus(task.id);
   const worker = task.assignedAgentId ? agentFor(task.assignedAgentId) : undefined;
   const offeredTo = task.offer ? agentFor(task.offer.agentId) : undefined;
+  const myOfferedAgent = task.offer ? myAgents.find((agent) => agent.id === task.offer?.agentId) : undefined;
   const bidding = BIDDABLE.includes(task.status);
   const takingBids = bidding && !task.offer;
   const bidCount = thread === "ready" ? bids.length : task.bidCount;
@@ -173,7 +177,7 @@ export function TaskView({ taskId }: { taskId: string }) {
       />
 
       <PageContent>
-        {task.description && <TaskDescription text={task.description} />}
+        {(task.description || task.rationale) && <TaskDescription text={task.description} rationale={task.rationale} />}
 
         <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
           <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
@@ -181,7 +185,7 @@ export function TaskView({ taskId }: { taskId: string }) {
               <StageIcon className="size-3.5" aria-hidden="true" />
             </span>
             <span className="font-semibold text-foreground">{stage.label}</span>·
-            <span>{taskProgressLine(task, { worker, offeredTo })}</span>
+            <span>{taskProgressLine(task, { worker, offeredTo, votesToDecide: pointSettings.votesToDecide })}</span>
           </p>
           <p className="m-0 flex items-baseline gap-2">
             {task.points !== null && (
@@ -195,7 +199,9 @@ export function TaskView({ taskId }: { taskId: string }) {
           </p>
         </div>
 
-        <Tabs key={task.id} defaultValue={bidding ? "bids" : "thread"} className="gap-4">
+        {task.status === "proposed" && <VotingPanel task={task} />}
+
+        <Tabs key={task.id} defaultValue={bidding || task.status === "proposed" ? "bids" : "thread"} className="gap-4">
           <TabsList className="h-11! self-start p-1">
             <ColorTab
               value="bids"
@@ -214,10 +220,24 @@ export function TaskView({ taskId }: { taskId: string }) {
                 agent={offeredTo}
                 canWithdraw={canOffer}
                 onWithdraw={() => withdrawOffer(task.id)}
+                respond={
+                  myOfferedAgent && (
+                    <OfferResponse
+                      taskId={task.id}
+                      agentName={myOfferedAgent.name}
+                      onDone={() => {
+                        loadTask(task.id);
+                        loadThread(task.id);
+                      }}
+                    />
+                  )
+                }
               />
             )}
             <p className="m-0 text-[13px] text-muted-foreground">
-              {!bidding
+              {task.status === "proposed"
+                ? `Bidding opens once ${pointSettings.votesToDecide} upvotes are in.`
+                : !bidding
                 ? `Bidding is closed${worker ? `. ${worker.name} took this task` : ""}.`
                 : canOffer
                   ? "Pick the agent you want and send them an offer. They have 24 hours to accept."
@@ -262,8 +282,11 @@ export function TaskView({ taskId }: { taskId: string }) {
   );
 }
 
-/** The brief at full width, so long text reads comfortably; past a few lines it folds behind "Show more". */
-function TaskDescription({ text }: { text: string }) {
+/**
+ * The task's description at full width, so long text reads comfortably; past a few lines it folds behind
+ * "Show more". Under it, the poster's reason the task serves the project's focus.
+ */
+function TaskDescription({ text, rationale }: { text: string; rationale?: string }) {
   const body = useRef<HTMLParagraphElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
@@ -280,17 +303,19 @@ function TaskDescription({ text }: { text: string }) {
 
   return (
     <section aria-label="Task description" className="flex flex-col items-start gap-2 rounded-[22px] border border-border bg-card p-5 sm:p-6">
-      <p
-        ref={body}
-        id="task-description"
-        className={cn(
-          "m-0 w-full text-[15px] leading-relaxed break-words whitespace-pre-line text-foreground/85",
-          !expanded && "line-clamp-6"
-        )}
-      >
-        {text}
-      </p>
-      {(overflows || expanded) && (
+      {text && (
+        <p
+          ref={body}
+          id="task-description"
+          className={cn(
+            "m-0 w-full text-[15px] leading-relaxed break-words whitespace-pre-line text-foreground/85",
+            !expanded && "line-clamp-6"
+          )}
+        >
+          {text}
+        </p>
+      )}
+      {text && (overflows || expanded) && (
         <Button
           variant="ghost"
           size="sm"
@@ -302,6 +327,12 @@ function TaskDescription({ text }: { text: string }) {
           {expanded ? "Show less" : "Show more"}
           <ChevronDownIcon data-icon="inline-end" aria-hidden="true" className={cn("transition-transform", expanded && "rotate-180")} />
         </Button>
+      )}
+      {rationale && (
+        <div className={cn("flex w-full flex-col gap-1", text && "mt-2 border-t border-border pt-4")}>
+          <span className="text-[13px] font-semibold text-muted-foreground">Why this helps</span>
+          <p className="m-0 text-sm leading-relaxed break-words whitespace-pre-line text-foreground">{rationale}</p>
+        </div>
       )}
     </section>
   );
@@ -322,7 +353,8 @@ function BidCard({
   canOffer: boolean;
   onOffer: (agent: Agent) => void;
 }) {
-  const atLimit = (stats?.activeTasks ?? 0) >= ACTIVE_TASK_LIMIT;
+  const { activeTaskLimit } = useProject().pointSettings;
+  const atLimit = (stats?.activeTasks ?? 0) >= activeTaskLimit;
   const name = agent?.name ?? "Unknown agent";
 
   return (
@@ -360,7 +392,7 @@ function BidCard({
             <Button variant="secondary" disabled={atLimit} onClick={() => onOffer(agent)}>
               Send offer
             </Button>
-            {atLimit && <span className="text-xs text-muted-foreground">At the {ACTIVE_TASK_LIMIT}-task limit</span>}
+            {atLimit && <span className="text-xs text-muted-foreground">At the {activeTaskLimit}-task limit</span>}
           </div>
         )
       )}
@@ -373,11 +405,14 @@ function OfferStatus({
   agent,
   canWithdraw,
   onWithdraw,
+  respond,
 }: {
   task: Task;
   agent?: Agent;
   canWithdraw: boolean;
   onWithdraw: () => Promise<void>;
+  /** Accept / decline, when the offered agent is yours. */
+  respond?: React.ReactNode;
 }) {
   const [withdrawing, setWithdrawing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -412,7 +447,8 @@ function OfferStatus({
             </p>
           </div>
         </div>
-        {canWithdraw && (
+        {respond}
+        {canWithdraw && !respond && (
           <Button
             variant="outline"
             size="sm"

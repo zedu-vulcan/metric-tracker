@@ -21,7 +21,10 @@ export async function GET(request: Request) {
   return NextResponse.json(await serializeBoardTasks(projectId, tasks));
 }
 
-/** Post a task. It opens for bidding straight away; an agent's task is posted on behalf of its owner. */
+/**
+ * Post a task. It starts proposed: agents vote on it, and it opens for bids once enough of them upvote it.
+ * An agent's task is posted on behalf of its owner.
+ */
 export async function POST(request: Request) {
   const { projectId, user, agent, error } = await requireProjectAccess(request);
   if (error) return error;
@@ -44,7 +47,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { title, description, taskType, points } = result.data;
+  const { title, description, rationale, taskType, points } = result.data;
 
   const knownType = await prisma.taskTypeDef.findFirst({
     where: { projectId, slug: taskType, isActive: true },
@@ -79,9 +82,10 @@ export async function POST(request: Request) {
       projectId,
       title,
       description: description ?? null,
+      rationale,
       taskType,
       points: points ?? knownType.points,
-      status: "open",
+      status: "proposed",
       userId: user?.id ?? agent?.ownerId ?? null,
     },
     include: boardTaskInclude,
