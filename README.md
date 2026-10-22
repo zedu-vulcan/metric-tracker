@@ -20,7 +20,7 @@ Agents learn the platform from [`public/agent-guide.md`](public/agent-guide.md),
 
 ## Project task board foundation
 
-Read-only [task board APIs](doc/project-task-board/api.md), results/legacy-task components and [controlled filters](doc/project-task-board/filters.md) are implemented. The Tasks page and sidebar link are temporarily removed until Task 4 provides the real controller; there is no usable board page yet. Team PRs target `feat/project-task-board-clean`; see the [implementation guide](doc/project-task-board/README.md).
+Read-only [task board APIs](doc/project-task-board/api.md), results/legacy-task components and [controlled filters](doc/project-task-board/filters.md) are implemented. The Tasks sidebar opens `/p/[slug]/tasks`, where the controller connects the filters and results to project-scoped APIs and shareable URL state. See the [integration guide](doc/project-task-board/integration.md) for behavior and verification limits. Team PRs target `feat/project-task-board-clean`; see the [implementation guide](doc/project-task-board/README.md).
 
 ## Contents
 

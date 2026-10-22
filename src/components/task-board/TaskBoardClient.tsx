@@ -14,6 +14,9 @@ import {
 import { taskBoardOptionsSchema, taskBoardResponseSchema } from "@/lib/schemas/task-board";
 import type { TaskBoardOptions, TaskBoardQuery, TaskBoardResponse } from "@/lib/schemas/task-board";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useProject } from "@/components/projects/ProjectProvider";
+import { createTaskBoardShareController, type TaskBoardShareState } from "@/lib/task-board-share";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { TaskBoardFilters } from "@/components/task-board/TaskBoardFilters";
 import { TaskBoardResults } from "@/components/task-board/TaskBoardResults";
@@ -26,6 +29,11 @@ function errorMessage(error: unknown) {
 }
 
 export function TaskBoardClient() {
+  const { id: projectId } = useProject();
+  return <TaskBoardProjectClient key={projectId} projectId={projectId} />;
+}
+
+function TaskBoardProjectClient({ projectId }: { projectId: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -42,8 +50,16 @@ export function TaskBoardClient() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [resultsError, setResultsError] = useState<string | null>(null);
   const [optionsError, setOptionsError] = useState<string | null>(null);
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
-  const [shareUrl, setShareUrl] = useState("");
+  const [share, setShare] = useState<TaskBoardShareState>({ status: "idle", url: "" });
+  const shareController = useMemo(() => createTaskBoardShareController({
+    writeText: (url) => navigator.clipboard.writeText(url),
+    onChange: setShare,
+  }), []);
+
+  useEffect(() => {
+    shareController.reset();
+    return () => shareController.dispose();
+  }, [shareController, pathname, search]);
   const [resultsAttempt, setResultsAttempt] = useState(0);
   const [optionsAttempt, setOptionsAttempt] = useState(0);
 
@@ -120,26 +136,15 @@ export function TaskBoardClient() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setData(null);
-    setResultsError(null);
-    setOptions(null);
     void loadOptions(controller.signal);
     return () => controller.abort();
-  }, [pathname, loadOptions, optionsAttempt]);
+  }, [loadOptions, optionsAttempt]);
 
   const copyView = async () => {
     const fullUrl = query
       ? buildTaskBoardShareUrl(pathname, window.location.origin, query)
       : new URL(pathname, window.location.origin).toString();
-    setShareUrl(fullUrl);
-    setCopyState("idle");
-    try {
-      await navigator.clipboard.writeText(fullUrl);
-      setCopyState("copied");
-    } catch {
-      setCopyState("error");
-    }
-    window.setTimeout(() => setCopyState("idle"), 1800);
+    await shareController.copy(fullUrl);
   };
 
   if (!parsed.success) {
@@ -161,25 +166,29 @@ export function TaskBoardClient() {
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={copyView}>
-          {copyState === "copied" ? <CheckIcon data-icon="inline-start" /> : <CopyIcon data-icon="inline-start" />}
-          {copyState === "copied" ? "Copied" : "Share view"}
+          {share.status === "copied" ? <CheckIcon data-icon="inline-start" /> : <CopyIcon data-icon="inline-start" />}
+          {share.status === "copied" ? "Copied" : "Share view"}
         </Button>
       </div>
-      {copyState === "error" && (
+      {share.status === "error" && (
         <div role="status" className="flex flex-col gap-1.5 text-xs text-destructive">
           <label htmlFor="task-board-share-url">Could not copy the link. Select it to copy manually.</label>
-          <input
+          <Input
             id="task-board-share-url"
             type="text"
             readOnly
-            value={shareUrl}
+            value={share.url}
             onFocus={(event) => event.currentTarget.select()}
             className="h-9 w-full rounded-lg border border-border bg-card px-3 font-mono text-foreground"
           />
+          <Button variant="outline" size="sm" className="self-start" onClick={() => shareController.reset()}>
+            Dismiss copy link
+          </Button>
         </div>
       )}
-      {copyState === "copied" && <span role="status" className="sr-only">View link copied.</span>}
+      {share.status === "copied" && <span role="status" className="sr-only">View link copied.</span>}
       <TaskBoardFilters
+        key={projectId}
         value={parsed.data}
         options={options ?? EMPTY_OPTIONS}
         optionsLoading={optionsLoading}
