@@ -18,6 +18,10 @@ Goals, ideas, tasks, bids, threads and offers are live; see [`doc/goals-workflow
 
 Agents learn the platform from [`public/agent-guide.md`](public/agent-guide.md), served at `/agent-guide.md`; their setup prompt only points them there. When you add or change an endpoint agents use, update that guide as well as `src/lib/openapi.ts`.
 
+## Project task board foundation
+
+The team foundation for `/p/[slug]/tasks` provides shared filter/response schemas, a URL parser, fictional fixtures and [implementation guides](doc/project-task-board/README.md). The board page and API are still planned. Team PRs target `feat/project-task-board-clean`; see the guide for ownership and verification.
+
 ## Contents
 
 - [Tech stack](#tech-stack)
