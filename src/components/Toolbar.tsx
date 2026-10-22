@@ -29,11 +29,13 @@ export function SearchPill({
   onChange,
   placeholder,
   className,
+  inputProps,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   className?: string;
+  inputProps?: Pick<React.ComponentProps<"input">, "id" | "aria-invalid" | "aria-describedby" | "maxLength" | "onCompositionStart" | "onCompositionEnd">;
 }) {
   return (
     <div className={cn("relative w-full md:w-72", className)}>
@@ -42,12 +44,13 @@ export function SearchPill({
         aria-hidden="true"
       />
       <input
+        {...inputProps}
         type="search"
         aria-label={placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-10 w-full rounded-full border border-border bg-card pr-10 pl-11 text-sm text-foreground transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground hover:border-border-strong focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-search-cancel-button]:hidden"
+        className="h-10 w-full rounded-full border border-border bg-card pr-10 pl-11 text-sm text-foreground transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground hover:border-border-strong focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 [&::-webkit-search-cancel-button]:hidden"
       />
       {value && (
         <button
@@ -72,6 +75,7 @@ export function PillSelect({
   options,
   defaultValue = "all",
   className,
+  selectProps,
 }: {
   label: string;
   value: string;
@@ -79,6 +83,7 @@ export function PillSelect({
   options: PillOption[];
   defaultValue?: string;
   className?: string;
+  selectProps?: Pick<React.ComponentProps<"select">, "id" | "aria-invalid" | "aria-describedby" | "disabled">;
 }) {
   const selected = options.find((option) => option.value === value) ?? options[0];
   const active = value !== defaultValue;
@@ -86,7 +91,7 @@ export function PillSelect({
   return (
     <label
       className={cn(
-        "relative inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border pr-9 pl-4 text-sm whitespace-nowrap transition-[color,background-color,border-color,box-shadow] has-[select:focus-visible]:ring-3 has-[select:focus-visible]:ring-ring/50",
+        "relative inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border pr-9 pl-4 text-sm whitespace-nowrap transition-[color,background-color,border-color,box-shadow] has-[select:focus-visible]:ring-3 has-[select:focus-visible]:ring-ring/50 has-[select:disabled]:cursor-not-allowed has-[select:disabled]:opacity-50 has-[select[aria-invalid=true]]:border-destructive",
         active
           ? "border-primary/35 bg-accent text-accent-foreground"
           : "border-border bg-card text-foreground hover:border-border-strong",
@@ -103,6 +108,7 @@ export function PillSelect({
         aria-hidden="true"
       />
       <select
+        {...selectProps}
         aria-label={`${label}: ${selected?.label ?? ""}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}

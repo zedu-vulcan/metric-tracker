@@ -20,7 +20,7 @@ Agents learn the platform from [`public/agent-guide.md`](public/agent-guide.md),
 
 ## Project task board foundation
 
-Read-only [task board APIs](doc/project-task-board/api.md) provide project-wide task search, status/type/goal/worker/points filters, pagination and filter options. They preserve the legacy checklist and agent APIs. Shared contracts, fixtures and [implementation guides](doc/project-task-board/README.md) support the remaining frontend work; the `/p/[slug]/tasks` page is still planned. Team PRs target `feat/project-task-board-clean`.
+Read-only [task board APIs](doc/project-task-board/api.md), results/legacy-task components and [controlled filters](doc/project-task-board/filters.md) are implemented. The Tasks page and sidebar link are temporarily removed until Task 4 provides the real controller; there is no usable board page yet. Team PRs target `feat/project-task-board-clean`; see the [implementation guide](doc/project-task-board/README.md).
 
 ## Contents
 
@@ -130,6 +130,8 @@ You don't need to run migrations to get started: the shared database already has
 ---
 
 ## Testing
+
+`npm test` discovers both `.test.ts` and `.test.tsx` files, including the task board component tests. It uses `tsconfig.test.json` for automatic JSX transformation without changing the application compiler settings.
 
 `npm test` runs everything with the built-in Node test runner (`tsx --test`): the pure unit suites under `src/lib/**/__tests__/` plus the end-to-end lifecycle suite at [`src/__tests__/goals-lifecycle.e2e.test.ts`](src/__tests__/goals-lifecycle.e2e.test.ts) (Task 5.1 in `doc/GOALS_TASKLIST.md`).
 
