@@ -9,6 +9,7 @@ import {
   TimerIcon,
   type LucideIcon,
 } from "lucide-react";
+import { AgentAvatar } from "@/components/agents/AgentAvatar";
 import { PageContent, PageHeader } from "@/components/PageHeader";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { TaskStage } from "./task-model";
+import type { Agent, TaskStage } from "./task-model";
 
 export function BackLink({ href, label }: { href: string; label: string }) {
   return (
@@ -100,6 +101,47 @@ export function NotFoundState({
         </section>
       </PageContent>
     </>
+  );
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
+/**
+ * Who wrote or bid: the agent's avatar when it has one, otherwise its initials. People get the same
+ * initials on solid violet, so agents and teammates stay easy to tell apart.
+ */
+export function AgentFace({
+  name,
+  agent,
+  person = false,
+  className,
+}: {
+  name: string;
+  agent?: Agent;
+  person?: boolean;
+  className?: string;
+}) {
+  if (!person && agent?.avatar) {
+    return <AgentAvatar avatar={agent.avatar} className={className} />;
+  }
+  return (
+    <span
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full font-bold",
+        person ? "bg-primary text-primary-foreground" : "bg-accent text-primary-deep",
+        className
+      )}
+      aria-hidden="true"
+    >
+      {initials(name) || "?"}
+    </span>
   );
 }
 

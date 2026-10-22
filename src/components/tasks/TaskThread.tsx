@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import {
   CheckIcon,
+  ChevronRightIcon,
   CopyIcon,
+  ExternalLinkIcon,
   FileTextIcon,
   LinkIcon,
   MessagesSquareIcon,
@@ -16,13 +18,22 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { shortDateTime, type Agent, type Task } from "./task-model";
-import { ColorTab, type ItemStyle } from "./TaskParts";
+import { AgentFace, ColorTab, type ItemStyle } from "./TaskParts";
 import { useTasks } from "./TasksProvider";
 import {
   COMMENT_TYPES,
@@ -210,15 +221,6 @@ function ReplyBox({ taskId, parentId, onDone }: { taskId: string; parentId?: str
   );
 }
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
-
 function Message({
   message,
   agent,
@@ -239,16 +241,12 @@ function Message({
 
   return (
     <li className={cn("flex", reply ? "gap-2.5" : "gap-3 sm:gap-4")}>
-      <span
-        className={cn(
-          "relative flex shrink-0 items-center justify-center rounded-full font-bold ring-4 ring-card",
-          reply ? "size-8 text-xs" : "size-10 text-[13px]",
-          person ? "bg-primary text-primary-foreground" : "bg-accent text-primary-deep"
-        )}
-        aria-hidden="true"
-      >
-        {initials(name) || "?"}
-      </span>
+      <AgentFace
+        name={name}
+        agent={agent}
+        person={person}
+        className={cn("relative ring-4 ring-card", reply ? "size-8 text-xs" : "size-10 text-[13px]")}
+      />
 
       <article
         className="flex min-w-0 flex-1 flex-col gap-2"
@@ -290,7 +288,12 @@ function Message({
             </div>
           )}
           <p className="m-0 max-w-[72ch] text-sm leading-relaxed whitespace-pre-line text-foreground/85">{message.body}</p>
-          {message.attachment && <AttachmentBlock attachment={message.attachment} />}
+          {message.attachment && (
+            <AttachmentFile
+              attachment={message.attachment}
+              from={`${name} · ${shortDateTime.format(new Date(message.at))}`}
+            />
+          )}
         </div>
 
         {onReply && (
@@ -321,12 +324,64 @@ function Score({ value }: { value: number }) {
   );
 }
 
-const ATTACHMENT_ICONS = { text: FileTextIcon, link: LinkIcon };
+function wordCount(text: string) {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return `${words.toLocaleString("en-GB")} ${words === 1 ? "word" : "words"}`;
+}
 
-/** The deliverable on its own, so copying it gives only the work and none of the chatter. */
-function AttachmentBlock({ attachment }: { attachment: Attachment }) {
+function hostname(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+const FILE_TILE =
+  "group/file mt-1 flex w-full max-w-md items-center gap-3 rounded-xl border border-border bg-card p-2.5 pr-3.5 text-left text-inherit no-underline transition-colors duration-150 outline-none hover:border-border-strong hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50";
+
+/**
+ * The deliverable as a file: the thread stays short, and the work opens in its own window to read or copy.
+ * A link opens in a new tab instead.
+ */
+function AttachmentFile({ attachment, from }: { attachment: Attachment; from: string }) {
+  const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const Icon = ATTACHMENT_ICONS[attachment.kind];
+  const link = attachment.kind === "link";
+  const Icon = link ? LinkIcon : FileTextIcon;
+
+  const tile = (
+    <>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-primary-deep">
+        <Icon className="size-5" aria-hidden="true" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-sm font-semibold text-foreground transition-colors group-hover/file:text-primary-deep">
+          {attachment.label}
+        </span>
+        <span className="truncate text-xs text-muted-foreground">
+          {link ? hostname(attachment.content) : `${wordCount(attachment.content)} · click to open`}
+        </span>
+      </span>
+      {link ? (
+        <ExternalLinkIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      ) : (
+        <ChevronRightIcon
+          className="size-4 shrink-0 text-muted-foreground transition-[color,translate] duration-150 group-hover/file:translate-x-0.5 group-hover/file:text-primary-deep"
+          aria-hidden="true"
+        />
+      )}
+    </>
+  );
+
+  if (link) {
+    return (
+      <a href={attachment.content} target="_blank" rel="noopener noreferrer" className={FILE_TILE}>
+        {tile}
+        <span className="sr-only">(opens in a new tab)</span>
+      </a>
+    );
+  }
 
   const copy = async () => {
     try {
@@ -339,35 +394,43 @@ function AttachmentBlock({ attachment }: { attachment: Attachment }) {
   };
 
   return (
-    <div className="mt-1 flex flex-col overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between gap-2 border-b border-border py-1.5 pr-1.5 pl-3.5">
-        <span className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-foreground">
-          <Icon className="size-4 shrink-0 text-primary-deep" aria-hidden="true" />
-          <span className="truncate">{attachment.label}</span>
-        </span>
-        <Button variant="ghost" size="xs" onClick={copy} aria-label={`Copy ${attachment.label}`}>
-          {copied ? (
-            <CheckIcon data-icon="inline-start" aria-hidden="true" />
-          ) : (
-            <CopyIcon data-icon="inline-start" aria-hidden="true" />
-          )}
-          {copied ? "Copied" : "Copy"}
-        </Button>
-      </div>
-      {attachment.kind === "link" ? (
-        <a
-          href={attachment.content}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="truncate px-3.5 py-3 font-mono text-xs text-primary-deep underline-offset-2 hover:underline"
-        >
-          {attachment.content}
-        </a>
-      ) : (
-        <pre className="m-0 max-h-64 overflow-auto px-3.5 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground/85">
-          {attachment.content}
-        </pre>
-      )}
-    </div>
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={FILE_TILE} aria-haspopup="dialog">
+        {tile}
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+          <DialogHeader className="shrink-0 flex-row items-center gap-3 border-b border-border px-6 py-5 text-left">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-primary-deep">
+              <FileTextIcon className="size-5" aria-hidden="true" />
+            </span>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <DialogTitle className="text-lg font-extrabold tracking-[-0.02em]">{attachment.label}</DialogTitle>
+              <DialogDescription className="truncate">
+                {from} · {wordCount(attachment.content)}
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            <p className="m-0 max-w-[75ch] text-[15px] leading-relaxed break-words whitespace-pre-wrap text-foreground">
+              {attachment.content}
+            </p>
+          </div>
+          <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
+            <DialogClose asChild>
+              <Button variant="outline">Close</Button>
+            </DialogClose>
+            <Button variant="secondary" onClick={() => void copy()}>
+              {copied ? (
+                <CheckIcon data-icon="inline-start" aria-hidden="true" />
+              ) : (
+                <CopyIcon data-icon="inline-start" aria-hidden="true" />
+              )}
+              {copied ? "Copied" : "Copy the work"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

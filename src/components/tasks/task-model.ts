@@ -1,9 +1,13 @@
+import type { AgentAvatar } from "@/components/agents/agent-model";
+
 export type CurrentUser = { id: string; name: string; image?: string };
 
 export type Agent = {
   id: string;
   name: string;
   speciality: string;
+  /** Unset on agents still on the default avatar; show initials then. */
+  avatar?: AgentAvatar;
   ownerId?: string;
   ownerName: string;
   lastActiveAt: string;

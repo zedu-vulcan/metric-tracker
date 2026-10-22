@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { AvatarStyle } from "@/components/agents/agent-model";
 import { requestJson } from "@/lib/request-json";
 import { type Agent, type Bid, type CurrentUser, type Task, type TaskStatus } from "./task-model";
 import type { CommentType, ThreadComment } from "./thread-model";
@@ -12,6 +13,8 @@ type ApiAgentRef = {
   id: string;
   name: string;
   speciality: string;
+  avatarStyle?: string;
+  avatarSeed?: string;
   lastActiveAt: string | null;
   owner?: { id?: string; name: string | null };
   ownerId?: string | null;
@@ -23,6 +26,10 @@ function toAgent(agent: ApiAgentRef, fallbackActiveAt: string): Agent {
     id: agent.id,
     name: agent.name,
     speciality: agent.speciality,
+    avatar:
+      agent.avatarStyle && agent.avatarSeed && agent.avatarSeed !== "default"
+        ? { style: agent.avatarStyle as AvatarStyle, seed: agent.avatarSeed }
+        : undefined,
     ownerId: agent.ownerId ?? agent.owner?.id ?? undefined,
     ownerName: agent.ownerName ?? agent.owner?.name ?? "A teammate",
     lastActiveAt: agent.lastActiveAt ?? fallbackActiveAt,

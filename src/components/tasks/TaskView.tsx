@@ -1,8 +1,8 @@
 "use client";
 
 import { useProject } from "@/components/projects/ProjectProvider";
-import { useEffect, useState } from "react";
-import { ClockIcon, HandIcon, ListTodoIcon, MessageSquareIcon } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronDownIcon, ClockIcon, HandIcon, ListTodoIcon, MessageSquareIcon } from "lucide-react";
 import { PageContent, PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import {
   type TaskStatus,
 } from "./task-model";
 import {
+  AgentFace,
   BackLink,
   TaskPageLoading,
   CardStack,
@@ -165,7 +166,6 @@ export function TaskView({ taskId }: { taskId: string }) {
       <BackLink href={tasksHref} label="Tasks" />
       <PageHeader
         title={task.title}
-        description={task.description || undefined}
         actions={
           <CopyRef refText={task.ref} title={task.title} status={taskStageText(task.status)} labelled />
         }
@@ -173,6 +173,8 @@ export function TaskView({ taskId }: { taskId: string }) {
       />
 
       <PageContent>
+        {task.description && <TaskDescription text={task.description} />}
+
         <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
           <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
             <span className={cn("flex size-6 items-center justify-center rounded-full", stageStyle.chip)}>
@@ -260,13 +262,49 @@ export function TaskView({ taskId }: { taskId: string }) {
   );
 }
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
+/** The brief at full width, so long text reads comfortably; past a few lines it folds behind "Show more". */
+function TaskDescription({ text }: { text: string }) {
+  const body = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+
+  useLayoutEffect(() => {
+    const element = body.current;
+    if (!element) return;
+    const measure = () => setOverflows(element.scrollHeight > element.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [text]);
+
+  return (
+    <section aria-label="Task description" className="flex flex-col items-start gap-2 rounded-[22px] border border-border bg-card p-5 sm:p-6">
+      <p
+        ref={body}
+        id="task-description"
+        className={cn(
+          "m-0 w-full text-[15px] leading-relaxed break-words whitespace-pre-line text-foreground/85",
+          !expanded && "line-clamp-6"
+        )}
+      >
+        {text}
+      </p>
+      {(overflows || expanded) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-3"
+          aria-expanded={expanded}
+          aria-controls="task-description"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "Show less" : "Show more"}
+          <ChevronDownIcon data-icon="inline-end" aria-hidden="true" className={cn("transition-transform", expanded && "rotate-180")} />
+        </Button>
+      )}
+    </section>
+  );
 }
 
 function BidCard({
@@ -290,12 +328,7 @@ function BidCard({
   return (
     <li className={cn(ITEM_CARD, "flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-8")}>
       <div className="flex min-w-0 flex-1 items-start gap-4">
-        <span
-          className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-accent text-sm font-bold text-primary-deep"
-          aria-hidden="true"
-        >
-          {initials(name) || "?"}
-        </span>
+        <AgentFace name={name} agent={agent} className="size-11 text-sm" />
         <div className="flex min-w-0 flex-col gap-1.5 pt-0.5">
           <p className="m-0 flex flex-wrap items-baseline gap-x-2">
             <span className="text-lg leading-snug font-bold tracking-[-0.02em] text-foreground">{name}</span>
