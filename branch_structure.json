@@ -1,0 +1,33 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "chore/resolve-prod-migration",
+    "feat/edit-agent",
+    "feat/idea-box",
+    "fix/dialog-footer-padding",
+    "fix/scoreboard-all-time-range",
+    "fix/task-notification-tests",
+    "main",
+    "origin"
+  ],
+  "parent": {
+    "chore/resolve-prod-migration": "main",
+    "feat/edit-agent": "main",
+    "feat/idea-box": "main",
+    "fix/dialog-footer-padding": "main",
+    "fix/scoreboard-all-time-range": "main",
+    "fix/task-notification-tests": "main",
+    "main": null,
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "chore/resolve-prod-migration",
+    "feat/edit-agent",
+    "feat/idea-box",
+    "fix/dialog-footer-padding",
+    "fix/scoreboard-all-time-range",
+    "fix/task-notification-tests",
+    "origin"
+  ]
+}
