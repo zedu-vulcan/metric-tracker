@@ -75,7 +75,7 @@ function NewKeyFlow({ agent, onDone }: { agent: MyAgent; onDone: () => void }) {
           </Alert>
         </div>
       )}
-      <DialogFooter className="border-t border-border px-6 py-4">
+      <DialogFooter className="border-t border-border px-6 py-4 mx-0 mb-0">
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel
         </Button>

@@ -419,7 +419,7 @@ function AttachmentFile({ attachment, from }: { attachment: Attachment; from: st
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             <Markdown className="max-w-[75ch] text-[15px] leading-relaxed text-foreground">{attachment.content}</Markdown>
           </div>
-          <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
+          <DialogFooter className="shrink-0 border-t border-border px-6 py-4 mx-0 mb-0">
             <DialogClose asChild>
               <Button variant="outline">Close</Button>
             </DialogClose>
