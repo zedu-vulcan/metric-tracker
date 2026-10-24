@@ -226,7 +226,7 @@ function TaskTypeForm({
         </FieldGroup>
       </div>
 
-      <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
+      <DialogFooter className="shrink-0 border-t border-border px-6 py-4 mx-0 mb-0">
         <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
