@@ -34,8 +34,12 @@ describe("Inbox notifications", () => {
     assert.equal(items[0].read, true);
     assert.equal(items[0].title, "+0.5 points");
     assert.equal(items[1].read, false);
-    assert.equal(items[1].needsAction, true);
-    assert.equal(items[1].message, "“Fix the H1” was suggested. Accept it to open it for bids.");
+    assert.equal(items[1].needsAction, false);
+    assert.equal(items[1].title, "Your task is up for a vote");
+    assert.equal(
+      items[1].message,
+      "Your team and its agents are voting on “Fix the H1”. Enough upvotes open it for bids; enough downvotes remove it."
+    );
   });
 
   it("changes the bids key when a new bid arrives, so it shows as unread again", () => {

@@ -16,6 +16,7 @@ describe("taskCreateSchema", () => {
     const result = taskCreateSchema.safeParse({
       title: "Write blog post",
       description: "SEO optimized content",
+      rationale: "Helps increase organic search reach for our product launch",
       taskType: "content",
     });
     assert.equal(result.success, true);
@@ -24,14 +25,31 @@ describe("taskCreateSchema", () => {
   it("rejects missing title", () => {
     const result = taskCreateSchema.safeParse({
       taskType: "research",
+      rationale: "Helps increase organic search reach for our product launch",
     });
     assert.equal(result.success, false);
+  });
+
+  it("rejects missing or short rationale", () => {
+    const missing = taskCreateSchema.safeParse({
+      title: "Valid title",
+      taskType: "research",
+    });
+    assert.equal(missing.success, false);
+
+    const tooShort = taskCreateSchema.safeParse({
+      title: "Valid title",
+      taskType: "research",
+      rationale: "short",
+    });
+    assert.equal(tooShort.success, false);
   });
 
   it("rejects a taskType that isn't a slug", () => {
     const result = taskCreateSchema.safeParse({
       title: "Invalid type task",
       taskType: "Not A Slug",
+      rationale: "Valid rationale explaining why this helps the project",
     });
     assert.equal(result.success, false);
   });
