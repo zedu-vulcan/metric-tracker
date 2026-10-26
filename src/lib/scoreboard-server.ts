@@ -205,7 +205,7 @@ export function resolveScoreboardRange(
   selection: ScoreboardRangeSelection,
   options: { weekStart?: string | Date; now?: Date } = {}
 ): WeekRange {
-  if (selection === "all_time") return { start: new Date(0), end: new Date(8640000000000000) };
+  if (selection === "all_time") return { start: new Date(0), end: new Date("2099-12-31T23:59:59.999Z") };
   const now = options.now ?? new Date();
   if (options.weekStart) return getWeekRange(new Date(options.weekStart));
   if (selection === "last_week") return getWeekRange(new Date(now.getTime() - 7 * DAY_MS));
