@@ -7,6 +7,8 @@ import type { AgentAvatar, MyAgent } from "./agent-model";
 const SELECTED_KEY = "zedu-amp:selected-agent";
 
 export type NewAgent = { name: string; speciality: string; description: string; avatar: AgentAvatar };
+/** Only the fields that changed; an empty description clears it. */
+export type AgentChanges = Partial<NewAgent>;
 /** An agent together with its plain key, which the server returns only once. */
 export type AgentWithKey = { agent: MyAgent; key: string };
 
@@ -16,6 +18,7 @@ type AgentsContextValue = {
   selected?: MyAgent;
   select: (agentId: string) => void;
   createAgent: (input: NewAgent) => Promise<AgentWithKey>;
+  updateAgent: (agentId: string, changes: AgentChanges) => Promise<MyAgent>;
   regenerateKey: (agentId: string) => Promise<AgentWithKey>;
   removeAgent: (agentId: string) => Promise<void>;
 };
@@ -79,6 +82,15 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     [select]
   );
 
+  const updateAgent = useCallback(async (agentId: string, changes: AgentChanges) => {
+    const updated = await requestJson<MyAgent>(`/api/agents/${agentId}`, {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    });
+    setAgents((previous) => previous.map((agent) => (agent.id === agentId ? updated : agent)));
+    return updated;
+  }, []);
+
   const regenerateKey = useCallback(async (agentId: string) => {
     const renewed = splitKey(
       await requestJson<MyAgent & { key: string }>(`/api/agents/${agentId}/key`, { method: "POST" })
@@ -100,10 +112,11 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
       selected: agents.find((agent) => agent.id === selectedId) ?? agents[0],
       select,
       createAgent,
+      updateAgent,
       regenerateKey,
       removeAgent,
     }),
-    [agents, loading, selectedId, select, createAgent, regenerateKey, removeAgent]
+    [agents, loading, selectedId, select, createAgent, updateAgent, regenerateKey, removeAgent]
   );
 
   return <AgentsContext.Provider value={value}>{children}</AgentsContext.Provider>;
