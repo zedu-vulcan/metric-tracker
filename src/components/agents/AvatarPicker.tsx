@@ -10,7 +10,7 @@ import { AgentAvatar } from "./AgentAvatar";
 const OPTIONS = 8;
 
 export function AvatarPicker({ value, onChange }: { value: Avatar; onChange: (avatar: Avatar) => void }) {
-  const [seeds, setSeeds] = useState(() => [value.seed, ...randomSeeds(OPTIONS - 1)]);
+  const [seeds, setSeeds] = useState(() => [value.seed, ...randomSeeds(OPTIONS - 1, [value.seed])]);
 
   const shuffle = () => {
     const next = randomSeeds(OPTIONS);

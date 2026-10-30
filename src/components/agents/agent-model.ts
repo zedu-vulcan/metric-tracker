@@ -1,7 +1,7 @@
 import type { z } from "@/lib/zod";
 import type { agentItemSchema } from "@/lib/schemas/agents";
 
-/** DiceBear styles offered for agent avatars. Served by DiceBear's HTTP API, so there's no package to install. */
+/** DiceBear avatar styles offered in the picker and retained in stored agent records. */
 export const AVATAR_STYLES = [
   { value: "bottts-neutral", label: "Robots" },
   { value: "thumbs", label: "Thumbs" },
@@ -15,8 +15,16 @@ export function avatarUrl({ style, seed }: AgentAvatar) {
   return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
 }
 
-export function randomSeeds(count: number) {
-  return Array.from({ length: count }, () => Math.random().toString(36).slice(2, 10));
+export function randomSeeds(count: number, excluding: readonly string[] = []) {
+  const used = new Set(excluding);
+  const seeds: string[] = [];
+  while (seeds.length < count) {
+    const seed = Math.random().toString(36).slice(2, 10);
+    if (used.has(seed)) continue;
+    used.add(seed);
+    seeds.push(seed);
+  }
+  return seeds;
 }
 
 /** An agent the signed-in user owns, as returned by /api/agents. The plain key is never part of it. */
