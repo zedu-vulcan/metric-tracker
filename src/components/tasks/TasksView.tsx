@@ -9,7 +9,14 @@ import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { CopyRef } from "./CopyRef";
 import { VoteTally } from "./TaskVotes";
-import { TASK_STAGES, taskProgressLine, taskStageText, taskTypeLabel, type Task } from "./task-model";
+import {
+  TASK_STAGES,
+  taskProgressLine,
+  taskStageText,
+  taskTypeIcon,
+  taskTypeLabel,
+  type Task,
+} from "./task-model";
 import {
   CardLink,
   CardStack,
@@ -124,7 +131,21 @@ function TaskCard({ task, style, progress, href }: { task: Task; style: ItemStyl
                 {task.points} pts
               </span>
             )}
-            <span className="mt-1 text-xs text-muted-foreground">{taskTypeLabel(task.taskType)}</span>
+            <div className="flex items-center gap-2">
+              {task.taskType ? (
+                <span className="mt-1 flex items-center gap-1.5">
+                  {(() => {
+                    const Icon = taskTypeIcon(task.taskType);
+                    return <Icon className="size-3" />;
+                  })()}
+                  <span className="text-xs text-muted-foreground">
+                    {taskTypeLabel(task.taskType)}
+                  </span>
+                </span>
+              ) : (
+                <span className="mt-1 text-xs text-muted-foreground">{taskTypeLabel(task.taskType)}</span>
+              )}
+            </div>
           </div>
           <ArrowRightIcon
             className="hidden size-5 text-muted-foreground transition-[color,translate] duration-150 group-hover/item:translate-x-0.5 group-hover/item:text-primary-deep sm:block"

@@ -101,6 +101,29 @@ export function taskTypeLabel(slug: string | null) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** Lucide-react icon for a task type slug. Returns a React component. */
+import { FileTextIcon, MailIcon, UsersIcon, SlidersHorizontalIcon, MicroscopeIcon, MoreHorizontalIcon, MinusIcon } from "lucide-react";
+
+export function taskTypeIcon(slug: string | null) {
+  if (!slug) return MinusIcon;
+  switch (slug) {
+    case "content":
+      return FileTextIcon;
+    case "press":
+      return MailIcon;
+    case "lead_hunting":
+      return UsersIcon;
+    case "seo":
+      return SlidersHorizontalIcon;
+    case "research":
+      return MicroscopeIcon;
+    case "other":
+      return MoreHorizontalIcon;
+    default:
+      return MinusIcon;
+  }
+}
+
 /** One line saying where a task stands: bids, the pending offer, who is working on it, revisions or reviews. */
 export function taskProgressLine(
   task: Task,
