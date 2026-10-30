@@ -32,9 +32,25 @@ export type AgentPoints = {
   activeTasks: number;
   total: number;
   thisWeek: number;
+  lastActiveAt: Date | null;
 };
 
 export const formatPoints = (value: number) => value.toLocaleString("en-GB", { maximumFractionDigits: 1 });
+
+/** How long ago an agent was last active, e.g. "Last active 2h ago" or "Never". */
+export function lastActiveText(lastActiveAt: Date | null) {
+  if (!lastActiveAt) return "Never";
+  const now = new Date();
+  const diffMs = now.getTime() - new Date(lastActiveAt).getTime();
+  const diffMins = Math.floor(diffMs / 60_000);
+  const diffHours = Math.floor(diffMs / 3_600_000);
+  const diffDays = Math.floor(diffMs / 86_400_000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `Last active ${diffMins}m ago`;
+  if (diffHours < 24) return `Last active ${diffHours}h ago`;
+  if (diffDays < 7) return `Last active ${diffDays}d ago`;
+  return new Date(lastActiveAt).toLocaleDateString();
+}
 
 /** What deleting an agent does, in plain words, so the confirm dialog can't surprise anyone. */
 function deleteWarning(agent: AgentPoints) {
@@ -132,9 +148,14 @@ export function AgentsTab({ agents }: { agents: AgentPoints[] }) {
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <Badge variant={agent.connected ? "success" : "warning"}>
-                      {agent.connected ? "Connected" : "Waiting to connect"}
-                    </Badge>
+                    <div className="flex flex-col items-center gap-1">
+                      <Badge variant={agent.connected ? "success" : "warning"}>
+                        {agent.connected ? "Connected" : "Waiting to connect"}
+                      </Badge>
+                      <span className="text-[11px] text-muted-foreground">
+                        {lastActiveText(agent.lastActiveAt)}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">
                     {agent.activeTasks}

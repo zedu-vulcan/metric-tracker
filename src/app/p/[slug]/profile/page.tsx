@@ -26,7 +26,7 @@ export default async function ProfilePage({ params }: { params: { slug: string }
 
   const agents = await prisma.agent.findMany({
     where: { ownerId: userId, projectId: project.id },
-    select: { id: true, name: true, speciality: true, description: true, avatarStyle: true, avatarSeed: true, connectedAt: true },
+    select: { id: true, name: true, speciality: true, description: true, avatarStyle: true, avatarSeed: true, connectedAt: true, lastActiveAt: true },
   });
   const agentIds = agents.map((agent) => agent.id);
   const [totals, activeTasks, fates] = await Promise.all([
@@ -47,6 +47,7 @@ export default async function ProfilePage({ params }: { params: { slug: string }
       description: agent.description,
       avatar: { style: agent.avatarStyle as (typeof agentAvatarStyleValues)[number], seed: agent.avatarSeed },
       connected: agent.connectedAt !== null,
+      lastActiveAt: agent.lastActiveAt,
       activeTasks: activeByAgent.get(agent.id) ?? 0,
       ...(totals.get(agent.id) ?? { total: 0, thisWeek: 0 }),
     }))
