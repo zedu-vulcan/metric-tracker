@@ -2,15 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  CheckIcon,
-  ChevronDownIcon,
-  LogInIcon,
-  PlusIcon,
-  SearchIcon,
-  SettingsIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { CheckIcon, ChevronDownIcon, LogInIcon, PlusIcon, SearchIcon, SettingsIcon, type LucideIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,37 +18,21 @@ import { useProject, type CurrentProject } from "./ProjectProvider";
 /** Show a filter box once the list is long enough to need one. */
 const SEARCH_FROM = 7;
 
-const ROLE_LABELS: Record<CurrentProject["role"], string> = {
-  owner: "Owner",
-  admin: "Admin",
-  member: "Member",
-};
+const ROLE_LABELS: Record<CurrentProject["role"], string> = { owner: "Owner", admin: "Admin", member: "Member" };
 
 function monogram(name: string) {
   const words = name.trim().split(/\s+/).filter(Boolean);
-  return (
-    (words[0]?.[0] ?? "P") + (words.length > 1 ? words[1][0] : "")
-  ).toUpperCase();
+  return ((words[0]?.[0] ?? "P") + (words.length > 1 ? words[1][0] : "")).toUpperCase();
 }
 
-function ProjectTile({
-  name,
-  current,
-  className,
-}: {
-  name: string;
-  current?: boolean;
-  className?: string;
-}) {
+function ProjectTile({ name, current, className }: { name: string; current?: boolean; className?: string }) {
   return (
     <span
       aria-hidden="true"
       className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-[10px] text-xs font-extrabold tracking-[-0.02em]",
-        current
-          ? "bg-primary text-primary-foreground"
-          : "bg-accent text-primary-deep",
-        className,
+        current ? "bg-primary text-primary-foreground" : "bg-accent text-primary-deep",
+        className
       )}
     >
       {monogram(name)}
@@ -64,17 +40,7 @@ function ProjectTile({
   );
 }
 
-function ActionItem({
-  href,
-  icon: Icon,
-  title,
-  hint,
-}: {
-  href: string;
-  icon: LucideIcon;
-  title: string;
-  hint: string;
-}) {
+function ActionItem({ href, icon: Icon, title, hint }: { href: string; icon: LucideIcon; title: string; hint: string }) {
   return (
     <DropdownMenuItem asChild className="gap-3 rounded-xl px-2 py-2">
       <Link href={href}>
@@ -82,9 +48,7 @@ function ActionItem({
           <Icon aria-hidden="true" />
         </span>
         <span className="flex min-w-0 flex-col leading-tight">
-          <span className="truncate text-sm font-semibold text-foreground">
-            {title}
-          </span>
+          <span className="truncate text-sm font-semibold text-foreground">{title}</span>
           <span className="truncate text-xs text-muted-foreground">{hint}</span>
         </span>
       </Link>
@@ -99,13 +63,9 @@ export function ProjectSwitcher({ projects }: { projects: CurrentProject[] }) {
 
   const searchable = projects.length >= SEARCH_FROM;
   const needle = query.trim().toLowerCase();
-  const shown = needle
-    ? projects.filter((project) => project.name.toLowerCase().includes(needle))
-    : projects;
+  const shown = needle ? projects.filter((project) => project.name.toLowerCase().includes(needle)) : projects;
   // The project you're in leads the list; the rest keep their order.
-  const ordered = [...shown].sort(
-    (a, b) => Number(b.id === current.id) - Number(a.id === current.id),
-  );
+  const ordered = [...shown].sort((a, b) => Number(b.id === current.id) - Number(a.id === current.id));
 
   return (
     <DropdownMenu onOpenChange={(open) => !open && setQuery("")}>
@@ -119,12 +79,7 @@ export function ProjectSwitcher({ projects }: { projects: CurrentProject[] }) {
           className="size-9 rounded-full text-[13px] ring-4 ring-accent transition-shadow group-aria-expanded:ring-card"
         />
         <span className="flex min-w-0 flex-1 items-center gap-2">
-          <span
-            className="truncate text-[15px] font-extrabold tracking-[-0.025em]"
-            title={current.name}
-          >
-            {current.name}
-          </span>
+          <span className="truncate text-[15px] font-extrabold tracking-[-0.025em]">{current.name}</span>
           <span className="hidden shrink-0 rounded-full bg-muted px-2 py-0.5 text-2xs font-bold tracking-[0.07em] text-muted-foreground uppercase transition-colors group-aria-expanded:bg-card group-aria-expanded:text-primary-deep sm:inline-flex">
             {ROLE_LABELS[current.role]}
           </span>
@@ -137,15 +92,9 @@ export function ProjectSwitcher({ projects }: { projects: CurrentProject[] }) {
         </span>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent
-        align="start"
-        sideOffset={8}
-        className="w-80 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
-      >
+      <DropdownMenuContent align="start" sideOffset={8} className="w-80 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5">
         <div className="flex items-center justify-between gap-2 px-2 pt-1.5 pb-2">
-          <span className="text-[15px] font-bold tracking-[-0.02em] text-foreground">
-            Your projects
-          </span>
+          <span className="text-[15px] font-bold tracking-[-0.02em] text-foreground">Your projects</span>
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
             {projects.length}
           </span>
@@ -153,20 +102,13 @@ export function ProjectSwitcher({ projects }: { projects: CurrentProject[] }) {
 
         {searchable && (
           <label className="mx-1 mb-1.5 flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/12">
-            <SearchIcon
-              className="size-4 shrink-0 text-muted-foreground"
-              aria-hidden="true"
-            />
+            <SearchIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="sr-only">Find a project</span>
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               // The menu's type-to-select would otherwise grab the letters.
-              onKeyDown={(event) =>
-                event.key !== "Escape" &&
-                event.key !== "ArrowDown" &&
-                event.stopPropagation()
-              }
+              onKeyDown={(event) => event.key !== "Escape" && event.key !== "ArrowDown" && event.stopPropagation()}
               placeholder="Find a project"
               className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
@@ -175,9 +117,7 @@ export function ProjectSwitcher({ projects }: { projects: CurrentProject[] }) {
 
         <DropdownMenuGroup className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
           {ordered.length === 0 ? (
-            <p className="m-0 px-2 py-6 text-center text-[13px] text-muted-foreground">
-              No project matches “{query.trim()}”.
-            </p>
+            <p className="m-0 px-2 py-6 text-center text-[13px] text-muted-foreground">No project matches “{query.trim()}”.</p>
           ) : (
             ordered.map((project) => {
               const isCurrent = project.id === current.id;
@@ -185,30 +125,15 @@ export function ProjectSwitcher({ projects }: { projects: CurrentProject[] }) {
                 <DropdownMenuItem
                   key={project.id}
                   asChild
-                  className={cn(
-                    "gap-3 rounded-xl px-2 py-2",
-                    isCurrent && "bg-accent/60",
-                  )}
+                  className={cn("gap-3 rounded-xl px-2 py-2", isCurrent && "bg-accent/60")}
                 >
-                  <Link
-                    href={projectHref(project.slug)}
-                    aria-current={isCurrent ? "page" : undefined}
-                  >
+                  <Link href={projectHref(project.slug)} aria-current={isCurrent ? "page" : undefined}>
                     <ProjectTile name={project.name} current={isCurrent} />
                     <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                      <span className="truncate text-sm font-semibold text-foreground">
-                        {project.name}
-                      </span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {ROLE_LABELS[project.role]}
-                      </span>
+                      <span className="truncate text-sm font-semibold text-foreground">{project.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">{ROLE_LABELS[project.role]}</span>
                     </span>
-                    {isCurrent && (
-                      <CheckIcon
-                        className="text-primary-deep"
-                        aria-label="Current project"
-                      />
-                    )}
+                    {isCurrent && <CheckIcon className="text-primary-deep" aria-label="Current project" />}
                   </Link>
                 </DropdownMenuItem>
               );
@@ -217,10 +142,7 @@ export function ProjectSwitcher({ projects }: { projects: CurrentProject[] }) {
         </DropdownMenuGroup>
 
         {current.canManage && (
-          <DropdownMenuItem
-            asChild
-            className="mt-0.5 gap-3 rounded-xl px-2 py-2 text-[13px] font-medium text-muted-foreground"
-          >
+          <DropdownMenuItem asChild className="mt-0.5 gap-3 rounded-xl px-2 py-2 text-[13px] font-medium text-muted-foreground">
             <Link href={current.href("/settings")}>
               <SettingsIcon className="mx-2" aria-hidden="true" />
               Settings for {current.name}
@@ -229,18 +151,8 @@ export function ProjectSwitcher({ projects }: { projects: CurrentProject[] }) {
         )}
 
         <DropdownMenuSeparator className="my-1.5" />
-        <ActionItem
-          href="/projects/join"
-          icon={LogInIcon}
-          title="Join with a code"
-          hint="Use the code a teammate shared"
-        />
-        <ActionItem
-          href="/projects/new"
-          icon={PlusIcon}
-          title="Create a project"
-          hint="Start a new workspace for your team"
-        />
+        <ActionItem href="/projects/join" icon={LogInIcon} title="Join with a code" hint="Use the code a teammate shared" />
+        <ActionItem href="/projects/new" icon={PlusIcon} title="Create a project" hint="Start a new workspace for your team" />
       </DropdownMenuContent>
     </DropdownMenu>
   );
