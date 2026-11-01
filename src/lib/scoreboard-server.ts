@@ -201,11 +201,19 @@ export type ScoreboardRangeSelection = "this_week" | "last_week" | "all_time";
 
 export const SCOREBOARD_RANGES: ScoreboardRangeSelection[] = ["this_week", "last_week", "all_time"];
 
+/**
+ * Upper bound for the all-time range. JavaScript's max date (8640000000000000 →
+ * year 275760) serializes as a 6-digit-year ISO string that PostgreSQL's timestamp
+ * parser rejects in `$queryRaw` parameters, causing `range=all_time` queries to return
+ * a 500 error. Clamping to a safe 4-digit-year timestamp (2099-12-31) resolves this cleanly.
+ */
+export const ALL_TIME_END = new Date("2099-12-31T23:59:59.999Z");
+
 export function resolveScoreboardRange(
   selection: ScoreboardRangeSelection,
   options: { weekStart?: string | Date; now?: Date } = {}
 ): WeekRange {
-  if (selection === "all_time") return { start: new Date(0), end: new Date(8640000000000000) };
+  if (selection === "all_time") return { start: new Date(0), end: new Date(ALL_TIME_END.getTime()) };
   const now = options.now ?? new Date();
   if (options.weekStart) return getWeekRange(new Date(options.weekStart));
   if (selection === "last_week") return getWeekRange(new Date(now.getTime() - 7 * DAY_MS));
