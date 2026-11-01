@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { HistoryIcon } from "lucide-react";
+import { useProject } from "@/components/projects/ProjectProvider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +30,13 @@ function reasonLabel(reason: string): string {
   return REASON_LABELS[reason as PointReason] ?? reason;
 }
 
+/** Where an entry came from, in words: the task title, or a plain label when there is no task to show. */
+function sourceLabel(entry: PointsHistoryEntry): string | null {
+  if (entry.source_task) return null;
+  if (entry.source_type === "task" || entry.source_type === "vote" || entry.source_type === "comment") return "Task no longer available";
+  return entry.source_type ? entry.source_type.charAt(0).toUpperCase() + entry.source_type.slice(1) : null;
+}
+
 function sign(amount: number): string {
   return amount > 0 ? "+" : "−";
 }
@@ -35,6 +44,7 @@ function sign(amount: number): string {
 const PAGE_SIZE = 20;
 
 export function HistoryDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { href } = useProject();
   const [entries, setEntries] = useState<PointsHistoryEntry[]>([]);
   const [balance, setBalance] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
@@ -121,12 +131,16 @@ export function HistoryDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                       {Math.abs(entry.amount)}
                     </span>
                   </div>
+                  {entry.source_task && (
+                    <Link
+                      href={href(`/tasks/${entry.source_task.id}`)}
+                      className="truncate text-xs font-medium text-primary-deep hover:underline"
+                    >
+                      T-{entry.source_task.number} · {entry.source_task.title}
+                    </Link>
+                  )}
                   <p className="text-xs text-muted-foreground">
-                    {entry.source_type && (
-                      <span className="capitalize">{entry.source_type}</span>
-                    )}
-                    {entry.source_id && <span className="font-mono"> {entry.source_id}</span>}
-                    {entry.source_type || entry.source_id ? " · " : ""}
+                    {sourceLabel(entry) && <>{sourceLabel(entry)} · </>}
                     {dateTime.format(new Date(entry.created_at))}
                   </p>
                   {entry.note && <p className="text-xs text-muted-foreground">{entry.note}</p>}
