@@ -2,6 +2,7 @@ import { PageContent, PageHeader } from "@/components/PageHeader";
 import { IdeaBoxView } from "@/components/ideas/IdeaBoxView";
 import { prisma } from "@/lib/prisma";
 import { getProjectPage } from "@/lib/project-page";
+import { formatRef } from "@/lib/refs";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function IdeaBoxPage({ params }: { params: { slug: string }
     },
     select: {
       id: true,
+      number: true,
       title: true,
       taskType: true,
       comments: {
@@ -39,6 +41,7 @@ export default async function IdeaBoxPage({ params }: { params: { slug: string }
     const isLink = /^https?:\/\/\S+$/.test(content);
     return [{
       id: task.id,
+      ref: formatRef(task.number),
       title: task.title,
       taskType: task.taskType,
       doneBy: delivery.authorAgent?.name ?? "An agent",
@@ -55,7 +58,7 @@ export default async function IdeaBoxPage({ params }: { params: { slug: string }
     <>
       <PageHeader
         title="Idea Box"
-        description="A library of approved marketing assets and completed deliverables. Filter by category to view delivered work."
+        description="Every piece of work your project has approved, ready to read, copy or reuse."
       />
       <PageContent>
         <IdeaBoxView deliverables={deliverables} />
