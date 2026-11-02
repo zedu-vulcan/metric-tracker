@@ -8,6 +8,7 @@ import {
   getBidderFairness,
   resolveScoreboardRange,
   type ScoreboardStore,
+  type SourceTask,
 } from "@/lib/scoreboard-server";
 import type { LedgerEntry, PointReason, PointRule, ScoreboardAgent, ScoreboardUser, TaskTypeConfig, WeekRange } from "@/lib/points";
 
@@ -21,6 +22,7 @@ function inMemoryScoreboardStore(seed: {
   entries?: LedgerEntry[];
   tasksGiven?: Record<string, number>;
   active?: Record<string, number>;
+  sourceTasks?: Record<string, SourceTask>;
 } = {}): ScoreboardStore {
   const users = [...(seed.users ?? [])];
   const agents = [...(seed.agents ?? [])];
@@ -64,6 +66,11 @@ function inMemoryScoreboardStore(seed: {
     async sumLedgerForUser(userId) {
       return entries.filter((entry) => entry.userId === userId).reduce((total, entry) => total + entry.amount, 0);
     },
+    async taskForSources(sources) {
+      const known = seed.sourceTasks ?? {};
+      const keys = sources.map((s) => `${s.sourceType}:${s.sourceId}`).filter((key) => key in known);
+      return Object.fromEntries(keys.map((key) => [key, known[key]]));
+    },
   };
 }
 
@@ -75,6 +82,8 @@ function entry(input: {
   idempotencyKey: string;
   createdAt: string;
   agentId?: string;
+  sourceType?: LedgerEntry["sourceType"];
+  sourceId?: string;
 }): LedgerEntry {
   return {
     id: input.id,
@@ -83,8 +92,8 @@ function entry(input: {
     projectId: "project_zedu",
     amount: input.amount,
     reason: input.reason,
-    sourceType: null,
-    sourceId: null,
+    sourceType: input.sourceType ?? null,
+    sourceId: input.sourceId ?? null,
     idempotencyKey: input.idempotencyKey,
     grantedByUserId: null,
     note: null,
@@ -258,6 +267,40 @@ describe("fetchUserPointsHistory", () => {
       page2.entries.map((e) => e.id),
       ["e_a_idea", "e_a_task"]
     );
+  });
+
+  it("names the task behind a task, vote or comment source instead of leaving a bare id", async () => {
+    const withSources = inMemoryScoreboardStore({
+      entries: [
+        entry({ id: "h_task", userId: "u_alpha", amount: 200, reason: "task_approved", idempotencyKey: "h1", createdAt: "2026-10-19T10:00:00Z", sourceType: "task", sourceId: "task_1" }),
+        entry({ id: "h_vote", userId: "u_alpha", amount: 40, reason: "task_voted", idempotencyKey: "h2", createdAt: "2026-10-19T09:00:00Z", sourceType: "vote", sourceId: "vote_1" }),
+        entry({ id: "h_review", userId: "u_alpha", amount: 1, reason: "review_submitted", idempotencyKey: "h3", createdAt: "2026-10-19T08:00:00Z", sourceType: "comment", sourceId: "comment_1" }),
+      ],
+      sourceTasks: {
+        "task:task_1": { taskId: "task_1", number: 442, title: "Verify robots.txt" },
+        "vote:vote_1": { taskId: "task_2", number: 1884, title: "Make Offer prices numeric" },
+        "comment:comment_1": { taskId: "task_1", number: 442, title: "Verify robots.txt" },
+      },
+    });
+    const { entries } = await fetchUserPointsHistory("u_alpha", { projectId: "p1", store: withSources });
+    assert.deepEqual(entries.map((e) => e.source_task), [
+      { id: "task_1", number: 442, title: "Verify robots.txt" },
+      { id: "task_2", number: 1884, title: "Make Offer prices numeric" },
+      { id: "task_1", number: 442, title: "Verify robots.txt" },
+    ]);
+  });
+
+  it("leaves source_task null for a deleted source, an idea and an entry with no source", async () => {
+    const withGaps = inMemoryScoreboardStore({
+      entries: [
+        entry({ id: "g_gone", userId: "u_alpha", amount: 40, reason: "task_voted", idempotencyKey: "g1", createdAt: "2026-10-19T12:00:00Z", sourceType: "vote", sourceId: "deleted_vote" }),
+        entry({ id: "g_idea", userId: "u_alpha", amount: 5, reason: "idea_accepted", idempotencyKey: "g2", createdAt: "2026-10-19T11:00:00Z", sourceType: "idea", sourceId: "idea_1" }),
+        entry({ id: "g_adj", userId: "u_alpha", amount: -10, reason: "manual_adjustment", idempotencyKey: "g3", createdAt: "2026-10-19T10:00:00Z" }),
+      ],
+    });
+    const { entries } = await fetchUserPointsHistory("u_alpha", { projectId: "p1", store: withGaps });
+    assert.deepEqual(entries.map((e) => e.source_task), [null, null, null]);
+    assert.equal(entries[0].source_id, "deleted_vote");
   });
 });
 
