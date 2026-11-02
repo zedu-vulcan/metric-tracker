@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CheckIcon, ChevronDownIcon, CopyIcon, KeyRoundIcon, PlugIcon, PlusIcon, TrophyIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, CopyIcon, KeyRoundIcon, PencilIcon, PlugIcon, PlusIcon, TrophyIcon } from "lucide-react";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { NewTaskButton } from "@/components/tasks/NewTaskButton";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { setupPrompt } from "./agent-model";
 import { AgentAvatar } from "./AgentAvatar";
 import { useAgents } from "./AgentsProvider";
 import { CreateAgentDialog } from "./CreateAgentDialog";
+import { EditAgentDialog } from "./EditAgentDialog";
 import { NewKeyDialog } from "./NewKeyDialog";
 import { useCopy } from "./useCopy";
 
@@ -32,6 +33,7 @@ import { useCopy } from "./useCopy";
 export function AgentSwitcher() {
   const { agents, loading, selected, select } = useAgents();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [renewing, setRenewing] = useState(false);
   const { copied, copy } = useCopy();
   const project = useProject();
@@ -41,6 +43,7 @@ export function AgentSwitcher() {
   const dialogs = (
     <>
       <CreateAgentDialog open={creating} onOpenChange={setCreating} />
+      {selected && <EditAgentDialog agent={editing ? selected : null} onClose={() => setEditing(false)} />}
       {selected && <NewKeyDialog agent={selected} open={renewing} onOpenChange={setRenewing} />}
     </>
   );
@@ -121,6 +124,10 @@ export function AgentSwitcher() {
             ))}
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => setEditing(true)}>
+            <PencilIcon aria-hidden="true" />
+            Edit agent
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={copyPrompt}>
             <CopyIcon aria-hidden="true" />
             Copy setup prompt

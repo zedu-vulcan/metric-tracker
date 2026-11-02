@@ -71,6 +71,31 @@ async function loadFeed(userId: string, projectId: string, now: Date): Promise<N
       }),
     ]);
 
+  // Ledger sources can be tasks, reviews or votes. Resolve them in batches and
+  // scope every lookup to this project; deleted sources keep the Agents fallback.
+  const sourceIds = (type: string) => points.flatMap((entry) =>
+    entry.sourceType === type && entry.sourceId ? [entry.sourceId] : []
+  );
+  const [pointTasks, pointComments, pointVotes] = await Promise.all([
+    prisma.task.findMany({
+      where: { projectId, id: { in: sourceIds("task") } },
+      select: taskSelect,
+    }),
+    prisma.taskComment.findMany({
+      where: { task: { projectId }, id: { in: sourceIds("comment") } },
+      select: { id: true, task: { select: taskSelect } },
+    }),
+    prisma.taskVote.findMany({
+      where: { task: { projectId }, id: { in: sourceIds("vote") } },
+      select: { id: true, task: { select: taskSelect } },
+    }),
+  ]);
+  const tasksBySource = new Map<string, { id: string; title: string }>([
+    ...pointTasks.map((task) => [`task:${task.id}`, taskRef(task)] as const),
+    ...pointComments.map((comment) => [`comment:${comment.id}`, taskRef(comment.task)] as const),
+    ...pointVotes.map((vote) => [`vote:${vote.id}`, taskRef(vote.task)] as const),
+  ]);
+
   return {
     proposedTasks: proposedTasks.map((task) => ({ task: taskRef(task), createdAt: task.createdAt })),
     biddingTasks: biddingTasks.map((task) => ({
@@ -115,6 +140,7 @@ async function loadFeed(userId: string, projectId: string, now: Date): Promise<N
       reason: entry.reason,
       note: entry.note,
       agentName: entry.agent?.name ?? null,
+      task: tasksBySource.get(`${entry.sourceType}:${entry.sourceId}`) ?? null,
       createdAt: entry.createdAt,
     })),
   };

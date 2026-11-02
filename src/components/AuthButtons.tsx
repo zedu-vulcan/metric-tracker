@@ -11,6 +11,7 @@ export function SignInButton({ callbackUrl = "/dashboard" }: { callbackUrl?: str
 
   return (
     <Button
+      variant="high-contrast"
       size="lg"
       className="w-full"
       disabled={isRedirecting}

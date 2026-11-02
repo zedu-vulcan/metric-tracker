@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import {
   BriefcaseBusinessIcon,
+  LightbulbIcon,
   ListTodoIcon,
   TriangleAlertIcon,
   type LucideIcon,
@@ -96,6 +97,14 @@ export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean
         badge={actionCount > 0 ? (actionCount > 99 ? "99+" : actionCount) : undefined}
       >
         Escalations
+      </SidebarNavLink>
+      <SidebarNavLink
+        aria-current={current(projectPath("/idea-box"))}
+        href={projectPath("/idea-box")}
+        collapsed={collapsed}
+        icon={<LightbulbIcon aria-hidden="true" />}
+      >
+        Idea Box
       </SidebarNavLink>
       {CHANNELS.length > 0 && <span aria-hidden="true" className="mx-3 my-1.5 h-px shrink-0 bg-sidebar-border" />}
       {inProject(CHANNELS).map(({ href, label, icon: Icon }) => (

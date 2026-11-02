@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BotIcon, MoreHorizontalIcon, Trash2Icon, TrophyIcon } from "lucide-react";
+import { BotIcon, MoreHorizontalIcon, PencilIcon, Trash2Icon, TrophyIcon } from "lucide-react";
 import { AgentAvatar } from "@/components/agents/AgentAvatar";
 import { SkillsBanner } from "@/components/SkillsResource";
 import type { AgentAvatar as Avatar } from "@/components/agents/agent-model";
 import { useAgents } from "@/components/agents/AgentsProvider";
+import { EditAgentDialog } from "@/components/agents/EditAgentDialog";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,14 +26,31 @@ export type AgentPoints = {
   id: string;
   name: string;
   speciality: string;
+  description: string | null;
   avatar: Avatar;
   connected: boolean;
   activeTasks: number;
   total: number;
   thisWeek: number;
+  lastActiveAt: Date | null;
 };
 
 export const formatPoints = (value: number) => value.toLocaleString("en-GB", { maximumFractionDigits: 1 });
+
+/** How long ago an agent was last active, e.g. "Last active 2h ago" or "Never". */
+export function lastActiveText(lastActiveAt: Date | null) {
+  if (!lastActiveAt) return "Never";
+  const now = new Date();
+  const diffMs = now.getTime() - new Date(lastActiveAt).getTime();
+  const diffMins = Math.floor(diffMs / 60_000);
+  const diffHours = Math.floor(diffMs / 3_600_000);
+  const diffDays = Math.floor(diffMs / 86_400_000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `Last active ${diffMins}m ago`;
+  if (diffHours < 24) return `Last active ${diffHours}h ago`;
+  if (diffDays < 7) return `Last active ${diffDays}d ago`;
+  return new Date(lastActiveAt).toLocaleDateString();
+}
 
 /** What deleting an agent does, in plain words, so the confirm dialog can't surprise anyone. */
 function deleteWarning(agent: AgentPoints) {
@@ -43,10 +61,11 @@ function deleteWarning(agent: AgentPoints) {
   return `${work}Its key stops working straight away. The ${formatPoints(agent.total)} points it earned stay yours.`;
 }
 
-/** Your agents in this project, highest earner first, each with a menu to delete it. */
+/** Your agents in this project, highest earner first, each with a menu to edit or delete it. */
 export function AgentsTab({ agents }: { agents: AgentPoints[] }) {
   const router = useRouter();
   const { removeAgent } = useAgents();
+  const [editing, setEditing] = useState<AgentPoints | null>(null);
   const [deleting, setDeleting] = useState<AgentPoints | null>(null);
 
   if (agents.length === 0) {
@@ -117,13 +136,26 @@ export function AgentsTab({ agents }: { agents: AgentPoints[] }) {
                           )}
                         </span>
                         <span className="truncate text-xs text-muted-foreground">{agent.speciality}</span>
+                        {agent.description && (
+                          <span
+                            className="truncate text-xs text-muted-foreground"
+                            title={agent.description}
+                          >
+                            {agent.description}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <Badge variant={agent.connected ? "success" : "warning"}>
-                      {agent.connected ? "Connected" : "Waiting to connect"}
-                    </Badge>
+                    <div className="flex flex-col items-center gap-1">
+                      <Badge variant={agent.connected ? "success" : "warning"}>
+                        {agent.connected ? "Connected" : "Waiting to connect"}
+                      </Badge>
+                      <span className="text-[11px] text-muted-foreground">
+                        {lastActiveText(agent.lastActiveAt)}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">
                     {agent.activeTasks}
@@ -147,6 +179,10 @@ export function AgentsTab({ agents }: { agents: AgentPoints[] }) {
                         <MoreHorizontalIcon aria-hidden="true" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem onSelect={() => setEditing(agent)}>
+                          <PencilIcon aria-hidden="true" />
+                          Edit agent
+                        </DropdownMenuItem>
                         <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(agent)}>
                           <Trash2Icon aria-hidden="true" />
                           Delete agent
@@ -159,6 +195,8 @@ export function AgentsTab({ agents }: { agents: AgentPoints[] }) {
             </TableBody>
           </Table>
         </CardContent>
+
+        <EditAgentDialog agent={editing} onClose={() => setEditing(null)} />
 
         <ConfirmAgentDialog
           open={deleting !== null}

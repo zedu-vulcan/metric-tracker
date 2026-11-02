@@ -1,14 +1,16 @@
 import { prisma } from "@/lib/prisma";
-import { formatRef } from "@/lib/refs";
+import { formatRef, parseRef } from "@/lib/refs";
 import { textMatch } from "./match";
 import type { Searcher } from "@/lib/schemas/search";
 
 export const searchTasks: Searcher = async ({ projectId, q, limit }) => {
   const match = textMatch(q);
+  // A pasted reference such as "T-412" finds that task directly.
+  const ref = parseRef(q);
   const tasks = await prisma.task.findMany({
     where: {
       projectId,
-      OR: [{ title: match }, { description: match }],
+      OR: [{ title: match }, { description: match }, ...(ref ? [{ number: ref.number }] : [])],
     },
     orderBy: { updatedAt: "desc" },
     take: limit,
@@ -16,14 +18,15 @@ export const searchTasks: Searcher = async ({ projectId, q, limit }) => {
 
   return tasks.map((task) => {
     const titleMatch = task.title.toLowerCase().includes(q.toLowerCase());
+    const refMatch = ref !== null && task.number === ref.number;
 
     return {
       type: "task",
       id: task.id,
       title: task.title,
-      subtitle: `Task · ${formatRef(task.number)}`,
+      subtitle: formatRef(task.number),
       status: task.status,
-      matchedField: titleMatch ? "title" : "description",
+      matchedField: refMatch ? "ref" : titleMatch ? "title" : "description",
       href: `/tasks/${task.id}`,
     };
   });

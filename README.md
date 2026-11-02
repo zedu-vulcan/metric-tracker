@@ -159,7 +159,7 @@ src/
     p/[slug]/
       layout.tsx           # Membership check + sidebar shell for every page in a project
       page.tsx             # Redirects to the project's Tasks page
-      settings/page.tsx    # Members, roles, invite link and code
+      settings/page.tsx    # General, brief, members, points, task types, data and danger sections
       <feature>/page.tsx   # One folder per feature: tasks, todo, work, scoreboard, settings…
     api/
       auth/[...nextauth]/  # NextAuth (don't change without discussing)

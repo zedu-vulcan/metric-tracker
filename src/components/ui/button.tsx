@@ -10,6 +10,8 @@ const buttonVariants = cva(
       variant: {
         default:
           "bg-primary font-semibold text-primary-foreground shadow-[0_6px_16px_rgb(125_104_249/0.28)] hover:bg-primary-deep hover:shadow-[0_8px_20px_rgb(91_69_224/0.3)] active:shadow-[0_2px_6px_rgb(91_69_224/0.3)]",
+        "high-contrast":
+          "bg-primary-deep font-semibold text-primary-foreground shadow-[0_6px_16px_rgb(91_69_224/0.28)] hover:shadow-[0_8px_20px_rgb(91_69_224/0.3)] active:shadow-[0_2px_6px_rgb(91_69_224/0.3)]",
         outline:
           "border-border bg-card text-foreground hover:border-border-strong hover:bg-muted aria-expanded:border-border-strong aria-expanded:bg-muted",
         secondary:

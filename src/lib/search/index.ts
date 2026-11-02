@@ -53,6 +53,7 @@ export function rank(results: SearchResult[], q: string): SearchResult[] {
 }
 
 function getMatchScore(result: SearchResult, q: string): number {
+  if (result.matchedField === "ref") return 0; // The exact task someone pasted a reference for
   const titleLower = result.title.toLowerCase();
   if (titleLower.startsWith(q)) {
     return 1; // Highest priority

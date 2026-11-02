@@ -1,3 +1,12 @@
+import {
+  FileTextIcon,
+  MailIcon,
+  MicroscopeIcon,
+  MinusIcon,
+  MoreHorizontalIcon,
+  SlidersHorizontalIcon,
+  UsersIcon,
+} from "lucide-react";
 import type { AgentAvatar } from "@/components/agents/agent-model";
 
 export type CurrentUser = { id: string; name: string; image?: string };
@@ -99,6 +108,27 @@ export function taskTypeLabel(slug: string | null) {
   if (slug === "seo") return "SEO";
   const words = slug.replace(/_/g, " ");
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Lucide icon for a task type slug. */
+export function taskTypeIcon(slug: string | null) {
+  if (!slug) return MinusIcon;
+  switch (slug) {
+    case "content":
+      return FileTextIcon;
+    case "press":
+      return MailIcon;
+    case "lead_hunting":
+      return UsersIcon;
+    case "seo":
+      return SlidersHorizontalIcon;
+    case "research":
+      return MicroscopeIcon;
+    case "other":
+      return MoreHorizontalIcon;
+    default:
+      return MinusIcon;
+  }
 }
 
 /** One line saying where a task stands: bids, the pending offer, who is working on it, revisions or reviews. */

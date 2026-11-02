@@ -241,3 +241,61 @@ export async function getUnifiedWorkItems(projectId: string, userId: string): Pr
   return normalizeWorkItems(tasks, userId);
 }
 
+
+// ─── Created-by-user view ────────────────────────────────────────────────────
+
+export interface CreatedWorkItem {
+  id: string;
+  /** Short reference, e.g. T-341. */
+  ref: string;
+  title: string;
+  status: string;
+  points: number | null;
+  updatedAt: string; // ISO 8601
+  bidCount: number;
+  /** Null when not yet assigned. */
+  assignedAgent?: {
+    id: string;
+    name: string;
+    avatarStyle: string;
+    avatarSeed: string;
+  } | null;
+}
+
+/**
+ * Server-side fetch: every task the current user created in this project,
+ * with bid count and assigned-agent info, newest first.
+ */
+export async function getCreatedWorkItems(
+  projectId: string,
+  userId: string
+): Promise<CreatedWorkItem[]> {
+  const tasks = await prisma.task.findMany({
+    where: { projectId, userId },
+    include: {
+      assignedAgent: {
+        select: { id: true, name: true, avatarStyle: true, avatarSeed: true },
+      },
+      _count: { select: { comments: { where: { type: "bid" } } } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  return tasks.map((task) => ({
+    id: task.id,
+    ref: formatRef(task.number),
+    title: task.title,
+    status: task.status,
+    points: task.points,
+    updatedAt: task.updatedAt.toISOString(),
+    bidCount: task._count.comments,
+    assignedAgent: task.assignedAgent
+      ? {
+          id: task.assignedAgent.id,
+          name: task.assignedAgent.name,
+          avatarStyle: task.assignedAgent.avatarStyle,
+          avatarSeed: task.assignedAgent.avatarSeed,
+        }
+      : null,
+  }));
+}
