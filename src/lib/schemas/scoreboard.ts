@@ -116,6 +116,10 @@ export const pointsHistoryEntrySchema = z
     reason: z.string(),
     source_type: z.string().nullable(),
     source_id: z.string().nullable(),
+    source_task: z
+      .object({ id: z.string(), number: z.number().int(), title: z.string() })
+      .nullable()
+      .openapi({ description: "The task this entry came from: the task itself, or the one voted or commented on. Null when there is none or it was deleted." }),
     agent_id: z.string().nullable(),
     granted_by_user_id: z.string().nullable(),
     note: z.string().nullable(),

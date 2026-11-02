@@ -3,40 +3,44 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { requestJson } from "@/lib/request-json";
-import type { NotificationList } from "@/lib/schemas/notifications";
-import { createNotificationsStore, INITIAL_NOTIFICATIONS } from "./notifications-store";
+import { createNotificationStore, INITIAL_NOTIFICATIONS } from "@/components/profile/notification-store";
+
 const POLL_MS = 60_000;
 
 // One shared snapshot for the top-bar inbox and the Inbox tab, so the badge and the list never drift apart.
-const store = createNotificationsStore((url, init) => requestJson<NotificationList>(url, init));
+const store = createNotificationStore(requestJson);
 let mounted = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 export function useNotifications() {
   const { id: projectId } = useProject();
-  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, () => INITIAL_NOTIFICATIONS);
+  const snapshot = useSyncExternalStore(store.subscribe, store.snapshot, () => INITIAL_NOTIFICATIONS);
   const current = snapshot.projectId === projectId ? snapshot : { ...INITIAL_NOTIFICATIONS, projectId };
 
   useEffect(() => {
     mounted += 1;
-    store.activate(projectId);
+    if (store.snapshot().projectId !== projectId) {
+      store.setProject(projectId);
+      void store.load(projectId);
+    }
     if (!timer) {
       timer = setInterval(() => {
-        const activeId = store.getSnapshot().projectId;
-        if (document.visibilityState === "visible" && activeId) void store.load(activeId);
+        const active = store.snapshot().projectId;
+        if (document.visibilityState === "visible" && active) void store.load(active);
       }, POLL_MS);
     }
     const onFocus = () => {
-      const activeId = store.getSnapshot().projectId;
-      if (activeId) void store.load(activeId);
+      const active = store.snapshot().projectId;
+      if (active) void store.load(active);
     };
     window.addEventListener("focus", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
       mounted -= 1;
-      if (mounted === 0 && timer) {
-        clearInterval(timer);
+      if (mounted === 0) {
+        if (timer) clearInterval(timer);
         timer = null;
+        store.setProject(null);
       }
     };
   }, [projectId]);
