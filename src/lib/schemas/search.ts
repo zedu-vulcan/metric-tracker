@@ -63,7 +63,9 @@ export const searchResultItemSchema = z.object({
   title: z.string(),
   subtitle: z.string().nullable(),
   status: z.string().nullable(),
-  matchedField: z.string(),
+  matchedField: z
+    .string()
+    .openapi({ description: "Where the query matched: title, ref (a pasted task reference such as T-412), description, name or speciality" }),
   href: z.string(),
 });
 
