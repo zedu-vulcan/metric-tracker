@@ -120,6 +120,14 @@ export function AgentsTab({ agents }: { agents: AgentPoints[] }) {
                           )}
                         </span>
                         <span className="truncate text-xs text-muted-foreground">{agent.speciality}</span>
+                        {agent.description && (
+                          <span
+                            className="truncate text-xs text-muted-foreground"
+                            title={agent.description}
+                          >
+                            {agent.description}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </TableCell>
