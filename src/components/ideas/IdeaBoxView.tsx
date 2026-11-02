@@ -71,7 +71,7 @@ export function IdeaBoxView({ deliverables }: { deliverables: Deliverable[] }) {
               className="group/tab h-9 flex-none gap-2 border border-border bg-card px-4 text-sm text-foreground/75 data-active:border-primary data-active:bg-primary data-active:text-primary-foreground"
             >
               {label}
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground group-data-active/tab:bg-white/20 group-data-active/tab:text-primary-foreground">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground group-data-[state=active]/tab:bg-white/20 group-data-[state=active]/tab:text-primary-foreground">
                 {counts.get(value) ?? 0}
               </span>
             </TabsTrigger>
