@@ -2,13 +2,24 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ProjectRole } from "@prisma/client";
-import { CheckIcon, CopyIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CoinsIcon,
+  CopyIcon,
+  DatabaseIcon,
+  DownloadIcon,
+  FileTextIcon,
+  RefreshCwIcon,
+  Settings2Icon,
+  TriangleAlertIcon,
+  UsersIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useCopy } from "@/components/agents/useCopy";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,10 +33,10 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectBriefCard, type Brief } from "@/components/projects/ProjectBrief";
+import { ProjectMembersCard, type SettingsMember } from "@/components/projects/ProjectMembersCard";
 import { PointSettingsCard } from "@/components/projects/PointSettings";
 import { TransferOwnership } from "@/components/projects/TransferOwnership";
 import { requestJson } from "@/lib/request-json";
@@ -38,19 +49,15 @@ type SettingsProject = {
   joinCode: string | null;
   inviteToken: string | null;
   brief: Brief;
+  memberCount: number;
+  createdAt: string;
 };
-
-type Member = { userId: string; name: string | null; email: string | null; role: ProjectRole; joinedAt: string };
 
 type Confirm = { title: string; description: string; action: string; run: () => Promise<void> };
 
-const ROLE_LABEL: Record<ProjectRole, string> = { owner: "Owner", admin: "Admin", member: "Member" };
-const ROLE_BADGE: Record<ProjectRole, "default" | "info" | "secondary"> = {
-  owner: "default",
-  admin: "info",
-  member: "secondary",
-};
+const ROLE_NAME: Record<ProjectRole, string> = { owner: "Owner", admin: "Admin", member: "Member" };
 
+type TabId = "general" | "brief" | "members" | "points" | "data" | "danger";
 export function ProjectSettings({
   project,
   members,
@@ -58,11 +65,13 @@ export function ProjectSettings({
   currentUserId,
 }: {
   project: SettingsProject;
-  members: Member[];
+  members: SettingsMember[];
   eligibleMembers: { userId: string; name: string | null; email: string | null }[];
   currentUserId: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { href, canManage } = useProject();
   const isOwner = project.role === "owner";
   const [confirm, setConfirm] = useState<Confirm | null>(null);
@@ -83,7 +92,7 @@ export function ProjectSettings({
     }
   }
 
-  const changeRole = (member: Member, role: ProjectRole) =>
+  const changeRole = (member: SettingsMember, role: ProjectRole) =>
     act(async () => {
       await requestJson(`/api/projects/${project.id}/members/${member.userId}`, {
         method: "PATCH",
@@ -91,7 +100,7 @@ export function ProjectSettings({
       });
     });
 
-  const removeMember = (member: Member) => {
+  const removeMember = (member: SettingsMember) => {
     const leaving = member.userId === currentUserId;
     setError(null);
     setConfirm({
@@ -107,9 +116,31 @@ export function ProjectSettings({
     });
   };
 
-  const canRemove = (member: Member) =>
-    member.role !== "owner" &&
-    (member.userId === currentUserId || isOwner || (canManage && member.role === "member"));
+  // Tabs a role can't use are left out entirely, and a link to one falls back to General.
+  const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
+    { id: "general", label: "General", icon: Settings2Icon },
+    { id: "brief", label: "Brief", icon: FileTextIcon },
+    { id: "members", label: "Members", icon: UsersIcon },
+    { id: "points", label: "Points", icon: CoinsIcon },
+    ...(canManage ? [{ id: "data" as const, label: "Data & Ownership", icon: DatabaseIcon }] : []),
+    ...(isOwner ? [{ id: "danger" as const, label: "Danger Zone", icon: TriangleAlertIcon }] : []),
+  ];
+  const requested = searchParams.get("tab");
+  const tab = tabs.find((item) => item.id === requested)?.id ?? "general";
+
+  function openTab(next: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", next);
+    // Pushed rather than replaced, so Back and Forward step through the sections someone opened.
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  // A deep link can land on a section whose pill sits off-screen in the mobile tab strip.
+  useEffect(() => {
+    document
+      .querySelector('[data-settings-tabs] [aria-selected="true"]')
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [tab]);
 
   return (
     <div className="grid gap-4">
@@ -119,122 +150,97 @@ export function ProjectSettings({
         </Alert>
       )}
 
-      <ProjectBriefCard projectId={project.id} brief={project.brief} canEdit={canManage} />
-      <PointSettingsCard />
+      <Tabs value={tab} onValueChange={openTab} className="gap-4">
+        <TabsList
+          aria-label="Project settings sections"
+          data-settings-tabs=""
+          className="w-full justify-start gap-1 self-start overflow-x-auto border border-border p-1 group-data-horizontal/tabs:h-12 sm:w-fit"
+        >
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <TabsTrigger
+              key={id}
+              value={id}
+              className="h-full flex-none gap-2 px-3 text-sm font-semibold text-muted-foreground data-active:text-foreground data-active:[&>svg]:text-primary-deep md:px-4"
+            >
+              <Icon aria-hidden="true" className="hidden size-[18px] sm:block" />
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {canManage && project.inviteToken && project.joinCode && (
-        <InviteCard
-          projectId={project.id}
-          inviteToken={project.inviteToken}
-          joinCode={project.joinCode}
-          onReset={() =>
-            setConfirm({
-              title: "Reset the invite link and code?",
-              description: "The current link and code stop working. People already in the project stay.",
-              action: "Reset",
-              run: async () => {
-                await requestJson(`/api/projects/${project.id}/invite`, { method: "POST" });
-              },
-            })
-          }
-        />
-      )}
+        {/* Kept mounted so half-typed briefs and point changes survive switching sections. */}
+        <TabsContent value="general" forceMount className="data-[state=inactive]:hidden">
+          <GeneralCard project={project} taskTypesHref={href("/task-types")} canManage={canManage} />
+        </TabsContent>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Members</CardTitle>
-          <CardDescription>
-            {members.length} {members.length === 1 ? "person" : "people"}. Admins manage members, the invite link and task
-            types; only the owner changes roles.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="hidden sm:table-cell">Joined</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map((member) => (
-                <TableRow key={member.userId}>
-                  <TableCell>
-                    <div className="grid min-w-0">
-                      <span className="truncate font-medium text-foreground">
-                        {member.name ?? member.email ?? "Unnamed"}
-                        {member.userId === currentUserId && <span className="text-muted-foreground"> (you)</span>}
-                      </span>
-                      {member.name && member.email && (
-                        <span className="truncate text-xs text-muted-foreground">{member.email}</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {isOwner && member.role !== "owner" ? (
-                      <NativeSelect
-                        size="sm"
-                        aria-label={`Role for ${member.name ?? member.email ?? "member"}`}
-                        value={member.role}
-                        disabled={pending}
-                        onChange={(event) => void changeRole(member, event.target.value as ProjectRole)}
-                      >
-                        <NativeSelectOption value="admin">Admin</NativeSelectOption>
-                        <NativeSelectOption value="member">Member</NativeSelectOption>
-                      </NativeSelect>
-                    ) : (
-                      <Badge variant={ROLE_BADGE[member.role]}>{ROLE_LABEL[member.role]}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden font-mono text-xs text-muted-foreground sm:table-cell">
-                    {member.joinedAt.slice(0, 10)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {canRemove(member) && (
-                      <Button variant="ghost" size="sm" onClick={() => removeMember(member)}>
-                        {member.userId === currentUserId ? "Leave" : "Remove"}
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        <TabsContent value="brief" forceMount className="data-[state=inactive]:hidden">
+          <ProjectBriefCard projectId={project.id} brief={project.brief} canEdit={canManage} />
+        </TabsContent>
 
-      {canManage && (
-        <>
-          <ProjectCard
-            project={project}
-            taskTypesHref={href("/task-types")}
-            onDelete={() =>
-              setConfirm({
-                title: `Delete ${project.name}?`,
-                description:
-                  "This deletes its tasks, agents, points and marketing records for everyone. It can't be undone.",
-                action: "Delete project",
-                run: async () => {
-                  await requestJson(`/api/projects/${project.id}`, { method: "DELETE" });
-                  router.push("/dashboard");
-                },
-              })
-            }
-          />
-          <BackupCard projectId={project.id} />
-        </>
-      )}
+        <TabsContent value="members" forceMount className="data-[state=inactive]:hidden">
+          <div className="grid gap-4">
+            <ProjectMembersCard
+              members={members}
+              currentUserId={currentUserId}
+              isOwner={isOwner}
+              canManage={canManage}
+              pending={pending}
+              onChangeRole={(member, role) => void changeRole(member, role)}
+              onRemove={removeMember}
+            />
+            {canManage && project.inviteToken && project.joinCode && (
+              <InviteCard
+                projectId={project.id}
+                inviteToken={project.inviteToken}
+                joinCode={project.joinCode}
+                onReset={() =>
+                  setConfirm({
+                    title: "Reset the invite link and code?",
+                    description: "The current link and code stop working. People already in the project stay.",
+                    action: "Reset",
+                    run: async () => {
+                      await requestJson(`/api/projects/${project.id}/invite`, { method: "POST" });
+                    },
+                  })
+                }
+              />
+            )}
+          </div>
+        </TabsContent>
 
-      {isOwner && (
-        <TransferOwnership
-          projectId={project.id}
-          members={eligibleMembers}
-        />
-      )}
+        <TabsContent value="points" forceMount className="data-[state=inactive]:hidden">
+          <PointSettingsCard />
+        </TabsContent>
+
+        {canManage && (
+          <TabsContent value="data" forceMount className="data-[state=inactive]:hidden">
+            <div className="grid gap-4">
+              <BackupCard projectId={project.id} />
+              {isOwner && <TransferOwnership projectId={project.id} members={eligibleMembers} />}
+            </div>
+          </TabsContent>
+        )}
+
+        {isOwner && (
+          <TabsContent value="danger" forceMount className="data-[state=inactive]:hidden">
+            <DangerCard
+              project={project}
+              onDelete={() =>
+                setConfirm({
+                  title: `Delete ${project.name}?`,
+                  description:
+                    "This deletes its tasks, agents, points and marketing records for everyone. It can't be undone.",
+                  action: "Delete project",
+                  run: async () => {
+                    await requestJson(`/api/projects/${project.id}`, { method: "DELETE" });
+                    router.push("/dashboard");
+                  },
+                })
+              }
+            />
+          </TabsContent>
+        )}
+      </Tabs>
 
       <Dialog open={confirm !== null} onOpenChange={(open) => !open && !pending && setConfirm(null)}>
         <DialogContent>
@@ -261,6 +267,105 @@ export function ProjectSettings({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function GeneralCard({
+  project,
+  taskTypesHref,
+  canManage,
+}: {
+  project: SettingsProject;
+  taskTypesHref: string;
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const [name, setName] = useState(project.name);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const dirty = name.trim() !== project.name;
+
+  async function rename(event: FormEvent) {
+    event.preventDefault();
+    setPending(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await requestJson(`/api/projects/${project.id}`, { method: "PATCH", body: JSON.stringify({ name: name.trim() }) });
+      setSaved(true);
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Something went wrong. Try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>General</CardTitle>
+        <CardDescription>
+          The name everyone sees. Task types and their points live on the{" "}
+          <Link href={taskTypesHref} className="font-medium text-primary-deep underline-offset-4 hover:underline">
+            Task types
+          </Link>{" "}
+          page.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {canManage ? (
+          <form onSubmit={(event) => void rename(event)}>
+            <FieldGroup>
+              <Field data-invalid={error ? true : undefined}>
+                <FieldLabel htmlFor="project-rename">Name</FieldLabel>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="project-rename"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    minLength={2}
+                    maxLength={60}
+                    aria-invalid={error ? true : undefined}
+                  />
+                  <Button type="submit" variant="outline" disabled={pending || name.trim().length < 2 || !dirty}>
+                    {pending && <Spinner data-icon="inline-start" />}
+                    Save name
+                  </Button>
+                  <span className="text-[13px] text-muted-foreground sm:self-center" aria-live="polite">
+                    {saved && !dirty ? "Saved" : ""}
+                  </span>
+                </div>
+                {error && <FieldError>{error}</FieldError>}
+              </Field>
+            </FieldGroup>
+          </form>
+        ) : (
+          <div className="grid gap-1">
+            <span className="text-[13px] font-semibold text-foreground">Name</span>
+            <p className="m-0 text-sm text-foreground">{project.name}</p>
+            <p className="m-0 text-[13px] text-muted-foreground">Only owners and admins can rename the project.</p>
+          </div>
+        )}
+
+        <dl className="m-0 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
+          <div className="grid gap-1">
+            <dt className="text-2xs font-bold tracking-[0.07em] text-muted-foreground uppercase">Your role</dt>
+            <dd className="m-0 text-sm font-semibold text-foreground">{ROLE_NAME[project.role]}</dd>
+          </div>
+          <div className="grid gap-1">
+            <dt className="text-2xs font-bold tracking-[0.07em] text-muted-foreground uppercase">Members</dt>
+            <dd className="m-0 text-sm font-semibold text-foreground tabular-nums">{project.memberCount}</dd>
+          </div>
+          <div className="grid gap-1">
+            <dt className="text-2xs font-bold tracking-[0.07em] text-muted-foreground uppercase">Created</dt>
+            <dd className="m-0 font-mono text-sm text-foreground tabular-nums">{project.createdAt.slice(0, 10)}</dd>
+          </div>
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -322,83 +427,20 @@ function InviteCard({
   );
 }
 
-function ProjectCard({
-  project,
-  taskTypesHref,
-  onDelete,
-}: {
-  project: SettingsProject;
-  taskTypesHref: string;
-  onDelete: () => void;
-}) {
-  const router = useRouter();
-  const [name, setName] = useState(project.name);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function rename(event: FormEvent) {
-    event.preventDefault();
-    setPending(true);
-    setError(null);
-    try {
-      await requestJson(`/api/projects/${project.id}`, { method: "PATCH", body: JSON.stringify({ name: name.trim() }) });
-      router.refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Something went wrong. Try again.");
-    } finally {
-      setPending(false);
-    }
-  }
-
+function DangerCard({ project, onDelete }: { project: SettingsProject; onDelete: () => void }) {
   return (
-    <Card>
+    <Card className="border-destructive/30">
       <CardHeader>
-        <CardTitle>Project</CardTitle>
+        <CardTitle>Delete project</CardTitle>
         <CardDescription>
-          The name everyone sees. Task types and their points live on the{" "}
-          <Link href={taskTypesHref} className="font-medium text-primary-deep underline-offset-4 hover:underline">
-            Task types
-          </Link>{" "}
-          page.
+          Deleting {project.name} removes its tasks, agents, points and marketing records for everyone. It can&apos;t be
+          undone.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={rename}>
-          <FieldGroup>
-            <Field data-invalid={error ? true : undefined}>
-              <FieldLabel htmlFor="project-rename">Name</FieldLabel>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  id="project-rename"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  minLength={2}
-                  maxLength={60}
-                  aria-invalid={error ? true : undefined}
-                />
-                <Button
-                  type="submit"
-                  variant="outline"
-                  disabled={pending || name.trim().length < 2 || name.trim() === project.name}
-                >
-                  {pending && <Spinner data-icon="inline-start" />}
-                  Save name
-                </Button>
-              </div>
-              {error && <FieldError>{error}</FieldError>}
-            </Field>
-            {project.role === "owner" && (
-              <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Deleting the project removes all of its work and points for everyone.
-                </p>
-                <Button type="button" variant="destructive" onClick={onDelete}>
-                  Delete project
-                </Button>
-              </div>
-            )}
-          </FieldGroup>
-        </form>
+        <Button type="button" variant="destructive" onClick={onDelete}>
+          Delete project
+        </Button>
       </CardContent>
     </Card>
   );

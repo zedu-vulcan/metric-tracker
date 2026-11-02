@@ -41,11 +41,7 @@ export function TransferOwnership({ projectId, members }: { projectId: string; m
   }
 
   return (
-    <section aria-labelledby="danger-zone-title" className="grid gap-3">
-      <div className="grid gap-1">
-        <h2 id="danger-zone-title" className="m-0 text-lg font-bold tracking-tight text-destructive">Danger Zone</h2>
-        <p className="m-0 text-sm text-muted-foreground">Changes here affect who controls this project.</p>
-      </div>
+    <>
       <Card className="border-destructive/30">
         <CardHeader>
           <CardTitle>Transfer ownership</CardTitle>
@@ -93,6 +89,6 @@ export function TransferOwnership({ projectId, members }: { projectId: string; m
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </section>
+    </>
   );
 }
