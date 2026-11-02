@@ -131,21 +131,7 @@ function TaskCard({ task, style, progress, href }: { task: Task; style: ItemStyl
                 {task.points} pts
               </span>
             )}
-            <div className="flex items-center gap-2">
-              {task.taskType ? (
-                <span className="mt-1 flex items-center gap-1.5">
-                  {(() => {
-                    const Icon = taskTypeIcon(task.taskType);
-                    return <Icon className="size-3" />;
-                  })()}
-                  <span className="text-xs text-muted-foreground">
-                    {taskTypeLabel(task.taskType)}
-                  </span>
-                </span>
-              ) : (
-                <span className="mt-1 text-xs text-muted-foreground">{taskTypeLabel(task.taskType)}</span>
-              )}
-            </div>
+            <TaskTypeTag taskType={task.taskType} />
           </div>
           <ArrowRightIcon
             className="hidden size-5 text-muted-foreground transition-[color,translate] duration-150 group-hover/item:translate-x-0.5 group-hover/item:text-primary-deep sm:block"
@@ -154,5 +140,16 @@ function TaskCard({ task, style, progress, href }: { task: Task; style: ItemStyl
         </div>
       </div>
     </li>
+  );
+}
+
+/** The task type in words, with its icon when the task has a type. */
+function TaskTypeTag({ taskType }: { taskType: string | null }) {
+  const Icon = taskType ? taskTypeIcon(taskType) : null;
+  return (
+    <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+      {Icon && <Icon aria-hidden="true" className="size-3" />}
+      {taskTypeLabel(taskType)}
+    </span>
   );
 }

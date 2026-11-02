@@ -1,3 +1,12 @@
+import {
+  FileTextIcon,
+  MailIcon,
+  MicroscopeIcon,
+  MinusIcon,
+  MoreHorizontalIcon,
+  SlidersHorizontalIcon,
+  UsersIcon,
+} from "lucide-react";
 import type { AgentAvatar } from "@/components/agents/agent-model";
 
 export type CurrentUser = { id: string; name: string; image?: string };
@@ -101,9 +110,7 @@ export function taskTypeLabel(slug: string | null) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** Lucide-react icon for a task type slug. Returns a React component. */
-import { FileTextIcon, MailIcon, UsersIcon, SlidersHorizontalIcon, MicroscopeIcon, MoreHorizontalIcon, MinusIcon } from "lucide-react";
-
+/** Lucide icon for a task type slug. */
 export function taskTypeIcon(slug: string | null) {
   if (!slug) return MinusIcon;
   switch (slug) {
