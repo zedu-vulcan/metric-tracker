@@ -15,7 +15,7 @@ export type NotificationFeed = {
   offers: { task: TaskRef; agentName: string; offeredAt: Date }[];
   decidedTasks: { task: TaskRef; status: "approved" | "changes_requested"; agentName: string; revisionCount: number; updatedAt: Date }[];
   comments: { id: string; task: TaskRef; type: "note" | "review"; isReply: boolean; authorName: string; agentName: string; body: string; verdict: "approve" | "changes" | null; score: number | null; createdAt: Date }[];
-  points: { id: string; amount: number; reason: string; note: string | null; agentName: string | null; createdAt: Date }[];
+  points: { id: string; amount: number; reason: string; note: string | null; agentName: string | null; task?: TaskRef | null; createdAt: Date }[];
 };
 
 type Item = Omit<Notification, "read" | "createdAt"> & { createdAt: Date };
@@ -134,7 +134,7 @@ export function buildNotifications(feed: NotificationFeed, readKeys: ReadonlySet
       message: earned
         ? `${who} earned ${formatPoints(entry.amount)}: ${label.toLowerCase()}.`
         : `${formatPoints(entry.amount)} taken off: ${entry.note ? excerpt(entry.note) : label.toLowerCase()}.`,
-      href: "/profile?tab=agents",
+      href: entry.task ? taskHref(entry.task) : "/profile?tab=agents",
       needsAction: false,
       createdAt: entry.createdAt,
     });
