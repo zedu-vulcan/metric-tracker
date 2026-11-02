@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PencilIcon, PlusIcon, RotateCwIcon, SlidersHorizontalIcon } from "lucide-react";
-import { PageContent, PageHeader } from "@/components/PageHeader";
-import { Toolbar, ToolbarGroup } from "@/components/Toolbar";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,6 +39,7 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
   }
 }
 
+/** Task types and their points, managed from the Task types tab in project settings. */
 export function TaskTypesView() {
   const [items, setItems] = useState<TaskTypeItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,131 +109,125 @@ export function TaskTypesView() {
 
   return (
     <>
-      <PageHeader
-        title="Task types"
-        description="Define the task types and their points. Changes affect future tasks only."
-      />
-
-      <PageContent>
-        <Toolbar>
-          <ToolbarGroup>
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2}>
+            Task types
+          </CardTitle>
+          <CardDescription>
+            The kinds of task agents can take on and what each pays. Changes apply to new tasks only.
+          </CardDescription>
+          <CardAction className="row-span-2 flex flex-wrap items-center justify-end gap-3 self-center">
             <Checkbox
               id="show-archived"
               checked={showArchived}
               onChange={(event) => setShowArchived(event.target.checked)}
               label="Show archived"
             />
-          </ToolbarGroup>
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <PlusIcon data-icon="inline-start" aria-hidden="true" />
-            Add task type
-          </Button>
-        </Toolbar>
-
-        {error && (
-          <Alert variant="destructive">
-            <AlertTitle>Something went wrong</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-            <Button variant="outline" size="sm" onClick={() => void load()} className="mt-2 self-start">
-              <RotateCwIcon data-icon="inline-start" aria-hidden="true" />
-              Try again
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
+              <PlusIcon data-icon="inline-start" aria-hidden="true" />
+              Add task type
             </Button>
-          </Alert>
-        )}
-
-        <Card>
-          <CardHeader>
-            <div className="flex w-full items-center justify-between gap-3">
-              <CardTitle>Task types</CardTitle>
-              {items && <span className="text-sm font-semibold text-muted-foreground tabular-nums">{visible.length}</span>}
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 px-2 sm:px-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertTitle>Something went wrong</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+              <AlertAction>
+                <Button variant="outline" size="sm" onClick={() => void load()}>
+                  <RotateCwIcon data-icon="inline-start" aria-hidden="true" />
+                  Try again
+                </Button>
+              </AlertAction>
+            </Alert>
+          )}
+          {!items && !error && (
+            <div className="flex flex-col gap-2 py-1">
+              {Array.from({ length: 5 }, (_, index) => (
+                <Skeleton key={index} className="h-14 w-full rounded-xl" />
+              ))}
             </div>
-          </CardHeader>
-          <CardContent className="px-2 sm:px-4">
-            {!items && !error && (
-              <div className="flex flex-col gap-2 py-1">
-                {Array.from({ length: 5 }, (_, index) => (
-                  <Skeleton key={index} className="h-14 w-full rounded-xl" />
-                ))}
-              </div>
-            )}
+          )}
 
-            {items && visible.length === 0 && (
-              <Empty className="py-12">
-                <EmptyHeader>
-                  <EmptyMedia className="size-12 rounded-full bg-accent text-primary-deep">
-                    <SlidersHorizontalIcon className="size-5" aria-hidden="true" />
-                  </EmptyMedia>
-                  <EmptyTitle>No task types {showArchived ? "" : "yet"}</EmptyTitle>
-                  <EmptyDescription>
-                    {showArchived
-                      ? "Nothing archived."
-                      : "Add the first task type so agents know what points are on offer."}
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )}
+          {items && visible.length === 0 && (
+            <Empty className="py-12">
+              <EmptyHeader>
+                <EmptyMedia className="size-12 rounded-full bg-accent text-primary-deep">
+                  <SlidersHorizontalIcon className="size-5" aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>No task types {showArchived ? "" : "yet"}</EmptyTitle>
+                <EmptyDescription>
+                  {showArchived
+                    ? "Nothing archived."
+                    : "Add the first task type so agents know what points are on offer."}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
 
-            {items && visible.length > 0 && (
-              <Table variant="pill">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="w-40">Slug</TableHead>
-                    <TableHead className="w-24 text-right">Points</TableHead>
-                    <TableHead className="w-24 text-right">Max</TableHead>
-                    <TableHead className="w-24 text-center">Active</TableHead>
-                    <TableHead className="w-10" aria-label="Actions" />
+          {items && visible.length > 0 && (
+            <Table variant="pill">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="w-40">Slug</TableHead>
+                  <TableHead className="w-24 text-right">Points</TableHead>
+                  <TableHead className="w-24 text-right">Max</TableHead>
+                  <TableHead className="w-24 text-center">Active</TableHead>
+                  <TableHead className="w-10" aria-label="Actions" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visible.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="max-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate font-semibold text-foreground">{item.name}</span>
+                        {!item.isActive && <Badge variant="secondary">Archived</Badge>}
+                      </div>
+                      {item.description && <p className="truncate text-xs text-muted-foreground">{item.description}</p>}
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-mono text-xs text-muted-foreground">{item.slug}</span>
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-foreground tabular-nums">{item.points}</TableCell>
+                    <TableCell className="text-right text-muted-foreground tabular-nums">{item.maxPoints}</TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        id={`active-${item.id}`}
+                        checked={item.isActive}
+                        onChange={() => void toggleActive(item)}
+                        aria-label={`${item.isActive ? "Archive" : "Activate"} ${item.name}`}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Edit ${item.name}`}
+                        onClick={() => {
+                          setEditing(item);
+                          setDialogOpen(true);
+                        }}
+                      >
+                        <PencilIcon aria-hidden="true" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visible.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="max-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate font-semibold text-foreground">{item.name}</span>
-                          {!item.isActive && <Badge variant="secondary">Archived</Badge>}
-                        </div>
-                        {item.description && <p className="truncate text-xs text-muted-foreground">{item.description}</p>}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-mono text-xs text-muted-foreground">{item.slug}</span>
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-foreground tabular-nums">{item.points}</TableCell>
-                      <TableCell className="text-right text-muted-foreground tabular-nums">{item.maxPoints}</TableCell>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          id={`active-${item.id}`}
-                          checked={item.isActive}
-                          onChange={() => void toggleActive(item)}
-                          aria-label={`${item.isActive ? "Archive" : "Activate"} ${item.name}`}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Edit ${item.name}`}
-                          onClick={() => {
-                            setEditing(item);
-                            setDialogOpen(true);
-                          }}
-                        >
-                          <PencilIcon aria-hidden="true" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </PageContent>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <TaskTypeFormDialog
         open={dialogOpen}
