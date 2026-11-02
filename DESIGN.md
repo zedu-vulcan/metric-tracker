@@ -252,6 +252,7 @@ All buttons are pills.
 | Variant | Recipe |
 |---|---|
 | Primary | `bg-primary text-primary-foreground font-semibold` with a soft violet glow `shadow-[0_6px_16px_rgb(125_104_249/0.28)]`, hover `bg-primary-deep`. **One per view.** |
+| High contrast (`variant="high-contrast"`) | `bg-primary-deep text-primary-foreground font-semibold` with the deep violet glow. Used by the Google sign-in button on the home and invite pages: white on `primary-deep` has approximately **6.23:1** contrast, above the 4.5:1 minimum for normal text. The fill stays deep violet on hover, keyboard focus and press; hover/press shadows and the shared focus ring provide feedback. |
 | Outline | `border border-border bg-card text-foreground font-medium`, hover `border-border-strong bg-muted` |
 | Secondary | `bg-accent text-accent-foreground`, hover `bg-brand-wash-strong`. A soft violet alternative to outline. |
 | Ghost | `text-muted-foreground`, hover `bg-muted text-foreground` |

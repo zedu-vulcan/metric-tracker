@@ -1,5 +1,14 @@
 # Development work log
 
+## 2026-11-02 — Google sign-in button contrast
+
+- Objective and starting point: improve the Google sign-in button's readability. White 14px text on the default `primary` fill has approximately 4.02:1 contrast, below WCAG AA's 4.5:1 minimum for normal text.
+- Checkpoint 1 — Investigation: the home and invite pages share [SignInButton](../src/components/AuthButtons.tsx), which uses the default [Button](../src/components/ui/button.tsx) variant. The existing `primary-deep` token supports sufficient contrast without introducing a new color. Use an opt-in variant to keep other buttons unchanged; work on the user-approved `Fix/signup-button-contrast` branch. No database or authentication changes are needed.
+- Remaining work: implement and document the variant, verify rendered button states and TypeScript, then prepare the PR.
+- Checkpoint 2 — Implementation and docs: added the opt-in `high-contrast` Button variant and selected it in SignInButton. It uses the existing deep violet fill in enabled states while retaining the shared focus, disabled and loading behavior. Documented its use in [DESIGN.md](../DESIGN.md#49-buttons--button-exists-restyle-sizes). No dependencies or environment variables were added.
+- Checkpoint 3 — Verification: read the palette values from `globals.css` and calculated contrast using WCAG relative luminance: default 4.0230:1; deep violet 6.2269:1. Both changed TSX files transpile without syntax diagnostics using the available local TypeScript compiler. `git diff --check` passed. Full `npm ci` failed with `ENOSPC` (C: drive full); removed only this checkout's incomplete dependency folder. `npx --no-install tsc --noEmit --incremental false` could not pass with dependencies missing. A local app preview and full type-check remain unverified; ESLint is unconfigured, and no database or OAuth operations were run.
+- Outcome: implementation and design documentation completed; prepare a draft PR into `main` with the dependency-install/type-check limitation explicit. Verify on a machine with enough space using `npm ci`, `npm run db:generate`, `npx tsc --noEmit`, and `npm run dev`; inspect the signed-out Google button's normal, hover, keyboard-focus and pressed states.
+
 ## 2026-10-20 — Task 4.3: revision cycle
 
 - Objective and starting point: implement the two-revision limit through the existing comments API. Revision comments previously saved without changing the task's count, status, or worker assignment.
