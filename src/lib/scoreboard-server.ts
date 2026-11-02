@@ -40,6 +40,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type LedgerPage = { entries: LedgerEntry[]; total: number };
 
+/** The task a ledger row points at, directly (task) or through a vote or comment on it. */
+export type SourceTask = { taskId: string; number: number; title: string };
+
+type SourceRef = { sourceType: string; sourceId: string };
+
+const sourceKey = (sourceType: string, sourceId: string) => `${sourceType}:${sourceId}`;
+
 export interface ScoreboardStore {
   listLedger(range: WeekRange): Promise<LedgerEntry[]>;
   listUsers(): Promise<ScoreboardUser[]>;
@@ -54,6 +61,8 @@ export interface ScoreboardStore {
   listLedgerByUser(userId: string, page: { offset: number; limit: number }): Promise<LedgerPage>;
   /** All-time balance for a user. */
   sumLedgerForUser(userId: string): Promise<number>;
+  /** The task behind each ledger source, keyed `${sourceType}:${sourceId}`. Sources that no longer exist are omitted. */
+  taskForSources(sources: SourceRef[]): Promise<Record<string, SourceTask>>;
 }
 
 type RawLedgerRow = {
@@ -190,6 +199,37 @@ export function prismaScoreboardStore(client: PointsSqlClient, projectId: string
       const rows = await client.$queryRaw<{ total: number }[]>`
         SELECT COALESCE(SUM(amount), 0)::float8 AS total FROM points_ledger WHERE project_id = ${projectId} AND user_id = ${userId}`;
       return rows[0]?.total ?? 0;
+    },
+
+    async taskForSources(sources) {
+      const idsFor = (sourceType: string) => [...new Set(sources.filter((s) => s.sourceType === sourceType).map((s) => s.sourceId))];
+      const taskIds = idsFor("task");
+      const voteIds = idsFor("vote");
+      const commentIds = idsFor("comment");
+      type Row = { source_id: string; task_id: string; number: number; title: string };
+      const toMap = (sourceType: string, rows: Row[]) =>
+        rows.map((row) => [sourceKey(sourceType, row.source_id), { taskId: row.task_id, number: row.number, title: row.title }] as const);
+
+      const [tasks, votes, comments] = await Promise.all([
+        taskIds.length
+          ? client.$queryRaw<Row[]>`
+              SELECT t.id AS source_id, t.id AS task_id, t.number, t.title FROM "Task" t
+              WHERE t."projectId" = ${projectId} AND t.id IN (${Prisma.join(taskIds)})`
+          : [],
+        voteIds.length
+          ? client.$queryRaw<Row[]>`
+              SELECT v.id AS source_id, t.id AS task_id, t.number, t.title FROM "TaskVote" v
+              JOIN "Task" t ON t.id = v."taskId"
+              WHERE t."projectId" = ${projectId} AND v.id IN (${Prisma.join(voteIds)})`
+          : [],
+        commentIds.length
+          ? client.$queryRaw<Row[]>`
+              SELECT c.id AS source_id, t.id AS task_id, t.number, t.title FROM "TaskComment" c
+              JOIN "Task" t ON t.id = c."taskId"
+              WHERE t."projectId" = ${projectId} AND c.id IN (${Prisma.join(commentIds)})`
+          : [],
+      ]);
+      return Object.fromEntries([...toMap("task", tasks), ...toMap("vote", votes), ...toMap("comment", comments)]);
     },
   };
 }
@@ -424,6 +464,8 @@ export type PointsHistoryWireEntry = {
   reason: string;
   source_type: string | null;
   source_id: string | null;
+  /** The task this entry came from (the task itself, or the one voted or commented on). Null when there is none or it was deleted. */
+  source_task: { id: string; number: number; title: string } | null;
   agent_id: string | null;
   granted_by_user_id: string | null;
   note: string | null;
@@ -436,13 +478,15 @@ export type PointsHistoryResponse = {
   pagination: { page: number; limit: number; total: number; total_pages: number };
 };
 
-function serializeLedgerEntry(entry: LedgerEntry): PointsHistoryWireEntry {
+function serializeLedgerEntry(entry: LedgerEntry, sourceTasks: Record<string, SourceTask>): PointsHistoryWireEntry {
+  const task = entry.sourceType && entry.sourceId ? sourceTasks[sourceKey(entry.sourceType, entry.sourceId)] : undefined;
   return {
     id: entry.id,
     amount: entry.amount,
     reason: entry.reason,
     source_type: entry.sourceType,
     source_id: entry.sourceId,
+    source_task: task ? { id: task.taskId, number: task.number, title: task.title } : null,
     agent_id: entry.agentId,
     granted_by_user_id: entry.grantedByUserId,
     note: entry.note,
@@ -465,8 +509,11 @@ export async function fetchUserPointsHistory(
     store.sumLedgerForUser(userId),
   ]);
 
+  const sources = entries.flatMap((e) => (e.sourceType && e.sourceId ? [{ sourceType: e.sourceType, sourceId: e.sourceId }] : []));
+  const sourceTasks = sources.length ? await store.taskForSources(sources) : {};
+
   return {
-    entries: entries.map(serializeLedgerEntry),
+    entries: entries.map((e) => serializeLedgerEntry(e, sourceTasks)),
     balance,
     pagination: {
       page,
