@@ -22,9 +22,10 @@ describe("Search Unit Tests", () => {
 
   it("escapes special characters in textMatch", () => {
     const escaped = textMatch("test%string_query");
-    // Prisma contains doesn't automatically escape % or _ unless formatted,
-    // let's verify textMatch handles it according to implementation
-    assert.ok(typeof escaped === "object" || typeof escaped === "string");
+    assert.deepStrictEqual(escaped, {
+      contains: "test\\%string\\_query",
+      mode: "insensitive",
+    });
   });
 
   it("ranks results correctly based on group order and match position", () => {
