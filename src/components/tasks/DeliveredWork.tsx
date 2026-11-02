@@ -41,7 +41,6 @@ const FILE_TILE =
 /** The deliverable as a file: the work opens in its own window to read or copy. */
 export function DeliveredWork({ attachment, from }: { attachment: Attachment; from: string }) {
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const link = attachment.kind === "link";
   const Icon = link ? LinkIcon : FileTextIcon;
 
@@ -78,6 +77,33 @@ export function DeliveredWork({ attachment, from }: { attachment: Attachment; fr
     );
   }
 
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={FILE_TILE} aria-haspopup="dialog">
+        {tile}
+      </button>
+      <WorkReader attachment={attachment} from={from} open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
+/** The delivered text in its own window, to read in full or copy. */
+export function WorkReader({
+  attachment,
+  title = attachment.label,
+  from,
+  open,
+  onOpenChange,
+}: {
+  attachment: Attachment;
+  /** Heading for the window; defaults to the attachment's own label. */
+  title?: string;
+  from: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(attachment.content);
@@ -89,41 +115,36 @@ export function DeliveredWork({ attachment, from }: { attachment: Attachment; fr
   };
 
   return (
-    <>
-      <button type="button" onClick={() => setOpen(true)} className={FILE_TILE} aria-haspopup="dialog">
-        {tile}
-      </button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-          <DialogHeader className="shrink-0 flex-row items-center gap-3 border-b border-border px-6 py-5 text-left">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-primary-deep">
-              <FileTextIcon className="size-5" aria-hidden="true" />
-            </span>
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <DialogTitle className="text-lg font-extrabold tracking-[-0.02em]">{attachment.label}</DialogTitle>
-              <DialogDescription className="truncate">
-                {from} · {wordCount(attachment.content)}
-              </DialogDescription>
-            </div>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-            <Markdown className="max-w-[75ch] text-[15px] leading-relaxed text-foreground">{attachment.content}</Markdown>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <DialogHeader className="shrink-0 flex-row items-center gap-3 border-b border-border px-6 py-5 text-left">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-primary-deep">
+            <FileTextIcon className="size-5" aria-hidden="true" />
+          </span>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <DialogTitle className="text-lg font-extrabold tracking-[-0.02em]">{title}</DialogTitle>
+            <DialogDescription className="truncate">
+              {from} · {wordCount(attachment.content)}
+            </DialogDescription>
           </div>
-          <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
-            <DialogClose asChild>
-              <Button variant="outline">Close</Button>
-            </DialogClose>
-            <Button variant="secondary" onClick={() => void copy()}>
-              {copied ? (
-                <CheckIcon data-icon="inline-start" aria-hidden="true" />
-              ) : (
-                <CopyIcon data-icon="inline-start" aria-hidden="true" />
-              )}
-              {copied ? "Copied" : "Copy the work"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <Markdown className="max-w-[75ch] text-[15px] leading-relaxed text-foreground">{attachment.content}</Markdown>
+        </div>
+        <DialogFooter className="m-0 shrink-0 border-t border-border px-6 py-4">
+          <DialogClose asChild>
+            <Button variant="outline">Close</Button>
+          </DialogClose>
+          <Button variant="secondary" onClick={() => void copy()}>
+            {copied ? (
+              <CheckIcon data-icon="inline-start" aria-hidden="true" />
+            ) : (
+              <CopyIcon data-icon="inline-start" aria-hidden="true" />
+            )}
+            {copied ? "Copied" : "Copy the work"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

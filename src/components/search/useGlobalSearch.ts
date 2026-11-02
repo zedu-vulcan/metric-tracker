@@ -51,10 +51,10 @@ export function useGlobalSearch(open: boolean) {
   }, [open, normalizedQuery, retryKey]);
 
   const retry = useCallback(() => setRetryKey((current) => current + 1), []);
-  const results: SearchResult[] =
-    data?.query === normalizedQuery && normalizedQuery.length >= 2 && normalizedQuery.length <= 100
-      ? data.data.results
-      : [];
+  const searchable = normalizedQuery.length >= 2 && normalizedQuery.length <= 100;
+  // While the next query loads, keep showing the last answer (marked stale) instead of flashing to placeholders.
+  const results: SearchResult[] = searchable && data ? data.data.results : [];
+  const stale = searchable && data !== null && data.query !== normalizedQuery;
 
-  return { query, setQuery, status, results, retry, normalizedQuery };
+  return { query, setQuery, status, results, stale, retry, normalizedQuery };
 }

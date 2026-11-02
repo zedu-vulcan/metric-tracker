@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ProjectRole } from "@prisma/client";
 import {
@@ -13,6 +12,7 @@ import {
   FileTextIcon,
   RefreshCwIcon,
   Settings2Icon,
+  SlidersHorizontalIcon,
   TriangleAlertIcon,
   UsersIcon,
   type LucideIcon,
@@ -39,6 +39,7 @@ import { ProjectBriefCard, type Brief } from "@/components/projects/ProjectBrief
 import { ProjectMembersCard, type SettingsMember } from "@/components/projects/ProjectMembersCard";
 import { PointSettingsCard } from "@/components/projects/PointSettings";
 import { TransferOwnership } from "@/components/projects/TransferOwnership";
+import { TaskTypesView } from "@/components/task-types/TaskTypesView";
 import { requestJson } from "@/lib/request-json";
 
 type SettingsProject = {
@@ -57,7 +58,7 @@ type Confirm = { title: string; description: string; action: string; run: () => 
 
 const ROLE_NAME: Record<ProjectRole, string> = { owner: "Owner", admin: "Admin", member: "Member" };
 
-type TabId = "general" | "brief" | "members" | "points" | "data" | "danger";
+type TabId = "general" | "brief" | "members" | "points" | "task-types" | "data" | "danger";
 export function ProjectSettings({
   project,
   members,
@@ -72,7 +73,7 @@ export function ProjectSettings({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { href, canManage } = useProject();
+  const { canManage } = useProject();
   const isOwner = project.role === "owner";
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [pending, setPending] = useState(false);
@@ -122,6 +123,7 @@ export function ProjectSettings({
     { id: "brief", label: "Brief", icon: FileTextIcon },
     { id: "members", label: "Members", icon: UsersIcon },
     { id: "points", label: "Points", icon: CoinsIcon },
+    ...(canManage ? [{ id: "task-types" as const, label: "Task types", icon: SlidersHorizontalIcon }] : []),
     ...(canManage ? [{ id: "data" as const, label: "Data & Ownership", icon: DatabaseIcon }] : []),
     ...(isOwner ? [{ id: "danger" as const, label: "Danger Zone", icon: TriangleAlertIcon }] : []),
   ];
@@ -170,7 +172,7 @@ export function ProjectSettings({
 
         {/* Kept mounted so half-typed briefs and point changes survive switching sections. */}
         <TabsContent value="general" forceMount className="data-[state=inactive]:hidden">
-          <GeneralCard project={project} taskTypesHref={href("/task-types")} canManage={canManage} />
+          <GeneralCard project={project} onOpenTaskTypes={() => openTab("task-types")} canManage={canManage} />
         </TabsContent>
 
         <TabsContent value="brief" forceMount className="data-[state=inactive]:hidden">
@@ -211,6 +213,13 @@ export function ProjectSettings({
         <TabsContent value="points" forceMount className="data-[state=inactive]:hidden">
           <PointSettingsCard />
         </TabsContent>
+
+        {canManage && (
+          // Loads its list when opened; nothing half-typed lives outside its dialog, so it needn't stay mounted.
+          <TabsContent value="task-types">
+            <TaskTypesView />
+          </TabsContent>
+        )}
 
         {canManage && (
           <TabsContent value="data" forceMount className="data-[state=inactive]:hidden">
@@ -272,11 +281,11 @@ export function ProjectSettings({
 
 function GeneralCard({
   project,
-  taskTypesHref,
+  onOpenTaskTypes,
   canManage,
 }: {
   project: SettingsProject;
-  taskTypesHref: string;
+  onOpenTaskTypes: () => void;
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -308,11 +317,21 @@ function GeneralCard({
       <CardHeader>
         <CardTitle>General</CardTitle>
         <CardDescription>
-          The name everyone sees. Task types and their points live on the{" "}
-          <Link href={taskTypesHref} className="font-medium text-primary-deep underline-offset-4 hover:underline">
-            Task types
-          </Link>{" "}
-          page.
+          The name everyone sees.
+          {canManage && (
+            <>
+              {" "}
+              Task types and their points have their own{" "}
+              <button
+                type="button"
+                onClick={onOpenTaskTypes}
+                className="font-medium text-primary-deep underline-offset-4 outline-none hover:underline focus-visible:underline"
+              >
+                Task types
+              </button>{" "}
+              tab.
+            </>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">

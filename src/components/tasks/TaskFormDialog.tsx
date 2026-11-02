@@ -216,7 +216,7 @@ function TaskForm({ onCancel, onCreate }: { onCancel: () => void; onCreate: (tas
         </FieldGroup>
       </div>
 
-      <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
+      <DialogFooter className="m-0 shrink-0 border-t border-border px-6 py-4">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
