@@ -7,9 +7,9 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { POINTS_TIMEZONE } from "@/lib/points";
 import { apiFetch } from "@/lib/request-json";
 import type { ScoreboardResponse } from "@/lib/schemas/scoreboard";
+import { describeScoreboardPeriod } from "@/lib/scoreboard-period";
 import { cn } from "@/lib/utils";
 import { HistoryDialog } from "./HistoryDialog";
 import { PointsTable } from "./PointsTable";
@@ -22,18 +22,10 @@ const RANGES: { value: RangeSelection; label: string }[] = [
   { value: "all_time", label: "All time" },
 ];
 
-const weekDay = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: POINTS_TIMEZONE });
-
 async function fetchScoreboard(range: RangeSelection): Promise<ScoreboardResponse> {
   const response = await apiFetch(`/api/scoreboard?range=${range}`);
   if (!response.ok) throw new Error("Couldn't load the scoreboard.");
   return (await response.json()) as ScoreboardResponse;
-}
-
-function weekLabel(board: ScoreboardResponse) {
-  // The range end is exclusive (next Monday 00:00), so step back a minute to land on Sunday.
-  const end = new Date(new Date(board.range.end).getTime() - 60_000);
-  return `${weekDay.format(new Date(board.range.start))} – ${weekDay.format(end)}`;
 }
 
 export function ScoreboardView({ currentUser }: { currentUser: { id: string; name: string } }) {
@@ -62,18 +54,13 @@ export function ScoreboardView({ currentUser }: { currentUser: { id: string; nam
   };
 
   const selected = boards[range] ?? null;
-  const thisWeek = boards.this_week ?? null;
   const rangeLabel = RANGES.find((option) => option.value === range)?.label ?? "This week";
 
   return (
     <>
       <PageHeader
         title="Scoreboard"
-        description={
-          thisWeek
-            ? `Week of ${weekLabel(thisWeek)} · resets Sunday 23:59, Lagos time. Everyone aims for ${thisWeek.target} points a week.`
-            : "Points earned by everyone in this project, week by week."
-        }
+        description={describeScoreboardPeriod(range, selected)}
         actions={
           <Button variant="outline" onClick={() => setHistoryOpen(true)}>
             <HistoryIcon data-icon="inline-start" aria-hidden="true" />
