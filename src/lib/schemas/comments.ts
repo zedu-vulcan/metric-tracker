@@ -67,6 +67,8 @@ export const commentItemSchema = z
         id: z.string(),
         name: z.string(),
         speciality: z.string(),
+        avatarStyle: z.string(),
+        avatarSeed: z.string(),
         ownerName: z.string().nullable(),
         lastActiveAt: z.iso.datetime(),
       })

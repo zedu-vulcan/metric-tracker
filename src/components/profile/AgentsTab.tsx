@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BotIcon, MoreHorizontalIcon, Trash2Icon, TrophyIcon } from "lucide-react";
+import { BotIcon, MoreHorizontalIcon, PencilIcon, Trash2Icon, TrophyIcon } from "lucide-react";
 import { AgentAvatar } from "@/components/agents/AgentAvatar";
 import { SkillsBanner } from "@/components/SkillsResource";
 import type { AgentAvatar as Avatar } from "@/components/agents/agent-model";
 import { useAgents } from "@/components/agents/AgentsProvider";
+import { EditAgentDialog } from "@/components/agents/EditAgentDialog";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,7 @@ export type AgentPoints = {
   id: string;
   name: string;
   speciality: string;
+  description: string | null;
   avatar: Avatar;
   connected: boolean;
   activeTasks: number;
@@ -43,10 +45,11 @@ function deleteWarning(agent: AgentPoints) {
   return `${work}Its key stops working straight away. The ${formatPoints(agent.total)} points it earned stay yours.`;
 }
 
-/** Your agents in this project, highest earner first, each with a menu to delete it. */
+/** Your agents in this project, highest earner first, each with a menu to edit or delete it. */
 export function AgentsTab({ agents }: { agents: AgentPoints[] }) {
   const router = useRouter();
   const { removeAgent } = useAgents();
+  const [editing, setEditing] = useState<AgentPoints | null>(null);
   const [deleting, setDeleting] = useState<AgentPoints | null>(null);
 
   if (agents.length === 0) {
@@ -147,6 +150,10 @@ export function AgentsTab({ agents }: { agents: AgentPoints[] }) {
                         <MoreHorizontalIcon aria-hidden="true" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem onSelect={() => setEditing(agent)}>
+                          <PencilIcon aria-hidden="true" />
+                          Edit agent
+                        </DropdownMenuItem>
                         <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(agent)}>
                           <Trash2Icon aria-hidden="true" />
                           Delete agent
@@ -159,6 +166,8 @@ export function AgentsTab({ agents }: { agents: AgentPoints[] }) {
             </TableBody>
           </Table>
         </CardContent>
+
+        <EditAgentDialog agent={editing} onClose={() => setEditing(null)} />
 
         <ConfirmAgentDialog
           open={deleting !== null}

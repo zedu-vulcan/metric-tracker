@@ -85,6 +85,8 @@ export function useNotifications() {
     loading: current.loading,
     failed: current.failed,
     unreadCount: current.notifications.filter((note) => !note.read).length,
+    // Counted whether or not it's been opened: an item leaves the list when it's dealt with, not when it's read.
+    actionCount: current.notifications.filter((note) => note.needsAction).length,
     markRead: (id: string) => markRead(projectId, [id]),
     markAllRead: () => markRead(projectId),
     reload: () => load(projectId),

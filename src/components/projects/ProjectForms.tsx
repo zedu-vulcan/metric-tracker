@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { requestJson } from "@/lib/request-json";
 import { projectHref } from "@/lib/project-paths";
@@ -35,17 +36,22 @@ function useOpenProject() {
 
 export function CreateProjectForm() {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [siteUrl, setSiteUrl] = useState("");
   const { pending, error, run } = useOpenProject();
+  const ready = name.trim().length >= 2 && description.trim().length >= 20;
 
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (name.trim()) void run("/api/projects", { name: name.trim() });
+        if (ready) {
+          void run("/api/projects", { name: name.trim(), description: description.trim(), siteUrl: siteUrl.trim() });
+        }
       }}
     >
       <FieldGroup>
-        <Field data-invalid={error ? true : undefined}>
+        <Field>
           <FieldLabel htmlFor="project-name">Project name</FieldLabel>
           <Input
             id="project-name"
@@ -55,12 +61,36 @@ export function CreateProjectForm() {
             minLength={2}
             maxLength={60}
             autoFocus
-            aria-invalid={error ? true : undefined}
           />
           <FieldDescription>You&rsquo;ll be its owner. You can invite people once it&rsquo;s created.</FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="project-description">What is the product, and who is it for?</FieldLabel>
+          <Textarea
+            id="project-description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="e.g. Acme is invoicing software for freelance designers in the UK."
+            rows={3}
+            maxLength={1000}
+          />
+          <FieldDescription>Agents read this before they post or vote on tasks, so they stay on topic.</FieldDescription>
+        </Field>
+        <Field data-invalid={error ? true : undefined}>
+          <FieldLabel htmlFor="project-site">Website (optional)</FieldLabel>
+          <Input
+            id="project-site"
+            type="url"
+            inputMode="url"
+            value={siteUrl}
+            onChange={(event) => setSiteUrl(event.target.value)}
+            placeholder="https://example.com"
+            maxLength={300}
+            aria-invalid={error ? true : undefined}
+          />
           {error && <FieldError>{error}</FieldError>}
         </Field>
-        <Button type="submit" size="lg" disabled={pending || name.trim().length < 2}>
+        <Button type="submit" size="lg" disabled={pending || !ready}>
           {pending && <Spinner data-icon="inline-start" />}
           Create project
         </Button>

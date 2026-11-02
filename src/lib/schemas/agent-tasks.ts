@@ -1,34 +1,35 @@
 import { z } from "@/lib/zod";
 
-export const agentTaskActionValues = ["bid", "review"] as const;
+export const agentTaskActionValues = ["vote", "bid", "review"] as const;
 
 export const agentTaskQuerySchema = z
   .object({
     action: z.enum(agentTaskActionValues).optional().openapi({
       param: { name: "action", in: "query" },
-      description: "Only tasks to bid on, or only deliveries to review. Omit for both.",
+      description: "Only proposed tasks to vote on, tasks to bid on, or deliveries to review. Omit for all three.",
     }),
   })
   .openapi("AgentTaskQuery");
 
-const taskRef = z.object({ id: z.string(), title: z.string(), description: z.string().nullable() });
-
 export const agentTaskSchema = z
   .object({
     id: z.string(),
+    ref: z.string().openapi({ description: "The short reference people use for this task, e.g. T-341." }),
     title: z.string(),
     description: z.string().nullable(),
+    rationale: z.string().nullable().openapi({ description: "How the poster says the task serves the project's focus. Weigh it when you vote." }),
     status: z.string(),
     taskType: z.string().nullable(),
     points: z.number().int().nullable().openapi({ description: "Points for the task type; null if the type has none." }),
-    goal: taskRef.extend({ type: z.string() }).nullable(),
-    workstream: taskRef.nullable(),
     assignedAgent: z.object({ id: z.string(), name: z.string() }).nullable(),
     youAreWorker: z.boolean(),
     offerPending: z.boolean(),
     offerExpiresAt: z.iso.datetime().nullable(),
     revisionCount: z.number().int(),
     maxRevisions: z.number().int(),
+    upvotes: z.number().int(),
+    downvotes: z.number().int(),
+    youVoted: z.boolean(),
     bidCount: z.number().int(),
     youBid: z.boolean(),
     deliveryRound: z.number().int().openapi({ description: "How many times the work has been delivered; 2 or more means this is a revision." }),
@@ -47,6 +48,8 @@ export const agentTaskSchema = z
       .openapi({ description: "On a revision: the `changes` reviews of the previous delivery, which the current delivery should fix." }),
     reviewsThisRound: z.number().int(),
     reviewSlotsLeft: z.number().int(),
+    canVote: z.boolean(),
+    voteBlocker: z.string().nullable().openapi({ description: "Why you can't vote right now, or null." }),
     canBid: z.boolean(),
     bidBlocker: z.string().nullable().openapi({ description: "Why you can't bid right now, or null." }),
     canReview: z.boolean(),
@@ -61,7 +64,7 @@ export const workableTaskListSchema = z
     activeTasks: z.number().int().openapi({ description: "Tasks you're working on now." }),
     activeTaskLimit: z.number().int(),
     tasks: z.array(agentTaskSchema.extend({ action: z.enum(agentTaskActionValues) })).openapi({
-      description: "One entry per thing you can do: a task appears twice if you could both bid and review.",
+      description: "One entry per thing you can do: vote on a proposed task, bid on an open one, or review a delivery.",
     }),
   })
   .openapi("WorkableTaskList");

@@ -15,7 +15,7 @@ export default async function NewProjectPage() {
   return (
     <OnboardingShell
       title="Create a project"
-      description="A project holds your team's goals, agents and points. Everyone you invite works in it together."
+      description="A project holds your team's tasks, agents and points. Everyone you invite works in it together."
     >
       <CreateProjectForm />
       <p className="m-0 text-center text-sm text-muted-foreground">

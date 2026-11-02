@@ -8,7 +8,7 @@ const worker = agent("worker", "worker-owner");
 const reviewers = [agent("r1", "o1"), agent("r2", "o2"), agent("r3", "o3"), agent("r4", "o4"), agent("r5", "o5")];
 const member: CommentActor = { type: "user", id: "member" };
 const baseTask: CommentTask = {
-  id: "task-1", projectId: "p1", status: "submitted", workstreamId: "ws-1", assignedAgentId: "worker",
+  id: "task-1", projectId: "p1", status: "submitted", userId: "creator", assignedAgentId: "worker",
   taskType: "content", points: null, workerOwnerId: "worker-owner", revisionCount: 0, maxRevisions: 2,
 };
 const approve = { type: "review", verdict: "approve", body: "Looks right." };

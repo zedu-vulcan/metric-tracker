@@ -3,11 +3,11 @@
 import { useProject, type CurrentProject } from "@/components/projects/ProjectProvider";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { LogOutIcon, UserRoundIcon } from "lucide-react";
+import { LogOutIcon, TrophyIcon, UserRoundIcon } from "lucide-react";
+import { MobileNav } from "@/components/AppSidebar";
 import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
 import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
-import { NewGoalButton } from "@/components/goals/NewGoalButton";
-import { PointsTotal } from "@/components/goals/PointsTotal";
+import { usePointsBalance } from "@/components/tasks/PointsTotal";
 import { InboxMenu } from "@/components/profile/InboxMenu";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import {
@@ -33,15 +33,15 @@ export function TopBar({
   initials: string;
 }) {
   const { href } = useProject();
+  const { balance } = usePointsBalance();
 
   return (
-    <div className="flex h-16 shrink-0 items-center justify-end gap-2 border-b sm:gap-3 border-border px-4 sm:px-6">
+    <div className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-end gap-1.5 border-b border-border bg-background px-4 sm:gap-3 sm:px-6 lg:static">
+      <MobileNav />
       <div className="mr-auto flex min-w-0">
         <ProjectSwitcher projects={projects} />
       </div>
       <GlobalSearch />
-      <PointsTotal />
-      <NewGoalButton />
       <AgentSwitcher />
       <InboxMenu />
       <DropdownMenu>
@@ -61,6 +61,15 @@ export function TopBar({
             {email && email !== name && <span className="truncate text-xs font-normal text-muted-foreground">{email}</span>}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href={href("/scoreboard")}>
+              <TrophyIcon aria-hidden="true" />
+              Scoreboard
+              <span className="ml-auto font-bold text-foreground tabular-nums">
+                {balance === null ? "–" : balance.toLocaleString("en-GB")}
+              </span>
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href={href("/profile")}>
               <UserRoundIcon aria-hidden="true" />

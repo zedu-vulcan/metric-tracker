@@ -1,8 +1,9 @@
 import { AppSidebar } from "@/components/AppSidebar";
 import { AgentsProvider } from "@/components/agents/AgentsProvider";
-import { GoalsProvider } from "@/components/goals/GoalsProvider";
+import { TasksProvider } from "@/components/tasks/TasksProvider";
 import { ProjectProvider } from "@/components/projects/ProjectProvider";
 import { TopBar } from "@/components/TopBar";
+import { getPointSettings } from "@/lib/point-settings";
 import { getProjectPage } from "@/lib/project-page";
 import { listUserProjects } from "@/lib/projects";
 
@@ -13,16 +14,17 @@ function initials(name: string) {
 
 export default async function ProjectLayout({ children, params }: { children: React.ReactNode; params: { slug: string } }) {
   const { session, userId, project } = await getProjectPage(params.slug);
-  const projects = (await listUserProjects(userId)).map(({ project: other, role }) => ({ ...other, role }));
+  const [userProjects, pointSettings] = await Promise.all([listUserProjects(userId), getPointSettings(project.id)]);
+  const projects = userProjects.map(({ project: other, role }) => ({ ...other, role }));
 
   const displayName = session.user?.name ?? session.user?.email ?? "Signed in";
 
   return (
     // Keyed by project, so switching projects starts every store fresh.
-    <ProjectProvider key={project.id} project={project}>
+    <ProjectProvider key={project.id} project={project} pointSettings={pointSettings}>
       <main className="grid min-h-screen lg:grid-cols-[auto_minmax(0,1fr)]">
         <AppSidebar />
-        <GoalsProvider
+        <TasksProvider
           currentUser={{ id: userId, name: session.user?.name ?? "You", image: session.user?.image ?? undefined }}
         >
           <AgentsProvider>
@@ -37,7 +39,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
               {children}
             </div>
           </AgentsProvider>
-        </GoalsProvider>
+        </TasksProvider>
       </main>
     </ProjectProvider>
   );

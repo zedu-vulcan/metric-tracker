@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
-import { MAX_PAID_REVIEWS_PER_TASK, clampTaskPoints, shareOfTaskPoints, type PointReason } from "@/lib/points";
-import { awardForRule, awardPoints } from "@/lib/points-server";
+import { getPointSettings } from "@/lib/point-settings";
+import { clampTaskPoints, shareOfTaskPoints } from "@/lib/points";
+import { awardPoints } from "@/lib/points-server";
 import { commentAuthors, type TaskCommentStore } from "@/lib/task-comments";
 
 /** The transaction client is supplied by the route; this adapter never opens another connection. */
@@ -12,7 +13,7 @@ export function createTaskCommentStore(tx: Prisma.TransactionClient): TaskCommen
       const task = await tx.task.findUnique({
         where: { id },
         select: {
-          id: true, projectId: true, status: true, workstreamId: true, assignedAgentId: true, taskType: true, points: true,
+          id: true, projectId: true, status: true, userId: true, assignedAgentId: true, taskType: true, points: true,
           revisionCount: true, maxRevisions: true,
           assignedAgent: { select: { ownerId: true } },
         },
@@ -33,7 +34,7 @@ export function createTaskCommentStore(tx: Prisma.TransactionClient): TaskCommen
       // PostgreSQL rechecks this predicate after a competing update acquires the row lock.
       const result = await tx.task.updateMany({
         where: {
-          id: task.id, status: task.status, workstreamId: task.workstreamId,
+          id: task.id, status: task.status,
           assignedAgentId: task.assignedAgentId, revisionCount: task.revisionCount,
           maxRevisions: task.maxRevisions,
         },
@@ -60,12 +61,16 @@ export function createTaskCommentStore(tx: Prisma.TransactionClient): TaskCommen
     },
     async payReview(task, commentId, reviewer) {
       // This review is already saved, so it's part of the count.
-      const reviews = await tx.taskComment.count({ where: { taskId: task.id, type: "review" } });
-      if (reviews > MAX_PAID_REVIEWS_PER_TASK) return;
-      await awardForRule(
+      const [reviews, settings] = await Promise.all([
+        tx.taskComment.count({ where: { taskId: task.id, type: "review" } }),
+        getPointSettings(task.projectId, tx),
+      ]);
+      if (reviews > settings.paidReviewsPerTask || settings.reviewPoints === 0) return;
+      await awardPoints(
         task.projectId,
-        "review_submitted",
         reviewer.ownerId,
+        settings.reviewPoints,
+        "review_submitted",
         { agentId: reviewer.id, sourceType: "comment", sourceId: commentId, idempotencyKey: `review:${commentId}` },
         { tx, workerOwnerId: task.workerOwnerId ?? undefined },
       );
@@ -87,26 +92,19 @@ export function createTaskCommentStore(tx: Prisma.TransactionClient): TaskCommen
         { tx },
       );
 
-      // Shares for the goal's owner and the idea's proposer. Whoever's agent did the work already has the full points.
-      if (!task.workstreamId) return;
-      const workstream = await tx.workstream.findUnique({
-        where: { id: task.workstreamId },
-        select: { goal: { select: { createdById: true } }, proposedByAgent: { select: { id: true, ownerId: true } } },
-      });
-      if (!workstream) return;
-      const payShare = async (reason: PointReason, userId: string, agentId: string | undefined, key: string) => {
-        if (userId === task.workerOwnerId) return;
-        const rule = await tx.pointRule.findUnique({
-          where: { projectId_ruleKey: { projectId: task.projectId, ruleKey: reason } },
-          select: { amount: true, enabled: true },
-        });
-        const share = rule?.enabled ? shareOfTaskPoints(points, Number(rule.amount)) : 0;
-        if (share === 0) return;
-        await awardPoints(task.projectId, userId, share, reason, { agentId, sourceType: "task", sourceId: task.id, idempotencyKey: `${key}:${task.id}` }, { tx });
-      };
-      await payShare("goal_task_approved", workstream.goal.createdById, undefined, "goal-share");
-      const proposer = workstream.proposedByAgent;
-      if (proposer) await payShare("idea_task_approved", proposer.ownerId, proposer.id, "idea-share");
+      // A share for whoever posted the task, on top of the worker's points.
+      if (!task.userId || task.userId === task.workerOwnerId) return;
+      const { creatorSharePct } = await getPointSettings(task.projectId, tx);
+      const share = shareOfTaskPoints(points, creatorSharePct);
+      if (share === 0) return;
+      await awardPoints(
+        task.projectId,
+        task.userId,
+        share,
+        "goal_task_approved",
+        { sourceType: "task", sourceId: task.id, idempotencyKey: `goal-share:${task.id}` },
+        { tx },
+      );
     },
   };
 }

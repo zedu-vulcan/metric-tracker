@@ -2,17 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  BotIcon,
-  FileTextIcon,
-  FolderSearchIcon,
-  ListTodoIcon,
-  NewspaperIcon,
-  SearchIcon,
-  SendIcon,
-  TargetIcon,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { BotIcon, ListTodoIcon, SearchIcon, type LucideIcon } from "lucide-react";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -37,15 +27,8 @@ import { useGlobalSearch } from "./useGlobalSearch";
 import { useQuickActions } from "./useQuickActions";
 
 const resultIcons: Record<SearchResultType, LucideIcon> = {
-  goal: TargetIcon,
-  workstream: FolderSearchIcon,
   task: ListTodoIcon,
   agent: BotIcon,
-  directory: FolderSearchIcon,
-  content: FileTextIcon,
-  press_outlet: NewspaperIcon,
-  press_coverage: NewspaperIcon,
-  press_submission: SendIcon,
 };
 
 function HighlightedTitle({ title, query }: { title: string; query: string }) {
@@ -149,14 +132,14 @@ export function GlobalSearch() {
         open={open}
         onOpenChange={setOpen}
         title="Search this project"
-        description="Find goals, workstreams, tasks, agents and marketing records."
+        description="Find tasks and agents in this project."
         className="top-1/2 w-[calc(100vw-1rem)] max-w-2xl -translate-y-1/2 p-0"
       >
         <Command shouldFilter={false} className="rounded-xl p-0">
           <CommandInput
             value={query}
             onValueChange={setQuery}
-            placeholder="Search goals, tasks, agents…"
+            placeholder="Search tasks and agents…"
             aria-label="Search this project"
           />
           <div aria-live="polite" className="sr-only">{resultAnnouncement}</div>

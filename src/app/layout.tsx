@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Amp",
-  description: "Amp: the marketing workspace where teams and their AI agents work toward shared goals.",
+  description: "Amp: the marketing workspace where teams and their AI agents get marketing work done together.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

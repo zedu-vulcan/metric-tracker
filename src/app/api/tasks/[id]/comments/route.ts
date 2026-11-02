@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
@@ -36,5 +37,15 @@ const postComment = createTaskCommentHandler({
 });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  return postComment(request, params);
+  const response = await postComment(request, params);
+  if (response.ok) {
+    const task = await prisma.task.findUnique({
+      where: { id: params.id },
+      select: { project: { select: { slug: true } } },
+    });
+    if (task?.project?.slug) {
+      revalidatePath(`/p/${task.project.slug}/work`);
+    }
+  }
+  return response;
 }

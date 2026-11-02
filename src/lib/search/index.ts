@@ -5,47 +5,24 @@ import type {
   SearchResult,
 } from "@/lib/schemas/search";
 import {
-  searchGoals,
-  searchWorkstreams,
   searchTasks,
   searchAgents,
 } from "./work";
-import {
-  searchDirectories,
-  searchContent,
-  searchPressOutlets,
-  searchPressCoverage,
-  searchPressSubmissions,
-} from "./marketing";
 
 // Fixed order of groups as specified in the contract
 export const groupOrder: SearchResultType[] = [
-  "goal",
-  "workstream",
   "task",
   "agent",
-  "directory",
-  "content",
-  "press_outlet",
-  "press_coverage",
-  "press_submission",
 ];
 
 export const searcherRegistry: Record<SearchResultType, Searcher> = {
-  goal: searchGoals,
-  workstream: searchWorkstreams,
   task: searchTasks,
   agent: searchAgents,
-  directory: searchDirectories,
-  content: searchContent,
-  press_outlet: searchPressOutlets,
-  press_coverage: searchPressCoverage,
-  press_submission: searchPressSubmissions,
 };
 
 /**
  * Ranks search results according to the contract rules:
- * 1. Fixed group order (goal -> workstream -> task -> agent -> ...)
+ * 1. Fixed group order (task -> agent -> ...)
  * 2. Inside a group:
  *    - Title starts with query (case-insensitive)
  *    - Title contains query (case-insensitive)

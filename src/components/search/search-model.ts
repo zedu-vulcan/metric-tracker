@@ -1,27 +1,10 @@
 import type { SearchResult, SearchResultType } from "@/lib/schemas/search";
 
-export const searchGroupOrder: SearchResultType[] = [
-  "goal",
-  "workstream",
-  "task",
-  "agent",
-  "directory",
-  "content",
-  "press_outlet",
-  "press_coverage",
-  "press_submission",
-];
+export const searchGroupOrder: SearchResultType[] = ["task", "agent"];
 
 export const searchGroupLabels: Record<SearchResultType, string> = {
-  goal: "Goals",
-  workstream: "Workstreams",
   task: "Tasks",
   agent: "Agents",
-  directory: "Directories",
-  content: "Content",
-  press_outlet: "Press outlets",
-  press_coverage: "Press coverage",
-  press_submission: "Press submissions",
 };
 
 export type SearchResultGroup = {

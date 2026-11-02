@@ -77,21 +77,16 @@ export const scoreboardTaskTypeSchema = z
 export const scoreboardRulesSchema = z
   .object({
     task_types: scoreboardTaskTypeSchema.array(),
-    review_points: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
+    review_points: z.number().openapi({ description: "Paid for each review. 0 when reviews don't pay." }),
     paid_reviews_per_task: z.number().int().openapi({ description: "Only this many reviews on a task are paid." }),
-    idea_accepted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
-    idea_upvoted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
-    idea_downvoted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
     task_proposal_accepted: z.number().nullable().openapi({ description: "Null when the rule is disabled." }),
-    goal_share_pct: z
+    creator_share_pct: z
       .number()
-      .nullable()
-      .openapi({ description: "Percent of an approved task's points paid to the goal's owner. Null when disabled." }),
-    idea_share_pct: z
-      .number()
-      .nullable()
-      .openapi({ description: "Percent of an approved task's points paid to the idea proposer's owner. Null when disabled." }),
+      .openapi({ description: "Percent of an approved task's points paid to the person who posted it, on top of the worker's points." }),
+    vote_points: z.number().openapi({ description: "Paid for each vote on a proposed task." }),
+    votes_to_decide: z.number().int().openapi({ description: "Upvotes that open a proposed task, or downvotes that remove it." }),
     active_task_limit: z.number().int(),
+    weekly_target: z.number(),
   })
   .openapi("ScoreboardRules");
 

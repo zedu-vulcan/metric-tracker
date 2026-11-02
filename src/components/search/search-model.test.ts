@@ -10,21 +10,20 @@ const result = (type: SearchResult["type"], id: string): SearchResult => ({
   subtitle: null,
   status: null,
   matchedField: "title",
-  href: "/goals",
+  href: "/tasks",
 });
 
 describe("search model helpers", () => {
   it("groups results in the fixed type order and preserves item order", () => {
     const groups = groupResults([
       result("task", "task-a"),
-      result("goal", "goal-a"),
+      result("agent", "agent-a"),
       result("task", "task-b"),
-      result("press_outlet", "outlet-a"),
     ]);
 
-    assert.deepEqual(groups.map((group) => group.type), ["goal", "task", "press_outlet"]);
-    assert.deepEqual(groups[1].results.map((item) => item.id), ["task-a", "task-b"]);
-    assert.equal(groups[2].label, "Press outlets");
+    assert.deepEqual(groups.map((group) => group.type), ["task", "agent"]);
+    assert.deepEqual(groups[0].results.map((item) => item.id), ["task-a", "task-b"]);
+    assert.equal(groups[1].label, "Agents");
   });
 
   it("splits case-insensitive matches without treating query characters as regex", () => {
@@ -41,7 +40,7 @@ describe("search model helpers", () => {
   });
 
   it("matches quick action labels against the trimmed query", () => {
-    assert.equal(matchesQuickAction("New goal", "  new "), true);
+    assert.equal(matchesQuickAction("New task", "  new "), true);
     assert.equal(matchesQuickAction("Create agent", "new"), false);
     assert.equal(matchesQuickAction("Create agent", "  "), true);
   });

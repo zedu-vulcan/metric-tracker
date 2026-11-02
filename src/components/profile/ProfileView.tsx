@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BotIcon, InboxIcon, UserRoundIcon, type LucideIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { ProjectFate } from "@/lib/account";
 import { cn } from "@/lib/utils";
 import { AgentsTab, type AgentPoints } from "./AgentsTab";
 import { GeneralTab, type ProfileDetails } from "./GeneralTab";
@@ -26,7 +27,15 @@ function TabCount({ value, label, strong }: { value: number; label: string; stro
   );
 }
 
-export function ProfileView({ profile, agents }: { profile: ProfileDetails; agents: AgentPoints[] }) {
+export function ProfileView({
+  profile,
+  agents,
+  fates,
+}: {
+  profile: ProfileDetails;
+  agents: AgentPoints[];
+  fates: ProjectFate[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -61,7 +70,7 @@ export function ProfileView({ profile, agents }: { profile: ProfileDetails; agen
       </TabsList>
 
       <TabsContent value="general">
-        <GeneralTab profile={profile} agents={agents} />
+        <GeneralTab profile={profile} agents={agents} fates={fates} />
       </TabsContent>
       <TabsContent value="agents">
         <AgentsTab agents={agents} />

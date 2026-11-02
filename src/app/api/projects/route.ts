@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   );
 }
 
-/** Creates a project; the creator is its owner. */
+/** Creates a project with its brief; the creator is its owner. */
 export async function POST(request: Request) {
   const { user, error } = await requireUser(request);
   if (error) return error;
@@ -38,6 +38,6 @@ export async function POST(request: Request) {
   const result = projectCreateSchema.safeParse(body);
   if (!result.success) return validationError(result.error.flatten().fieldErrors);
 
-  const project = await createProject(user.id, result.data.name);
+  const project = await createProject(user.id, result.data);
   return NextResponse.json(serializeProject(project, "owner", 1), { status: 201 });
 }

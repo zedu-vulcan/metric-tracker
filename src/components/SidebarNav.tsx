@@ -1,42 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
-  BookOpenIcon,
-  ChevronDownIcon,
-  FileTextIcon,
-  FolderOpenIcon,
-  LayoutDashboardIcon,
-  MegaphoneIcon,
-  NewspaperIcon,
-  ScanSearchIcon,
-  SettingsIcon,
-  TargetIcon,
-  TrophyIcon,
+  BriefcaseBusinessIcon,
+  LightbulbIcon,
+  ListTodoIcon,
+  TriangleAlertIcon,
   type LucideIcon,
 } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { useNotifications } from "@/components/profile/useNotifications";
 import { useProject } from "@/components/projects/ProjectProvider";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEM =
-  "group/nav flex h-9 shrink-0 items-center gap-2.5 rounded-full px-3.5 text-sm font-medium whitespace-nowrap text-sidebar-muted-foreground no-underline transition-[color,background-color,box-shadow] duration-150 outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring [&_svg]:size-4 [&_svg]:shrink-0 lg:h-11 lg:gap-3 lg:px-4 lg:text-[15px] lg:[&_svg]:size-5";
-const NAV_ITEM_CURRENT =
-  "bg-sidebar-primary font-semibold text-sidebar-primary-foreground shadow-[0_8px_20px_rgb(125_104_249/0.35)] hover:bg-sidebar-primary hover:text-sidebar-primary-foreground";
+  "group/nav flex h-11 shrink-0 items-center gap-3 rounded-full px-4 text-[15px] font-medium whitespace-nowrap text-sidebar-muted-foreground no-underline transition-[color,background-color,box-shadow] duration-150 outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring [&_svg]:size-5 [&_svg]:shrink-0";
 
 export function SidebarNavList({
   className,
   ...props
 }: React.ComponentProps<"nav">) {
-  return <nav className={cn("flex shrink-0 items-center gap-1 lg:flex-col lg:items-stretch lg:gap-1.5", className)} {...props} />;
+  return <nav className={cn("flex shrink-0 flex-col items-stretch gap-1.5", className)} {...props} />;
 }
 
 interface SidebarNavLinkProps extends React.ComponentProps<"a"> {
@@ -51,17 +34,23 @@ export function SidebarNavLink({ icon, badge, collapsed = false, children, class
       title={collapsed && typeof children === "string" ? children : undefined}
       className={cn(
         NAV_ITEM,
-        "aria-[current=page]:bg-sidebar-primary aria-[current=page]:font-semibold aria-[current=page]:text-sidebar-primary-foreground aria-[current=page]:shadow-[0_8px_20px_rgb(125_104_249/0.35)]",
-        collapsed && "lg:size-11 lg:justify-center lg:self-center lg:px-0",
+        "relative aria-[current=page]:bg-sidebar-primary aria-[current=page]:font-semibold aria-[current=page]:text-sidebar-primary-foreground aria-[current=page]:shadow-[0_8px_20px_rgb(125_104_249/0.35)]",
+        collapsed && "size-11 justify-center self-center px-0",
         className
       )}
       {...props}
     >
       {icon}
-      <span className={cn("min-w-0 flex-1 truncate", collapsed && "lg:sr-only")}>{children}</span>
+      <span className={cn("min-w-0 flex-1 truncate", collapsed && "sr-only")}>{children}</span>
       {badge != null && !collapsed && (
         <span className="ml-auto shrink-0 rounded-full bg-sidebar-accent px-2 text-xs font-semibold text-sidebar-foreground group-aria-[current=page]/nav:bg-white/20">
           {badge}
+        </span>
+      )}
+      {/* The collapsed rail has no room for a number, so a dot says something is waiting. */}
+      {badge != null && collapsed && (
+        <span className="absolute top-2 right-2 size-2.5 rounded-full bg-warning ring-2 ring-sidebar">
+          <span className="sr-only">{badge} waiting</span>
         </span>
       )}
     </a>
@@ -70,48 +59,54 @@ export function SidebarNavLink({ icon, badge, collapsed = false, children, class
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
 
-/** Marketing channels, grouped under one expandable "Marketing" item. Paths are inside the current project. */
-const MARKETING_CHANNELS: NavItem[] = [
-  { href: "/content", label: "Content", icon: FileTextIcon },
-  { href: "/directories", label: "Directories", icon: FolderOpenIcon },
-  { href: "/seo", label: "SEO checker", icon: ScanSearchIcon },
-  { href: "/media", label: "Press & Media", icon: NewspaperIcon },
-];
-
-/** Top-level items shown after the Marketing group. */
-const CHANNELS: NavItem[] = [
-  { href: "/goals", label: "Goals", icon: TargetIcon },
-  { href: "/scoreboard", label: "Scoreboard", icon: TrophyIcon },
-  { href: "/guide", label: "How Amp works", icon: BookOpenIcon },
-  { href: "/settings", label: "Project settings", icon: SettingsIcon },
-];
+/** Top-level items shown after the divider. */
+const CHANNELS: NavItem[] = [];
 
 export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
   const { href: projectPath } = useProject();
-  const overview = projectPath();
-  const isCurrent = (href: string) => (href === overview ? pathname === href : pathname.startsWith(href));
-  const current = (href: string) => (isCurrent(href) ? "page" : undefined);
+  const { actionCount } = useNotifications();
+  const tasks = projectPath("/tasks");
+  const yourMove = projectPath("/todo");
+  const current = (href: string) => (pathname.startsWith(href) ? "page" : undefined);
   const inProject = (items: NavItem[]) => items.map((item) => ({ ...item, href: projectPath(item.href) }));
 
   return (
     <SidebarNavList aria-label="Main navigation">
       <SidebarNavLink
-        aria-current={current(overview)}
-        href={overview}
+        aria-current={current(tasks)}
+        href={tasks}
         collapsed={collapsed}
-        icon={<LayoutDashboardIcon aria-hidden="true" />}
+        icon={<ListTodoIcon aria-hidden="true" />}
       >
-        Overview
+        Tasks
       </SidebarNavLink>
-      <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-sidebar-border lg:mx-3 lg:my-1.5 lg:h-px lg:w-auto" />
-      <SidebarNavGroup
-        label="Marketing"
-        icon={MegaphoneIcon}
-        items={inProject(MARKETING_CHANNELS)}
+      <SidebarNavLink
+        aria-current={current(projectPath("/work"))}
+        href={projectPath("/work")}
         collapsed={collapsed}
-        isCurrent={isCurrent}
-      />
+        icon={<BriefcaseBusinessIcon aria-hidden="true" />}
+      >
+        My Work
+      </SidebarNavLink>
+      <SidebarNavLink
+        aria-current={current(yourMove)}
+        href={yourMove}
+        collapsed={collapsed}
+        icon={<TriangleAlertIcon aria-hidden="true" />}
+        badge={actionCount > 0 ? (actionCount > 99 ? "99+" : actionCount) : undefined}
+      >
+        Escalations
+      </SidebarNavLink>
+      <SidebarNavLink
+        aria-current={current(projectPath("/idea-box"))}
+        href={projectPath("/idea-box")}
+        collapsed={collapsed}
+        icon={<LightbulbIcon aria-hidden="true" />}
+      >
+        Idea Box
+      </SidebarNavLink>
+      {CHANNELS.length > 0 && <span aria-hidden="true" className="mx-3 my-1.5 h-px shrink-0 bg-sidebar-border" />}
       {inProject(CHANNELS).map(({ href, label, icon: Icon }) => (
         <SidebarNavLink
           key={href}
@@ -124,112 +119,5 @@ export function DashboardSidebarNav({ collapsed = false }: { collapsed?: boolean
         </SidebarNavLink>
       ))}
     </SidebarNavList>
-  );
-}
-
-type SidebarNavGroupProps = {
-  label: string;
-  icon: LucideIcon;
-  items: NavItem[];
-  collapsed: boolean;
-  isCurrent: (href: string) => boolean;
-};
-
-/**
- * A nav item that holds other items. On the full desktop sidebar it expands in place;
- * on the mobile bar and the collapsed sidebar there's no room, so it opens a menu instead.
- */
-function SidebarNavGroup({ label, icon: Icon, items, collapsed, isCurrent }: SidebarNavGroupProps) {
-  const active = items.some((item) => isCurrent(item.href));
-  const [open, setOpen] = useState(active);
-
-  useEffect(() => {
-    if (active) setOpen(true);
-  }, [active]);
-
-  return (
-    <>
-      <GroupMenu label={label} icon={Icon} items={items} active={active} isCurrent={isCurrent} className="lg:hidden" />
-      {collapsed ? (
-        <GroupMenu
-          label={label}
-          icon={Icon}
-          items={items}
-          active={active}
-          isCurrent={isCurrent}
-          iconOnly
-          side="right"
-          className="hidden lg:flex lg:size-11 lg:justify-center lg:self-center lg:px-0"
-        />
-      ) : (
-        <Collapsible open={open} onOpenChange={setOpen} className="hidden lg:flex lg:flex-col">
-          <CollapsibleTrigger className={cn(NAV_ITEM, active && !open && NAV_ITEM_CURRENT, active && open && "text-sidebar-foreground")}>
-            <Icon aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-            <ChevronDownIcon aria-hidden="true" className={cn("opacity-70 transition-transform duration-150", open && "rotate-180")} />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mt-1.5 ml-6 flex flex-col gap-1.5 border-l border-sidebar-border pl-2.5">
-              {items.map(({ href, label: itemLabel, icon: ItemIcon }) => (
-                <SidebarNavLink
-                  key={href}
-                  href={href}
-                  aria-current={isCurrent(href) ? "page" : undefined}
-                  icon={<ItemIcon aria-hidden="true" />}
-                  className="lg:h-10 lg:text-sm"
-                >
-                  {itemLabel}
-                </SidebarNavLink>
-              ))}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-    </>
-  );
-}
-
-function GroupMenu({
-  label,
-  icon: Icon,
-  items,
-  active,
-  isCurrent,
-  iconOnly = false,
-  side = "bottom",
-  className,
-}: Omit<SidebarNavGroupProps, "collapsed"> & {
-  active: boolean;
-  iconOnly?: boolean;
-  side?: "bottom" | "right";
-  className?: string;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={iconOnly ? label : undefined}
-        title={iconOnly ? label : undefined}
-        className={cn(NAV_ITEM, active && NAV_ITEM_CURRENT, className)}
-      >
-        <Icon aria-hidden="true" />
-        {!iconOnly && (
-          <>
-            <span>{label}</span>
-            <ChevronDownIcon aria-hidden="true" className="opacity-70" />
-          </>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align="start" className="w-52">
-        <DropdownMenuLabel>{label}</DropdownMenuLabel>
-        {items.map(({ href, label: itemLabel, icon: ItemIcon }) => (
-          <DropdownMenuItem key={href} asChild>
-            <a href={href} aria-current={isCurrent(href) ? "page" : undefined} className="aria-[current=page]:font-semibold">
-              <ItemIcon aria-hidden="true" />
-              {itemLabel}
-            </a>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

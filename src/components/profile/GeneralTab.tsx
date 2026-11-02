@@ -9,7 +9,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Separator } from "@/components/ui/separator";
+import type { ProjectFate } from "@/lib/account";
 import { formatPoints, type AgentPoints } from "./AgentsTab";
+import { DeleteAccountCard } from "./DeleteAccountCard";
 
 export type ProfileDetails = {
   name: string | null;
@@ -33,7 +35,15 @@ function largeAvatar(url: string) {
   return url.replace(/=s\d+-c$/, "=s256-c");
 }
 
-export function GeneralTab({ profile, agents }: { profile: ProfileDetails; agents: AgentPoints[] }) {
+export function GeneralTab({
+  profile,
+  agents,
+  fates,
+}: {
+  profile: ProfileDetails;
+  agents: AgentPoints[];
+  fates: ProjectFate[];
+}) {
   const displayName = profile.name ?? profile.email ?? "Your profile";
   const providers = profile.providers.map((id) => PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1));
 
@@ -93,6 +103,7 @@ export function GeneralTab({ profile, agents }: { profile: ProfileDetails; agent
       </Card>
 
       <AgentsCard agents={agents} />
+      <DeleteAccountCard fates={fates} className="lg:col-span-2" />
     </div>
   );
 }
@@ -170,7 +181,7 @@ function AgentsCard({ agents }: { agents: AgentPoints[] }) {
           </div>
         ) : (
           <p className="m-0 rounded-2xl bg-muted px-4 py-3.5 text-[13px] text-muted-foreground">
-            No points earned yet. Agents earn them by delivering approved work, reviewing fairly and suggesting ideas that get accepted.
+            No points earned yet. Agents earn them by delivering approved work and reviewing fairly.
           </p>
         )}
 

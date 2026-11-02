@@ -1,7 +1,9 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api";
-import { ACTIVE_TASK_LIMIT } from "@/lib/points";
+import { getPointSettings } from "@/lib/point-settings";
 import { prisma } from "@/lib/prisma";
+import { getMembership, hasRole } from "@/lib/projects";
 import { offerCreateSchema, taskOfferedSchema } from "@/lib/schemas/tasks";
 import { serializeTaskOffered } from "@/lib/tasks";
 
@@ -9,21 +11,23 @@ export const dynamic = "force-dynamic";
 
 const OFFER_HOURS = 24;
 
-/** The task with what the offer rules need: its goal's owner and any live offer. */
+/** The task with what the offer rules need: its creator, project, and any live offer. */
 async function findOfferTask(id: string) {
   return prisma.task.findUnique({
     where: { id },
     select: {
       id: true,
       status: true,
+      projectId: true,
       offeredToAgentId: true,
       offerExpiresAt: true,
-      workstream: { select: { goal: { select: { createdById: true } } } },
+      project: { select: { slug: true } },
+      userId: true,
     },
   });
 }
 
-/** Offer the task to one bidder (goal owner only). The agent has 24 hours to accept. */
+/** Offer the task to one bidder (task creator or project admin). The agent has 24 hours to accept. */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const { user, error } = await requireUser(request);
   if (error) return error;
@@ -50,8 +54,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (existing.workstream?.goal.createdById !== user.id) {
-    return NextResponse.json({ error: "Only the goal owner can send offers" }, { status: 403 });
+
+  const isCreator = existing.userId === user.id;
+  const membership = await getMembership(user.id, existing.projectId);
+  const isProjectAdmin = membership ? hasRole(membership.role, "admin") : false;
+
+  if (!isCreator && !isProjectAdmin) {
+    return NextResponse.json(
+      { error: "Only the task's creator or a project admin can send offers" },
+      { status: 403 }
+    );
   }
   if (existing.status !== "open" && existing.status !== "bidding" && existing.status !== "reopened") {
     return NextResponse.json({ error: "Task is not open for offers" }, { status: 400 });
@@ -60,29 +72,47 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const now = new Date();
   if (existing.offeredToAgentId && existing.offerExpiresAt && existing.offerExpiresAt > now) {
     return NextResponse.json(
-      { error: "An offer is already waiting for an answer. Withdraw it first." },
-      { status: 409 }
+      { error: "Task already has a pending offer" },
+      { status: 400 }
     );
   }
 
-  const agentId = result.data.agentId;
-  const [agent, bid, activeTasks] = await Promise.all([
-    prisma.agent.findUnique({ where: { id: agentId }, select: { id: true } }),
-    prisma.taskComment.findFirst({ where: { taskId: params.id, type: "bid", authorAgentId: agentId }, select: { id: true } }),
-    prisma.task.count({
-      where: { assignedAgentId: agentId, status: { in: ["in_progress", "submitted", "in_review", "changes_requested"] } },
-    }),
-  ]);
-
+  const agent = await prisma.agent.findUnique({
+    where: { id: result.data.agentId },
+    select: { id: true, ownerId: true },
+  });
   if (!agent) {
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });
   }
-  if (!bid) {
-    return NextResponse.json({ error: "Only agents that bid on the task can be offered it" }, { status: 400 });
+  if (agent.ownerId === existing.userId) {
+    return NextResponse.json({ error: "The task's creator can't offer it to their own agent" }, { status: 403 });
   }
-  if (activeTasks >= ACTIVE_TASK_LIMIT) {
+
+  const bid = await prisma.taskComment.findFirst({
+    where: {
+      taskId: params.id,
+      type: "bid",
+      authorAgentId: agent.id,
+    },
+    select: { id: true },
+  });
+  if (!bid) {
     return NextResponse.json(
-      { error: `This agent already holds ${ACTIVE_TASK_LIMIT} active tasks` },
+      { error: "Agent has not placed a bid on this task" },
+      { status: 400 }
+    );
+  }
+
+  const activeCount = await prisma.task.count({
+    where: {
+      assignedAgentId: agent.id,
+      status: "in_progress",
+    },
+  });
+  const { activeTaskLimit } = await getPointSettings(existing.projectId);
+  if (activeCount >= activeTaskLimit) {
+    return NextResponse.json(
+      { error: `Agent already has ${activeTaskLimit} active in-progress tasks` },
       { status: 400 }
     );
   }
@@ -108,6 +138,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     );
   }
 
+  if (existing.project?.slug) {
+    revalidatePath(`/p/${existing.project.slug}/work`);
+  }
+
   const updated = await prisma.task.findUnique({ where: { id: params.id } });
   if (!updated) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -116,7 +150,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   return NextResponse.json(taskOfferedSchema.parse(serializeTaskOffered(updated)));
 }
 
-/** Withdraw a pending offer (goal owner only). The task keeps taking bids. */
+/** Withdraw a pending offer (task creator or project admin). The task keeps taking bids. */
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const { user, error } = await requireUser(request);
   if (error) return error;
@@ -125,8 +159,16 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (existing.workstream?.goal.createdById !== user.id) {
-    return NextResponse.json({ error: "Only the goal owner can withdraw offers" }, { status: 403 });
+
+  const isCreator = existing.userId === user.id;
+  const membership = await getMembership(user.id, existing.projectId);
+  const isProjectAdmin = membership ? hasRole(membership.role, "admin") : false;
+
+  if (!isCreator && !isProjectAdmin) {
+    return NextResponse.json(
+      { error: "Only the task's creator or a project admin can withdraw offers" },
+      { status: 403 }
+    );
   }
   if (!existing.offeredToAgentId) {
     return NextResponse.json({ error: "There is no offer to withdraw" }, { status: 400 });
@@ -139,6 +181,10 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   });
   if (cleared.count === 0) {
     return NextResponse.json({ error: "The offer was already accepted or changed" }, { status: 409 });
+  }
+
+  if (existing.project?.slug) {
+    revalidatePath(`/p/${existing.project.slug}/work`);
   }
 
   const updated = await prisma.task.findUnique({ where: { id: params.id } });

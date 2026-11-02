@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAgent, serializeAgentProfile } from "@/lib/agents";
+import { agentProjectSelect, requireAgent, serializeAgentProfile } from "@/lib/agents";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const connected = await prisma.agent.update({
     where: { id: agent.id },
     data: { connectedAt: new Date() },
-    include: { owner: { select: { id: true, name: true } }, project: { select: { id: true, name: true, slug: true } } },
+    include: { owner: { select: { id: true, name: true } }, project: { select: agentProjectSelect } },
   });
 
   return NextResponse.json(serializeAgentProfile(connected));

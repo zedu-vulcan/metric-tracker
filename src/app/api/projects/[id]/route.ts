@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json(serializeProject(project, access.role, project._count.members));
 }
 
-/** Rename the project (owner or admin). The slug, and so its links, stay the same. */
+/** Rename the project or edit its brief (owner or admin). The slug, and so its links, stay the same. */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const access = await requireProjectAccess(request, { projectId: params.id, minimumRole: "admin", allowAgents: false });
   if (access.error) return access.error;
@@ -28,7 +28,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const result = projectUpdateSchema.safeParse(body);
   if (!result.success) return validationError(result.error.flatten().fieldErrors);
 
-  await prisma.project.update({ where: { id: params.id }, data: { name: result.data.name } });
+  const { name, ...brief } = result.data;
+  const briefChanged = Object.values(brief).some((field) => field !== undefined);
+  await prisma.project.update({
+    where: { id: params.id },
+    data: { name, ...brief, ...(briefChanged && { briefUpdatedAt: new Date() }) },
+  });
   const project = await loadProject(params.id);
   if (!project || !access.role) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(serializeProject(project, access.role, project._count.members));
