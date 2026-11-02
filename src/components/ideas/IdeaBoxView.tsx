@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeliveredWork } from "@/components/tasks/DeliveredWork";
-import { shortDateTime } from "@/components/tasks/task-model";
+import { shortDateTime, taskTypeLabel } from "@/components/tasks/task-model";
 import type { Attachment } from "@/components/tasks/thread-model";
 
 const ALL_CATEGORY = "all";
@@ -22,7 +22,8 @@ type Deliverable = {
 };
 
 function categoryForType(taskType: string | null): string {
-  return taskType?.trim() || UNCATEGORIZED;
+  const slug = taskType?.trim();
+  return slug ? taskTypeLabel(slug) : UNCATEGORIZED;
 }
 
 export function IdeaBoxView({ deliverables }: { deliverables: Deliverable[] }) {
