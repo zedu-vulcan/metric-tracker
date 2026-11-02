@@ -9,6 +9,7 @@ import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
 import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
 import { usePointsBalance } from "@/components/tasks/PointsTotal";
 import { InboxMenu } from "@/components/profile/InboxMenu";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +41,7 @@ export function TopBar({
       <div className="mr-auto flex min-w-0">
         <ProjectSwitcher projects={projects} />
       </div>
+      <GlobalSearch />
       <AgentSwitcher />
       <InboxMenu />
       <DropdownMenu>
