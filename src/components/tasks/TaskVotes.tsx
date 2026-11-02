@@ -327,7 +327,7 @@ function VotesDialog({ task, open, onOpenChange }: { task: Task; open: boolean; 
           )}
         </div>
 
-        <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
+        <DialogFooter className="m-0 shrink-0 border-t border-border px-6 py-4">
           <DialogClose asChild>
             <Button variant="outline">Close</Button>
           </DialogClose>
