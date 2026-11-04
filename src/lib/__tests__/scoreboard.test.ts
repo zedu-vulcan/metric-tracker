@@ -228,7 +228,7 @@ describe("resolveScoreboardRange", () => {
 
     const all = resolveScoreboardRange("all_time", { now: NOW });
     assert.equal(all.start.getTime(), 0);
-    // The end must stay a plain 4-digit-year timestamp: JavaScript's max date
+    // The end must stay a safe 4-digit-year timestamp: JavaScript's max date
     // serializes to year 275760, which PostgreSQL's parser rejects in $queryRaw.
     assert.equal(all.end.toISOString(), "2099-12-31T23:59:59.999Z");
     assert.ok(all.end > NOW, "all_time.end is beyond now");
